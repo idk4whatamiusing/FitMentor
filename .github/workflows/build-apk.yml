@@ -24,7 +24,7 @@ jobs:
       - name: Setup Capacitor
         run: |
           npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init FitMentor ai.fitmentor.app --webDir dist
+          npx @capacitor/cli init --web-dir dist FitMentor ai.fitmentor.app
 
       - name: Copy web build
         run: |
