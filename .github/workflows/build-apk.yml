@@ -32,11 +32,15 @@ jobs:
 
       - name: Verify setup
         run: |
+          set +e
           echo "node: $(node --version)"
           echo "npm: $(npm --version)"
           echo "pwd: $(pwd)"
-          ls -la node_modules/.bin/cap
-          echo "script exists: $(test -f scripts/setup-capacitor.mjs && echo yes || echo no)"
+          ls node_modules/.bin/ 2>&1 || true
+          echo "---"
+          test -f node_modules/.bin/cap && echo "cap: YES" || echo "cap: NO"
+          test -f scripts/setup-capacitor.mjs && echo "script: YES" || echo "script: NO"
+          npm ls @capacitor/cli 2>&1 || true
 
       - name: Setup Capacitor & add Android platform
         run: node scripts/setup-capacitor.mjs
