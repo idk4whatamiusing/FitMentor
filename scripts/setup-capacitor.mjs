@@ -5,10 +5,10 @@ const log = (msg) => {
   console.log(msg);
   appendFileSync("/tmp/capacitor-setup.log", msg + "\n");
 };
-const run = (cmd) => {
+const run = (cmd, opts = {}) => {
   log("RUN: " + cmd);
-  const r = execSync(cmd, { encoding: "utf8", stdio: "pipe" });
-  log("EXIT: " + r);
+  const r = execSync(cmd, { encoding: "utf8", stdio: "pipe", ...opts });
+  log("EXIT OK (" + r.length + " chars)");
   return r;
 };
 
@@ -33,13 +33,12 @@ try {
   writeFileSync("capacitor.config.json", JSON.stringify(config));
   log("Config files written");
 
-  run("npx cap add android");
-  run("npx cap copy android");
+  run("npx --yes cap add android");
+  run("npx --yes cap copy android");
 
   log("SUCCESS");
 } catch (e) {
-  log("ERROR: " + e.message);
-  if (e.stdout) log("STDOUT: " + e.stdout);
-  if (e.stderr) log("STDERR: " + e.stderr);
+  log("ERROR: " + (e.message || "unknown"));
+  log("STDERR: " + (e.stderr || "none"));
   process.exit(1);
 }
