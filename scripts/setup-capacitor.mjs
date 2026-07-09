@@ -33,8 +33,25 @@ try {
   writeFileSync("capacitor.config.json", JSON.stringify(config));
   log("Config files written");
 
-  run("npx --yes cap add android");
-  run("npx --yes cap copy android");
+  // Use the direct path to cap binary (bin symlinks may not be created on GH runners)
+  const capBin = "node node_modules/@capacitor/cli/bin/capacitor";
+  run(capBin + " add android");
+  run(capBin + " copy android");
+
+  // Try direct binary first, fall back to npx
+  try {
+    run(capPath + " add android");
+  } catch (e) {
+    log("Direct cap failed, trying npx...");
+    run("npx --yes @capacitor/cli add android");
+  }
+
+  try {
+    run(capPath + " copy android");
+  } catch (e) {
+    log("Direct cap copy failed, trying npx...");
+    run("npx --yes @capacitor/cli copy android");
+  }
 
   log("SUCCESS");
 } catch (e) {
