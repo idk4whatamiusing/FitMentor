@@ -38,21 +38,6 @@ try {
   run(capBin + " add android");
   run(capBin + " copy android");
 
-  // Try direct binary first, fall back to npx
-  try {
-    run(capPath + " add android");
-  } catch (e) {
-    log("Direct cap failed, trying npx...");
-    run("npx --yes @capacitor/cli add android");
-  }
-
-  try {
-    run(capPath + " copy android");
-  } catch (e) {
-    log("Direct cap copy failed, trying npx...");
-    run("npx --yes @capacitor/cli copy android");
-  }
-
   log("SUCCESS");
 } catch (e) {
   log("ERROR: " + (e.message || "unknown"));
