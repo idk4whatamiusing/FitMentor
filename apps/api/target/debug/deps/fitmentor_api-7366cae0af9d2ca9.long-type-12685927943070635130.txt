@@ -1,0 +1,2 @@
+fn(AuthUser, State<AppState>, axum::Json<ProteinTarget>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {update_protein_target}
+fn(AuthUser, State<AppState>, axum::Json<ProteinTarget>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {update_protein_target}: Handler<_, _>

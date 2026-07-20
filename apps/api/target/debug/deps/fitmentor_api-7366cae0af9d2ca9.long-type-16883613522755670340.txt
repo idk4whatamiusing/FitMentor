@@ -1,0 +1,3 @@
+fn(AuthUser, State<Pool<Postgres>>, State<CacheService>, axum::Json<ProteinTarget>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {update_protein_target}
+(axum_core::extract::private::ViaRequest, AuthUser, State<Pool<Postgres>>, State<CacheService>, axum::Json<ProteinTarget>)
+fn(AuthUser, State<Pool<Postgres>>, State<CacheService>, axum::Json<ProteinTarget>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {update_protein_target}: Handler<(axum_core::extract::private::ViaRequest, AuthUser, State<Pool<Postgres>>, State<CacheService>, axum::Json<ProteinTarget>), (Pool<Postgres>, CacheService)>

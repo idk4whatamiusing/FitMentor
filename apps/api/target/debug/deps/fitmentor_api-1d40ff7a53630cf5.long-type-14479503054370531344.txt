@@ -1,0 +1,2 @@
+fn({type error}, State<Pool<Postgres>>, State<CacheService>, axum::Json<UpdateProfile>) -> impl std::future::Future<Output = Result<Response<Body>, AppError>> {update_profile}
+fn({type error}, State<Pool<Postgres>>, State<CacheService>, axum::Json<UpdateProfile>) -> impl std::future::Future<Output = Result<Response<Body>, AppError>> {update_profile}: Handler<_, _>

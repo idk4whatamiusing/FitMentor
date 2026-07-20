@@ -1,0 +1,2 @@
+fn(AuthUser, State<AppState>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {get_streak}
+fn(AuthUser, State<AppState>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {get_streak}: Handler<_, _>

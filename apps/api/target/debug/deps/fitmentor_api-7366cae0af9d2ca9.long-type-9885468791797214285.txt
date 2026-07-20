@@ -1,0 +1,2 @@
+fn(AuthUser, State<AppState>, axum::Json<UpdateProfile>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {update_profile}
+fn(AuthUser, State<AppState>, axum::Json<UpdateProfile>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {update_profile}: Handler<_, _>

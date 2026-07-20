@@ -1,0 +1,2 @@
+fn(AuthUser, State<Pool<Postgres>>, State<CacheService>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {get_me}
+fn(AuthUser, State<Pool<Postgres>>, State<CacheService>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {get_me}: Handler<(axum_core::extract::private::ViaParts, AuthUser, State<Pool<Postgres>>, State<CacheService>), (Pool<Postgres>, CacheService)>

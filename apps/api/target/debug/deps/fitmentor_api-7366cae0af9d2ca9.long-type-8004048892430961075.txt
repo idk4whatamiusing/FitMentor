@@ -1,0 +1,3 @@
+fn(AuthUser, State<Pool<Postgres>>, axum::extract::Query<DateRangeQuery>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {get_range}
+(axum_core::extract::private::ViaParts, AuthUser, State<Pool<Postgres>>, axum::extract::Query<DateRangeQuery>)
+fn(AuthUser, State<Pool<Postgres>>, axum::extract::Query<DateRangeQuery>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {get_range}: Handler<(axum_core::extract::private::ViaParts, AuthUser, State<Pool<Postgres>>, axum::extract::Query<DateRangeQuery>), (Pool<Postgres>, CacheService)>

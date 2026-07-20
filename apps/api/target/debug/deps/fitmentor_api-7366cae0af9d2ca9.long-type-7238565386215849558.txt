@@ -1,0 +1,2 @@
+fn(AuthUser, State<AppState>, axum::extract::Query<DateRangeQuery>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {get_range}
+fn(AuthUser, State<AppState>, axum::extract::Query<DateRangeQuery>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {get_range}: Handler<_, _>
