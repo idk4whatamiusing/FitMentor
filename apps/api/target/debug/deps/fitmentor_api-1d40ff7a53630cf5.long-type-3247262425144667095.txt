@@ -1,2 +1,0 @@
-fn({type error}, State<Pool<Postgres>>, axum::extract::Query<DateRangeQuery>) -> impl std::future::Future<Output = Result<Response<Body>, AppError>> {get_range}
-fn({type error}, State<Pool<Postgres>>, axum::extract::Query<DateRangeQuery>) -> impl std::future::Future<Output = Result<Response<Body>, AppError>> {get_range}: Handler<_, _>

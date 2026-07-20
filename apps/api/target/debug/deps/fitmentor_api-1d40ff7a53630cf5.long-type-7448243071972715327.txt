@@ -1,2 +1,0 @@
-fn({type error}, State<Pool<Postgres>>, State<CacheService>) -> impl std::future::Future<Output = Result<Response<Body>, AppError>> {get_me}
-fn({type error}, State<Pool<Postgres>>, State<CacheService>) -> impl std::future::Future<Output = Result<Response<Body>, AppError>> {get_me}: Handler<_, _>

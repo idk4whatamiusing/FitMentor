@@ -1,3 +1,0 @@
-fn(AuthUser, State<Pool<Postgres>>, State<CacheService>, axum::Json<UpdateDailyLog>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {upsert_today}
-(axum_core::extract::private::ViaRequest, AuthUser, State<Pool<Postgres>>, State<CacheService>, axum::Json<UpdateDailyLog>)
-fn(AuthUser, State<Pool<Postgres>>, State<CacheService>, axum::Json<UpdateDailyLog>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {upsert_today}: Handler<(axum_core::extract::private::ViaRequest, AuthUser, State<Pool<Postgres>>, State<CacheService>, axum::Json<UpdateDailyLog>), (Pool<Postgres>, CacheService)>

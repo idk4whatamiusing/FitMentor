@@ -1,2 +1,0 @@
-fn(AuthUser, State<AppState>, axum::Json<UpdateDailyLog>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {upsert_today}
-fn(AuthUser, State<AppState>, axum::Json<UpdateDailyLog>) -> impl std::future::Future<Output = Result<axum::http::Response<axum::body::Body>, AppError>> {upsert_today}: Handler<_, _>

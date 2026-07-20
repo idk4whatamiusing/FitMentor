@@ -35,3 +35,13 @@ dist-ssr
 # Capacitor (generated in CI)
 android/
 capacitor.config.*
+
+# Rust
+apps/api/target/
+apps/api/*.db
+
+# Gleam
+apps/ws/build/
+
+# Redis
+dump.rdb
