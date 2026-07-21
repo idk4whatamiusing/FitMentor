@@ -10,8 +10,8 @@ import {
   StatusBar,
 } from 'react-native';
 import type {Profile, DailyLog} from '@fitmentor/shared';
-import {loadProfile} from '../lib/profile';
-import {ensureToday, saveLog, loadLogs} from '../lib/habits';
+import {loadProfile} from '../../utils/profile';
+import {ensureToday, saveLog, loadLogs} from '../../utils/habits';
 
 type ToolTab = 'bmi' | 'sleep' | 'steps';
 

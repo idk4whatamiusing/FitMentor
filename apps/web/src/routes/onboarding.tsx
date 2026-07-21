@@ -10,9 +10,9 @@ import {
   type Diet,
   type Experience,
   type Gender,
-} from "@/lib/profile";
+} from "@/utils/profile";
 import { ChevronLeft } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 import logoImg from "@/assets/logo-v2.png";
 
 export const Route = createFileRoute("/onboarding")({

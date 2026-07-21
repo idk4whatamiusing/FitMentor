@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Flame, Dumbbell, Apple, TrendingUp, Sparkles, ChevronRight } from "lucide-react";
-import { loadProfile, calcTargets, GOAL_LABEL, type Profile } from "@/lib/profile";
-import { ensureToday, computeStreak, type DailyLog } from "@/lib/habits";
-import { generateWorkoutPlan } from "@/lib/workouts";
+import { loadProfile, calcTargets, GOAL_LABEL, type Profile } from "@/utils/profile";
+import { ensureToday, computeStreak, type DailyLog } from "@/utils/habits";
+import { generateWorkoutPlan } from "@/utils/workouts";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DailyHabits } from "@/components/dashboard/DailyHabits";
 import { CoachChat } from "@/components/dashboard/CoachChat";

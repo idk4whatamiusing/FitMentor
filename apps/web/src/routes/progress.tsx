@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
-import { last7, ensureToday, saveLog, computeStreak, type DailyLog } from "@/lib/habits";
-import { loadProfile, calcTargets, GOAL_LABEL } from "@/lib/profile";
+import { last7, ensureToday, saveLog, computeStreak, type DailyLog } from "@/utils/habits";
+import { loadProfile, calcTargets, GOAL_LABEL } from "@/utils/profile";
 import {
   LineChart,
   Line,

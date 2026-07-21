@@ -3,7 +3,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import ExerciseDetailScreen from '../screens/ExerciseDetailScreen';
 import MainTabs from './MainTabs';
-import {loadProfile} from '../lib/profile';
+import {loadProfile} from '../../utils/profile';
 
 export type RootStackParamList = {
   Onboarding: undefined;

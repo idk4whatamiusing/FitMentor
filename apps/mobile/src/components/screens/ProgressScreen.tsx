@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import type {Profile, DailyLog} from '@fitmentor/shared';
 import {GOAL_LABEL} from '@fitmentor/shared';
-import {loadProfile} from '../lib/profile';
-import {calcTargets} from '../lib/profileCalc';
-import {ensureToday, saveLog, computeStreak, loadLogs} from '../lib/habits';
+import {loadProfile} from '../../utils/profile';
+import {calcTargets} from '../../utils/profileCalc';
+import {ensureToday, saveLog, computeStreak, loadLogs} from '../../utils/habits';
 
 export default function ProgressScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);

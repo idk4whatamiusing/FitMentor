@@ -1,8 +1,8 @@
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { askCoach } from "@/lib/coach.functions";
-import { loadProfile, calcTargets } from "@/lib/profile";
+import { askCoach } from "@/services/coach-functions";
+import { loadProfile, calcTargets } from "@/utils/profile";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Send, ArrowRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";

@@ -1,6 +1,6 @@
 import { type ReactNode } from "react";
 import { MobileShell } from "@/components/MobileShell";
-import type { Profile } from "@/lib/profile";
+import type { Profile } from "@/utils/profile";
 
 export function DashboardLayout({
   children,

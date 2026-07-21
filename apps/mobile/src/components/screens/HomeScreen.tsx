@@ -10,10 +10,10 @@ import {
 } from 'react-native';
 import type {Profile, DailyLog} from '@fitmentor/shared';
 import {GOAL_LABEL} from '@fitmentor/shared';
-import {loadProfile} from '../lib/profile';
-import {ensureToday, computeStreak, saveLog} from '../lib/habits';
-import {generateWorkoutPlan} from '../lib/workouts';
-import {calcTargets} from '../lib/profileCalc';
+import {loadProfile} from '../../utils/profile';
+import {ensureToday, computeStreak, saveLog} from '../../utils/habits';
+import {generateWorkoutPlan} from '../../utils/workouts';
+import {calcTargets} from '../../utils/profileCalc';
 
 export default function HomeScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);

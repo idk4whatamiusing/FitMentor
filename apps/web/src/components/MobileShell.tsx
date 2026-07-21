@@ -1,8 +1,8 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { Home, Dumbbell, Sparkles, Apple, User, Wrench, Moon, Sun } from "lucide-react";
 import { type ReactNode, useState, useEffect } from "react";
-import { cn } from "@/lib/utils";
-import { saveTheme, loadTheme } from "@/lib/theme";
+import { cn } from "@/utils/cn";
+import { saveTheme, loadTheme } from "@/utils/theme";
 
 const TABS = [
   { to: "/", label: "Home", icon: Home },

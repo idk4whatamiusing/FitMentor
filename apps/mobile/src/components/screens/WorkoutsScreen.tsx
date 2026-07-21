@@ -12,9 +12,9 @@ import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../navigation/RootNavigator';
 import type {Profile, WorkoutDay} from '@fitmentor/shared';
 import {EXERCISE_LIBRARY} from '@fitmentor/shared';
-import {loadProfile} from '../lib/profile';
-import {generateWorkoutPlan} from '../lib/workouts';
-import {ensureToday, saveLog} from '../lib/habits';
+import {loadProfile} from '../../utils/profile';
+import {generateWorkoutPlan} from '../../utils/workouts';
+import {ensureToday, saveLog} from '../../utils/habits';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList>;

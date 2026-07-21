@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
-import { loadProfile, calcTargets, GOAL_LABEL, clearProfile, type Profile } from "@/lib/profile";
+import { loadProfile, calcTargets, GOAL_LABEL, clearProfile, type Profile } from "@/utils/profile";
 import {
   loadSubscription,
   saveSubscription,
@@ -9,7 +9,7 @@ import {
   getPlanName,
   clearSubscription,
   type PlanTier,
-} from "@/lib/subscription";
+} from "@/utils/subscription";
 import { Button } from "@/components/ui/button";
 import {
   Crown,
@@ -23,7 +23,7 @@ import {
   Check,
   Loader,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/profile")({

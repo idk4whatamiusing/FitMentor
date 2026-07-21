@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { MobileShell } from "@/components/MobileShell";
-import { EXERCISE_LIBRARY } from "@/lib/workouts";
+import { EXERCISE_LIBRARY } from "@/utils/workouts";
 import { ChevronLeft } from "lucide-react";
 
 export const Route = createFileRoute("/exercise/$name")({

@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import type {Profile, DailyLog} from '@fitmentor/shared';
 import {INDIAN_MEAL_PLANS, COMMON_FOODS} from '@fitmentor/shared';
-import {loadProfile} from '../lib/profile';
-import {calcTargets} from '../lib/profileCalc';
-import {ensureToday, saveLog} from '../lib/habits';
+import {loadProfile} from '../../utils/profile';
+import {calcTargets} from '../../utils/profileCalc';
+import {ensureToday, saveLog} from '../../utils/habits';
 
 export default function NutritionScreen() {
   const [tab, setTab] = useState<'plans' | 'log'>('plans');

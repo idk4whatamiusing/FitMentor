@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
-import { loadProfile } from "@/lib/profile";
-import { generateWorkoutPlan, EXERCISE_LIBRARY, type WorkoutDay } from "@/lib/workouts";
-import { saveLog, ensureToday } from "@/lib/habits";
+import { loadProfile } from "@/utils/profile";
+import { generateWorkoutPlan, EXERCISE_LIBRARY, type WorkoutDay } from "@/utils/workouts";
+import { saveLog, ensureToday } from "@/utils/habits";
 import { Button } from "@/components/ui/button";
 import { Check, ChevronRight, Clock, Dumbbell, Trophy } from "lucide-react";
 

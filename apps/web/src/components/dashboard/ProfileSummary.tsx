@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Flame } from "lucide-react";
-import { loadProfile, calcTargets, GOAL_LABEL } from "@/lib/profile";
-import type { Profile } from "@/lib/profile";
+import { loadProfile, calcTargets, GOAL_LABEL } from "@/utils/profile";
+import type { Profile } from "@/utils/profile";
 
 // ponytail: reads profile directly — no prop drilling, same pattern as dashboard.tsx
 export function ProfileSummary({ profile }: { profile: Profile }) {

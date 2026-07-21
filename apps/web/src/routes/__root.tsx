@@ -8,9 +8,9 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { reportLovableError } from "../lib/lovable-error-reporting";
+import { reportLovableError } from "../utils/lovable-error-reporting";
 import { Toaster } from "../components/ui/sonner";
-import { loadTheme } from "../lib/theme";
+import { loadTheme } from "../utils/theme";
 import appCss from "../styles.css?url";
 
 function registerSW() {

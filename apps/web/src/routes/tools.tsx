@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { MobileShell } from "@/components/MobileShell";
-import { loadProfile, calcTargets, type Profile } from "@/lib/profile";
-import { loadLogs, saveLog, todayKey, last7, type DailyLog } from "@/lib/habits";
+import { loadProfile, calcTargets, type Profile } from "@/utils/profile";
+import { loadLogs, saveLog, todayKey, last7, type DailyLog } from "@/utils/habits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 import {
   Scale,
   Moon,

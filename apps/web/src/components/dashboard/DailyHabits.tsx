@@ -1,7 +1,7 @@
 import { Droplet, Beef, Dumbbell } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { ensureToday, saveLog } from "@/lib/habits";
+import { ensureToday, saveLog } from "@/utils/habits";
 import type { DailyLog } from "@fitmentor/shared";
 
 // ponytail: water target hardcoded — could come from profile, but 8 glasses is universal enough

@@ -12,8 +12,8 @@ import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../navigation/RootNavigator';
 import type {Profile} from '@fitmentor/shared';
 import {GOAL_LABEL} from '@fitmentor/shared';
-import {loadProfile} from '../lib/profile';
-import {calcTargets} from '../lib/profileCalc';
+import {loadProfile} from '../../utils/profile';
+import {calcTargets} from '../../utils/profileCalc';
 
 type Props = {
   navigation: NativeStackNavigationProp<RootStackParamList>;

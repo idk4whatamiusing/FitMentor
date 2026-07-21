@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../navigation/RootNavigator';
-import {saveProfile} from '../lib/profile';
+import {saveProfile} from '../../utils/profile';
 import type {Profile, Goal, Place, Experience, Diet, Gender} from '@fitmentor/shared';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;

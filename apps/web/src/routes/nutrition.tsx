@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
-import { INDIAN_MEAL_PLANS, COMMON_FOODS } from "@/lib/meals";
-import { loadProfile, calcTargets } from "@/lib/profile";
-import { saveLog, ensureToday } from "@/lib/habits";
-import { loadCustomProteinTarget, saveCustomProteinTarget } from "@/lib/protein-target";
+import { INDIAN_MEAL_PLANS, COMMON_FOODS } from "@/utils/meals";
+import { loadProfile, calcTargets } from "@/utils/profile";
+import { saveLog, ensureToday } from "@/utils/habits";
+import { loadCustomProteinTarget, saveCustomProteinTarget } from "@/utils/proteinTarget";
 import { Plus, Apple, Target, Pencil, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
