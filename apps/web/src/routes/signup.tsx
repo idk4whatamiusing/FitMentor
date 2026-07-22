@@ -66,15 +66,6 @@ function SignUpPage() {
 
           <div className="mt-6 text-center">
             <p className="text-xs text-muted-foreground">
-              Already have an account?{" "}
-              <Link to="/signin" className="underline font-medium hover:text-foreground">
-                Sign in
-              </Link>
-            </p>
-          </div>
-
-          <div className="mt-6 text-center">
-            <p className="text-xs text-muted-foreground">
               By continuing, you agree to our{" "}
               <Link to="/" className="underline hover:text-foreground">Terms</Link>
               {" "}and{" "}
