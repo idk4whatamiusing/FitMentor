@@ -40,7 +40,7 @@ export const fetchProfile = createServerFn({ method: "GET" }).handler(async () =
   const json: unknown = await res.json();
   const data = (json as Record<string, unknown>).data as Record<string, unknown> | undefined;
   const profile = data?.profile as Record<string, unknown> | undefined;
-  if (!profile?.name) return null;
+  if (!profile?.name || !profile?.heightCm || !profile?.weightKg) return null;
   return profile as Profile;
 });
 
@@ -70,15 +70,15 @@ export const syncProfile = createServerFn({ method: "POST" })
       name: profile.name,
       age: profile.age,
       gender: profile.gender,
-      height_cm: profile.heightCm,
-      weight_kg: profile.weightKg,
+      heightCm: profile.heightCm,
+      weightKg: profile.weightKg,
       goal: profile.goal,
       place: profile.place,
       experience: profile.experience,
       diet: profile.diet,
-      days_per_week: profile.daysPerWeek,
-      budget_per_day: profile.budgetPerDay,
-      health_conditions: profile.healthConditions,
+      daysPerWeek: profile.daysPerWeek,
+      budgetPerDay: profile.budgetPerDay,
+      healthConditions: profile.healthConditions,
     };
 
     const res = await fetch(`${apiUrl}/v1/user/profile`, {
