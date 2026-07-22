@@ -88,9 +88,16 @@ function ToolsPage() {
 }
 
 function BMIAnalyzer() {
-  const profile = loadProfile();
-  const [weight, setWeight] = useState(profile?.weightKg ?? 65);
-  const [height, setHeight] = useState(profile?.heightCm ?? 170);
+  const { profile } = useProfile();
+  const [weight, setWeight] = useState(65);
+  const [height, setHeight] = useState(170);
+
+  useEffect(() => {
+    if (profile) {
+      setWeight(profile.weightKg);
+      setHeight(profile.heightCm);
+    }
+  }, [profile]);
 
   const hM = height / 100;
   const bmi = weight / (hM * hM);
