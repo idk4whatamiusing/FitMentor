@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Dumbbell } from "lucide-react";
 import logoImg from "@/assets/logo-v2.png";
-import { getDiscordAuthUrl, getSessionUser, renewSession } from "@/utils/oauth";
+import { getDiscordAuthUrl, checkSession, renewSession } from "@/utils/oauth";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Sign Up — FitMentor" }] }),
@@ -15,19 +15,20 @@ function SignUpPage() {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const user = getSessionUser();
-    if (user) {
-      navigate({ to: "/dashboard" });
-      return;
-    }
-    if (document.cookie.includes("fitmentor_remember")) {
-      renewSession().then((r) => {
-        if (r.ok) navigate({ to: "/dashboard" });
-        else setChecking(false);
-      });
-    } else {
-      setChecking(false);
-    }
+    checkSession().then((s) => {
+      if (s.ok) {
+        navigate({ to: "/dashboard" });
+        return;
+      }
+      if (document.cookie.includes("fitmentor_remember")) {
+        renewSession().then((r) => {
+          if (r.ok) navigate({ to: "/dashboard" });
+          else setChecking(false);
+        });
+      } else {
+        setChecking(false);
+      }
+    });
   }, [navigate]);
 
   const signUpDiscord = async () => {

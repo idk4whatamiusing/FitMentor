@@ -206,6 +206,18 @@ function ProfilePage() {
         </Button>
       </div>
 
+      <div className="mx-5 mt-3 text-center">
+        <button
+          onClick={() => {
+            if (confirm("This will clear your saved session. You'll need to sign in with Discord again."))
+              forgetDevice();
+          }}
+          className="text-xs text-muted-foreground/50 underline hover:text-muted-foreground"
+        >
+          Forget this device
+        </button>
+      </div>
+
       {showPayment && selectedTier && (
         <PaymentModal
           tier={selectedTier}

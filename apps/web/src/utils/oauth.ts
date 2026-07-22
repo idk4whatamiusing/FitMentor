@@ -53,6 +53,11 @@ export function getSessionUser(): SessionUser | null {
   return verifySession(decodeURIComponent(m[1]));
 }
 
+export const checkSession = createServerFn({ method: "GET" }).handler(async () => {
+  const raw = getCookie(SESSION_COOKIE);
+  return { ok: !!raw && verifySession(raw) !== null } as const;
+});
+
 export const getDiscordAuthUrl = createServerFn({ method: "GET" })
   .validator((d?: { mode?: string }) => d ?? {})
   .handler(async (ctx) => {
@@ -186,12 +191,17 @@ export const exchangeDiscordCode = createServerFn({ method: "POST" })
   });
 
 export function logout() {
-  document.cookie = `${SESSION_COOKIE}=; Path=/; Max-Age=0`;
   window.location.href = "/";
 }
 
+export const clearSession = createServerFn({ method: "POST" }).handler(async () => {
+  setResponseHeader("Set-Cookie", `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+  return { ok: true } as const;
+});
+
 export function forgetDevice() {
-  document.cookie = `${SESSION_COOKIE}=; Path=/; Max-Age=0`;
-  document.cookie = `${REMEMBER_COOKIE}=; Path=/; Max-Age=0`;
-  window.location.href = "/";
+  clearSession().then(() => {
+    document.cookie = `${REMEMBER_COOKIE}=; Path=/; Max-Age=0`;
+    window.location.href = "/";
+  });
 }
