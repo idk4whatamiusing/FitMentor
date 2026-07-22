@@ -17,6 +17,8 @@ pub struct Config {
     // Messaging: RabbitMQ (jobs/notifications) + Kafka (event stream)
     pub rabbitmq_url: String,
     pub kafka_brokers: String,
+    // Shared secret for trusted server-to-server calls from frontend
+    pub api_shared_secret: String,
 }
 
 impl Config {
@@ -50,6 +52,8 @@ impl Config {
                 .unwrap_or_else(|_| "amqp://guest:guest@localhost:5672".into()),
             kafka_brokers: std::env::var("KAFKA_BROKERS")
                 .unwrap_or_else(|_| "localhost:9092".into()),
+            api_shared_secret: std::env::var("API_SHARED_SECRET")
+                .unwrap_or_default(),
         }
     }
 }

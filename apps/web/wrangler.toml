@@ -9,3 +9,5 @@ pages_build_output_dir = "dist"
 # DISCORD_CLIENT_SECRET=
 # SESSION_SECRET=
 # APP_URL=
+# API_SHARED_SECRET=
+# API_URL=

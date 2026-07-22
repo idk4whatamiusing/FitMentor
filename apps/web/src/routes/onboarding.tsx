@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +12,7 @@ import {
   type Experience,
   type Gender,
 } from "@/utils/profile";
+import { syncProfile } from "@/services/sync";
 import { ChevronLeft } from "lucide-react";
 import { cn } from "@/utils/cn";
 import logoImg from "@/assets/logo-v2.png";
@@ -36,6 +38,7 @@ const HEALTH_OPTIONS = [
 function Onboarding() {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>(0);
+  const sync = useServerFn(syncProfile);
   const [draft, setDraft] = useState<Partial<Profile>>({
     daysPerWeek: 4,
     budgetPerDay: 150,
@@ -81,6 +84,7 @@ function Onboarding() {
       createdAt: new Date().toISOString(),
     };
     saveProfile(p);
+    sync({ data: p }).catch(() => {});
     navigate({ to: "/" });
   };
 

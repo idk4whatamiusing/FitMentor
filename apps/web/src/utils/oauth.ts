@@ -95,9 +95,12 @@ export const exchangeDiscordCode = createServerFn({ method: "POST" })
     if (!userRes.ok) return { ok: false, error: "userinfo_failed" } as const;
     const discordUser: DiscordUser = await userRes.json();
 
+    const sub = `discord:${discordUser.id}`;
+    const email = discordUser.email || `${discordUser.username}@discord`;
+
     const session = signSession({
-      sub: `discord:${discordUser.id}`,
-      email: discordUser.email || `${discordUser.username}@discord`,
+      sub,
+      email,
       name: discordUser.username,
       provider: "discord",
     });
@@ -107,14 +110,22 @@ export const exchangeDiscordCode = createServerFn({ method: "POST" })
       `${SESSION_COOKIE}=${session}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}`,
     );
 
+    // Sync user to backend DB
+    const apiUrl = process.env.API_URL || "https://16-112-225-113.sslip.io";
+    const apiKey = process.env.API_SHARED_SECRET || "";
+    if (apiKey) {
+      fetch(`${apiUrl}/v1/user/me`, {
+        headers: {
+          "X-Api-Key": apiKey,
+          "X-User-Id": sub,
+          "X-User-Email": email,
+        },
+      }).catch((err) => console.error("Failed to sync user to backend:", err));
+    }
+
     return {
       ok: true,
-      user: {
-        sub: `discord:${discordUser.id}`,
-        email: discordUser.email || `${discordUser.username}@discord`,
-        name: discordUser.username,
-        provider: "discord",
-      },
+      user: { sub, email, name: discordUser.username, provider: "discord" },
     } as const;
   });
 

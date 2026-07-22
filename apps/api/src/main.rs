@@ -23,6 +23,7 @@ pub struct AppState {
     pub cache: CacheService,
     pub jwt_validator: Arc<JwtValidator>,
     pub polar_webhook_secret: String,
+    pub api_shared_secret: String,
 }
 
 #[tokio::main]
@@ -51,6 +52,7 @@ async fn main() {
         cache,
         jwt_validator,
         polar_webhook_secret: config.polar_webhook_secret,
+        api_shared_secret: config.api_shared_secret,
     };
 
     let cors = CorsLayer::new()
@@ -67,6 +69,9 @@ async fn main() {
             header::CONTENT_TYPE,
             header::ACCEPT,
             "cf-access-jwt-assertion".parse().unwrap(),
+            "x-api-key".parse().unwrap(),
+            "x-user-id".parse().unwrap(),
+            "x-user-email".parse().unwrap(),
         ]);
 
     let app = routes::routes(state).layer(cors);
