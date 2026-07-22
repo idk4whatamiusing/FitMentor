@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie, setResponseHeader } from "@tanstack/react-start/server";
-import { getSession, renewSession, createSession, deleteSession, deleteRememberToken } from "@/utils/session";
+import { getSession, createSession, deleteSession, renewSession, deleteRememberToken } from "@/utils/session";
+import { useState, useEffect } from "react";
 
 interface DiscordUser {
   id: string;
@@ -27,7 +28,7 @@ export const checkSession = createServerFn({ method: "GET" }).handler(async () =
     const session = await getSession(sid);
     if (session) return { ok: true } as const;
 
-    // Session expired or invalid — try renewing from the embedded remember token
+    // Session expired — try renewing via remember token in KV
     const newSid = await renewSession(sid);
     if (newSid) {
       setSessionCookie(newSid);
@@ -37,6 +38,22 @@ export const checkSession = createServerFn({ method: "GET" }).handler(async () =
 
   return { ok: false } as const;
 });
+
+export const getCurrentUser = createServerFn({ method: "GET" }).handler(async () => {
+  const sid = getCookie(SESSION_COOKIE);
+  if (!sid) return null;
+  const session = await getSession(sid);
+  if (!session) return null;
+  return { sub: session.sub, email: session.email };
+});
+
+export function useAuth() {
+  const [user, setUser] = useState<{ sub: string; email: string } | null>(null);
+  useEffect(() => {
+    getCurrentUser().then((u) => setUser(u));
+  }, []);
+  return user;
+}
 
 export const getDiscordAuthUrl = createServerFn({ method: "GET" })
   .validator((d?: { mode?: string }) => d ?? {})
