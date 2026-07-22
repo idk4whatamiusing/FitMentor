@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { INDIAN_MEAL_PLANS, COMMON_FOODS } from "@/utils/meals";
-import { loadProfile, calcTargets } from "@/utils/profile";
+import { useProfile, calcTargets } from "@/utils/profile";
 import { saveLog, ensureToday } from "@/utils/habits";
 import { loadCustomProteinTarget, saveCustomProteinTarget } from "@/utils/proteinTarget";
 import { Plus, Apple, Target, Pencil, Check } from "lucide-react";
@@ -16,13 +16,12 @@ export const Route = createFileRoute("/nutrition")({
 
 function Nutrition() {
   const [tab, setTab] = useState<"plans" | "log">("plans");
-  const [profile, setProfile] = useState(() => loadProfile());
+  const { profile } = useProfile();
   const [today, setToday] = useState(() => ensureToday());
   const [customProtein, setCustomProtein] = useState(() => loadCustomProteinTarget());
   const [editingProtein, setEditingProtein] = useState(false);
 
   useEffect(() => {
-    setProfile(loadProfile());
     setToday(ensureToday());
     setCustomProtein(loadCustomProteinTarget());
 

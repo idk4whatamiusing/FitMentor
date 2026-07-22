@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
-import { loadProfile, calcTargets, GOAL_LABEL, type Profile } from "@/utils/profile";
+import { useProfile, calcTargets, GOAL_LABEL } from "@/utils/profile";
 import { logout, forgetDevice } from "@/utils/oauth";
 import {
   loadSubscription,
@@ -62,14 +62,13 @@ const PLANS: {
 ];
 
 function ProfilePage() {
-  const [p, setP] = useState<Profile | null>(null);
+  const { profile: p } = useProfile();
   const [sub, setSub] = useState(loadSubscription());
   const [showPayment, setShowPayment] = useState(false);
   const [selectedTier, setSelectedTier] = useState<PlanTier | null>(null);
   const nav = useNavigate();
 
   useEffect(() => {
-    setP(loadProfile());
     setSub(loadSubscription());
     const handler = () => setSub(loadSubscription());
     window.addEventListener("fitmentor:subscription", handler);

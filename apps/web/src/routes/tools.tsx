@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { MobileShell } from "@/components/MobileShell";
-import { loadProfile, calcTargets, type Profile } from "@/utils/profile";
+import { loadProfile, useProfile, calcTargets, type Profile } from "@/utils/profile";
 import { loadLogs, saveLog, todayKey, last7, type DailyLog } from "@/utils/habits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,7 @@ const TOOLS: { id: ToolTab; label: string; icon: typeof Scale }[] = [
 
 function ToolsPage() {
   const [tab, setTab] = useState<ToolTab>("bmi");
+  useProfile();
 
   return (
     <MobileShell>

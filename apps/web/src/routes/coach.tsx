@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { askCoach } from "@/services/coach-functions";
-import { loadProfile, calcTargets } from "@/utils/profile";
+import { useProfile, calcTargets } from "@/utils/profile";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ function Coach() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+  const { profile } = useProfile();
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -38,7 +39,6 @@ function Coach() {
   async function send(text: string) {
     const q = text.trim();
     if (!q || loading) return;
-    const profile = loadProfile();
     const profileWithTargets = profile ? { ...profile, ...calcTargets(profile) } : undefined;
     const newMsgs: Msg[] = [...messages, { role: "user", content: q }];
     setMessages(newMsgs);

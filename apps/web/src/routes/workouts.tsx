@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
-import { loadProfile } from "@/utils/profile";
+import { useProfile } from "@/utils/profile";
 import { generateWorkoutPlan, EXERCISE_LIBRARY, type WorkoutDay } from "@/utils/workouts";
 import { saveLog, ensureToday } from "@/utils/habits";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,11 @@ function Workouts() {
   const [tab, setTab] = useState<"plan" | "library">("plan");
   const [plan, setPlan] = useState<WorkoutDay[]>([]);
   const [openIdx, setOpenIdx] = useState<number | null>(0);
+  const { profile } = useProfile();
 
   useEffect(() => {
-    const p = loadProfile();
-    if (p) setPlan(generateWorkoutPlan(p));
-  }, []);
+    if (profile) setPlan(generateWorkoutPlan(profile));
+  }, [profile]);
 
   return (
     <MobileShell>

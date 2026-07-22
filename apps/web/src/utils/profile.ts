@@ -1,6 +1,8 @@
 // ponytail: re-exports types from shared for backward compat
 export type { Gender, Goal, Experience, Diet, Place, Profile } from "@fitmentor/shared";
 import type { Profile } from "@fitmentor/shared";
+import { useEffect, useState } from "react";
+import { fetchProfile } from "@/services/sync";
 
 let _profile: Profile | null = null;
 
@@ -16,6 +18,33 @@ export function saveProfile(p: Profile) {
 export function clearProfile() {
   _profile = null;
   window.dispatchEvent(new Event("fitmentor:profile"));
+}
+
+export function useProfile() {
+  const [profile, setProfile] = useState<Profile | null>(() => loadProfile());
+  const [loading, setLoading] = useState(!loadProfile());
+
+  useEffect(() => {
+    const p = loadProfile();
+    if (p) {
+      setProfile(p);
+      setLoading(false);
+      return;
+    }
+    fetchProfile().then((sp) => {
+      if (sp) saveProfile(sp);
+      setProfile(sp || null);
+      setLoading(false);
+    });
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setProfile(loadProfile());
+    window.addEventListener("fitmentor:profile", handler);
+    return () => window.removeEventListener("fitmentor:profile", handler);
+  }, []);
+
+  return { profile, loading };
 }
 
 // Mifflin-St Jeor BMR + activity multiplier

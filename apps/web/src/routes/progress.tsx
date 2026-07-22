@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { last7, ensureToday, saveLog, computeStreak, type DailyLog } from "@/utils/habits";
-import { loadProfile, calcTargets, GOAL_LABEL } from "@/utils/profile";
+import { loadProfile, useProfile, calcTargets, GOAL_LABEL } from "@/utils/profile";
 import {
   LineChart,
   Line,
@@ -151,7 +151,7 @@ function ProgressPage() {
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [streak, setStreak] = useState(0);
   const [weight, setWeight] = useState("");
-  const profile = loadProfile();
+  const { profile } = useProfile();
 
   useEffect(() => {
     setLogs(last7());
