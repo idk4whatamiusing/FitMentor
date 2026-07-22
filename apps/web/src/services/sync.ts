@@ -40,7 +40,7 @@ export const fetchProfile = createServerFn({ method: "GET" }).handler(async () =
   const json: unknown = await res.json();
   const data = (json as Record<string, unknown>).data as Record<string, unknown> | undefined;
   const profile = data?.profile as Record<string, unknown> | undefined;
-  if (!profile?.name || !profile?.heightCm || !profile?.weightKg) return null;
+  if (!profile?.name) return null;
   return profile as Profile;
 });
 
