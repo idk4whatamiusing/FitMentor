@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Flame, Dumbbell, Apple, TrendingUp, Sparkles, ChevronRight } from "lucide-react";
-import { loadProfile, calcTargets, GOAL_LABEL, type Profile } from "@/utils/profile";
+import { loadProfile, saveProfile, calcTargets, GOAL_LABEL, type Profile } from "@/utils/profile";
 import { ensureToday, computeStreak, type DailyLog } from "@/utils/habits";
 import { generateWorkoutPlan } from "@/utils/workouts";
+import { fetchProfile } from "@/services/sync";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DailyHabits } from "@/components/dashboard/DailyHabits";
 import { CoachChat } from "@/components/dashboard/CoachChat";
@@ -21,14 +22,23 @@ function DashboardPage() {
   const [streak, setStreak] = useState(0);
 
 useEffect(() => {
-  const p = loadProfile();
-  if (!p) {
-    navigate({ to: "/onboarding" });
-    return;
-  }
-  setProfile(p);
-  setLog(ensureToday());
-  setStreak(computeStreak());
+  const init = async () => {
+    let p = loadProfile();
+    if (!p) {
+      const profile = await fetchProfile();
+      if (profile) {
+        saveProfile(profile);
+        p = profile;
+      } else {
+        navigate({ to: "/onboarding" });
+        return;
+      }
+    }
+    setProfile(p);
+    setLog(ensureToday());
+    setStreak(computeStreak());
+  };
+  init();
   const onChange = () => {
     setProfile(loadProfile());
     setLog(ensureToday());

@@ -21,6 +21,29 @@ function verifySession(token: string): { sub: string; email: string } | null {
   }
 }
 
+export const fetchProfile = createServerFn({ method: "GET" }).handler(async () => {
+  const raw = getCookie(SESSION_COOKIE);
+  if (!raw) return null;
+  const session = verifySession(raw);
+  if (!session) return null;
+  const apiUrl = process.env.API_URL || "https://16-112-225-113.sslip.io";
+  const apiKey = process.env.API_SHARED_SECRET;
+  if (!apiKey) return null;
+  const res = await fetch(`${apiUrl}/v1/user/me`, {
+    headers: {
+      "X-Api-Key": apiKey,
+      "X-User-Id": session.sub,
+      "X-User-Email": session.email,
+    },
+  });
+  if (!res.ok) return null;
+  const json: unknown = await res.json();
+  const data = (json as Record<string, unknown>).data as Record<string, unknown> | undefined;
+  const profile = data?.profile as Record<string, unknown> | undefined;
+  if (!profile?.name) return null;
+  return profile as Profile;
+});
+
 export const syncProfile = createServerFn({ method: "POST" })
   .validator((d: unknown) => d as Profile)
   .handler(async ({ data: profile }) => {

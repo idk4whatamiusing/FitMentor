@@ -2,25 +2,19 @@
 export type { Gender, Goal, Experience, Diet, Place, Profile } from "@fitmentor/shared";
 import type { Profile } from "@fitmentor/shared";
 
-const KEY = "fitmentor.profile.v1";
+let _profile: Profile | null = null;
 
 export function loadProfile(): Profile | null {
-  if (typeof window === "undefined" || typeof localStorage === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Profile) : null;
-  } catch {
-    return null;
-  }
+  return _profile;
 }
 
 export function saveProfile(p: Profile) {
-  localStorage.setItem(KEY, JSON.stringify(p));
+  _profile = p;
   window.dispatchEvent(new Event("fitmentor:profile"));
 }
 
 export function clearProfile() {
-  localStorage.removeItem(KEY);
+  _profile = null;
   window.dispatchEvent(new Event("fitmentor:profile"));
 }
 
