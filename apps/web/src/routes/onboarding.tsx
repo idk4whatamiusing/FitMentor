@@ -85,7 +85,7 @@ function Onboarding() {
     };
     saveProfile(p);
     sync({ data: p }).catch(() => {});
-    navigate({ to: "/" });
+    navigate({ to: "/dashboard" });
   };
 
   const totalSteps = 9;
