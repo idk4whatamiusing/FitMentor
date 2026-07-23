@@ -31,6 +31,7 @@ struct Jwks {
 pub struct JwtValidator {
     team_domain: String,
     aud: String,
+    hmac_secret: String,
     cache: RwLock<Option<(Jwks, std::time::Instant)>>,
     client: reqwest::Client,
 }
@@ -42,6 +43,7 @@ impl JwtValidator {
         Self {
             team_domain,
             aud,
+            hmac_secret: std::env::var("JWT_SECRET").unwrap_or_else(|_| "fitmentor-dev-secret-change-in-production".to_string()),
             cache: RwLock::new(None),
             client: reqwest::Client::new(),
         }
@@ -103,7 +105,7 @@ impl JwtValidator {
         DecodingKey::from_rsa_components(n, e).map_err(|e| format!("invalid RSA key: {e}"))
     }
 
-    pub async fn validate(&self, token: &str) -> Result<Claims, String> {
+    async fn validate_cloudflare_access(&self, token: &str) -> Result<Claims, String> {
         let kid = Self::decode_jwt_header_kid(token)?;
         let jwks = self.get_jwks().await?;
         let jwk = Self::find_jwk(&jwks, &kid)?;
@@ -120,5 +122,23 @@ impl JwtValidator {
             .map_err(|e| format!("JWT validation failed: {e}"))?;
 
         Ok(token_data.claims)
+    }
+
+    fn validate_hmac(&self, token: &str) -> Result<Claims, String> {
+        let key = DecodingKey::from_secret(self.hmac_secret.as_bytes());
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.validate_exp = true;
+
+        let token_data = decode::<Claims>(token, &key, &validation)
+            .map_err(|e| format!("HMAC JWT validation failed: {e}"))?;
+
+        Ok(token_data.claims)
+    }
+
+    pub async fn validate(&self, token: &str) -> Result<Claims, String> {
+        if let Ok(claims) = self.validate_hmac(token) {
+            return Ok(claims);
+        }
+        self.validate_cloudflare_access(token).await
     }
 }

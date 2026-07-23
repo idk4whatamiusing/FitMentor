@@ -26,6 +26,57 @@ pub struct AppState {
     pub api_shared_secret: String,
 }
 
+async fn run_migrations(pool: &PgPool) {
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS meal_plans (
+            id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id    TEXT NOT NULL,
+            date       DATE NOT NULL,
+            plan       JSONB NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("failed to create meal_plans table");
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS workout_plans (
+            id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id    TEXT NOT NULL,
+            date       DATE NOT NULL,
+            plan       JSONB NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("failed to create workout_plans table");
+
+    // Ensure unique indexes exist (idempotent)
+    sqlx::query(
+        r#"CREATE UNIQUE INDEX IF NOT EXISTS idx_meal_plans_user_date ON meal_plans(user_id, date)"#,
+    )
+    .execute(pool)
+    .await
+    .expect("failed to create meal_plans index");
+
+    sqlx::query(
+        r#"CREATE UNIQUE INDEX IF NOT EXISTS idx_workout_plans_user_date ON workout_plans(user_id, date)"#,
+    )
+    .execute(pool)
+    .await
+    .expect("failed to create workout_plans index");
+
+    tracing::info!("migrations complete");
+}
+
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
@@ -39,6 +90,8 @@ async fn main() {
     let pool = db::create_pool(&config.database_url)
         .await
         .expect("failed to connect to database");
+
+    run_migrations(&pool).await;
 
     let cache = services::cache::CacheService::new(&config.redis_url).await;
 
