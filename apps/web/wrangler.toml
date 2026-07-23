@@ -8,6 +8,9 @@ pages_build_output_dir = "dist"
 binding = "fitmentor_sessions"
 id = "712dbd1cf4c64aa5a09700f783b041b9"
 
+[ai]
+binding = "AI"
+
 # === Set these in Cloudflare Pages dashboard → Settings → Environment variables ===
 # DISCORD_CLIENT_ID=
 # DISCORD_CLIENT_SECRET=
