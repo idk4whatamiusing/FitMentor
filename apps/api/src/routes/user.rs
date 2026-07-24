@@ -254,7 +254,7 @@ pub async fn upsert_subscription(
         .await?;
     } else {
         sqlx::query(
-            "INSERT INTO subscriptions (user_id, tier, status, current_period_start, current_period_end) VALUES ($1, $2, $3, now(), now() + interval '30 days')",
+            "INSERT INTO subscriptions (user_id, polar_sub_id, polar_product_id, polar_price_id, tier, status, current_period_start, current_period_end) VALUES ($1, 'direct', 'direct', 'direct', $2, $3, now(), now() + interval '30 days')",
         )
         .bind(user.id)
         .bind(&input.tier)
