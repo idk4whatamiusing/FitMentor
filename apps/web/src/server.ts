@@ -103,7 +103,7 @@ async function handleMealPlan(request: Request): Promise<Response> {
       "X-User-Id": sub,
       "Content-Type": "application/json",
     };
-    const res = await fetch(`${apiUrl}/v1/meal/today", { method: "GET", headers });
+    const res = await fetch(`${apiUrl}/v1/meal/today`, { method: "GET", headers });
     if (!res.ok) return new Response(JSON.stringify({ error: "meal plan not found" }), { status: 404, headers: { "content-type": "application/json" } });
     const json = await res.json();
     return new Response(JSON.stringify(json), { headers: { "content-type": "application/json" } });
@@ -126,7 +126,7 @@ async function handleWorkoutPlan(request: Request): Promise<Response> {
       "X-User-Id": sub,
       "Content-Type": "application/json",
     };
-    const res = await fetch(`${apiUrl}/v1/workout/today", { method: "GET", headers });
+    const res = await fetch(`${apiUrl}/v1/workout/today`, { method: "GET", headers });
     if (!res.ok) return new Response(JSON.stringify({ error: "workout plan not found" }), { status: 404, headers: { "content-type": "application/json" } });
     const json = await res.json();
     return new Response(JSON.stringify(json), { headers: { "content-type": "application/json" } });

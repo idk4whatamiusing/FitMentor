@@ -3,7 +3,7 @@ import { getCookie } from "@tanstack/react-start/server";
 import { getSession as getKvSession } from "@/utils/session";
 
 const SESSION_COOKIE = "fitmentor_session";
-const API_URL = process.env.API_URL || "https://16-112-132-239.sslip.io";
+const API_URL = process.env.API_URL || "https://ham-apollo-situations-consolidated.trycloudflare.com";
 
 async function headers(): Promise<Record<string, string>> {
   const sid = getCookie(SESSION_COOKIE);

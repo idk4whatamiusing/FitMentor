@@ -25,6 +25,13 @@ export const fetchProfile = createServerFn({ method: "GET" }).handler(async () =
   const data = (json as Record<string, unknown>).data as Record<string, unknown> | undefined;
   const profile = data?.profile as Record<string, unknown> | undefined;
   if (!profile?.name) return null;
+
+  // If profile is fresh from DB default insert (created_at === updated_at), user hasn't onboarded yet
+  if (profile.createdAt && profile.updatedAt) {
+    const diff = Math.abs(new Date(profile.updatedAt as string).getTime() - new Date(profile.createdAt as string).getTime());
+    if (diff < 1000) return null;
+  }
+
   return profile as Profile;
 });
 

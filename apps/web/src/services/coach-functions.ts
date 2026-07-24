@@ -74,7 +74,7 @@ ${profileBlock}`;
     const sid = getCookie(SESSION_COOKIE);
     const session = sid ? await getSession(sid) : null;
     if (session?.sub) {
-      const apiUrl = process.env.API_URL || "https://16-112-132-239.sslip.io";
+      const apiUrl = process.env.API_URL || "https://ham-apollo-situations-consolidated.trycloudflare.com";
       const apiKey = process.env.API_SHARED_SECRET;
       const lastUserMsg = [...data.messages].reverse().find((m) => m.role === "user");
       try {
