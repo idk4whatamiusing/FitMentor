@@ -131,14 +131,18 @@ export const exchangeDiscordCode = createServerFn({ method: "POST" })
 
     setSessionCookie(sid);
 
-    if (apiKey) {
-      fetch(`${apiUrl}/v1/user/me`, {
-        headers: {
-          "X-Api-Key": apiKey,
-          "X-User-Id": sub,
-          "X-User-Email": email,
-        },
-      }).catch(() => {});
+    if (apiKey && apiUrl) {
+      try {
+        await fetch(`${apiUrl}/v1/user/me`, {
+          headers: {
+            "X-Api-Key": apiKey,
+            "X-User-Id": sub,
+            "X-User-Email": email,
+          },
+        });
+      } catch (e) {
+        console.error("Failed to create user in API:", e);
+      }
     }
 
     return {
