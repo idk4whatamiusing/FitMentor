@@ -1,5 +1,6 @@
 pub mod ai_plans;
 pub mod auth;
+pub mod coach_log;
 pub mod coach_sessions;
 pub mod health;
 pub mod logs;
@@ -39,6 +40,7 @@ pub fn routes(state: AppState) -> Router {
             "/v1/coach/sessions/{id}",
             axum::routing::get(coach_sessions::get).delete(coach_sessions::delete),
         )
+        .route("/v1/coach/log", axum::routing::post(coach_log::log))
         // AI Plans (daily cached)
         .route("/v1/meal/today", axum::routing::get(ai_plans::get_meal_plan).put(ai_plans::upsert_meal_plan))
         .route("/v1/workout/today", axum::routing::get(ai_plans::get_workout_plan).put(ai_plans::upsert_workout_plan))
