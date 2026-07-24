@@ -192,6 +192,162 @@ async function handleWorkoutPlan(request: Request): Promise<Response> {
   }
 }
 
+async function handleInjuryAssessment(request: Request): Promise<Response> {
+  try {
+    const env = getCloudflareEnv(request);
+    const sub = await getUserSub(request, env);
+
+    if (sub) {
+      const res = await callApi(sub, "/v1/tools/injury-advice", "GET");
+      if (res?.ok) {
+        const json = await res.json() as any;
+        const plan = json?.data?.plan;
+        if (plan) return new Response(JSON.stringify({ advice: typeof plan === "string" ? plan : JSON.stringify(plan) }), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+    }
+
+    if (!env?.AI) return new Response(JSON.stringify({ error: "AI unavailable" }), { status: 500, headers: { "content-type": "application/json" } });
+    const { area, description, profile } = await request.json();
+    const system = `You are a fitness physio assistant. Give personalized injury advice. Be concise, practical, and include exercise alternatives when relevant. Always include a disclaimer to see a doctor for serious injuries.`;
+    const prompt = `Pain area: ${area}\nDescription: ${description ?? "N/A"}\nProfile: ${JSON.stringify(profile ?? {})}\n\nProvide: 1) Likely cause 2) Home care tips 3) Exercise swaps 4) When to see a doctor`;
+    const result = await env.AI.run("@cf/meta/llama-4-scout-17b-16e-instruct", {
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: 1024,
+    });
+    const advice = aiText(result);
+    if (sub) callApi(sub, "/v1/tools/injury-advice", "PUT", { plan: advice }).catch(() => {});
+    return new Response(JSON.stringify({ advice }), {
+      headers: { "content-type": "application/json" },
+    });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e?.message ?? String(e) }), {
+      status: 500, headers: { "content-type": "application/json" },
+    });
+  }
+}
+
+async function handleBMITips(request: Request): Promise<Response> {
+  try {
+    const env = getCloudflareEnv(request);
+    const sub = await getUserSub(request, env);
+
+    if (sub) {
+      const res = await callApi(sub, "/v1/tools/bmi-advice", "GET");
+      if (res?.ok) {
+        const json = await res.json() as any;
+        const plan = json?.data?.plan;
+        if (plan) return new Response(JSON.stringify({ tips: typeof plan === "string" ? plan : JSON.stringify(plan) }), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+    }
+
+    if (!env?.AI) return new Response(JSON.stringify({ error: "AI unavailable" }), { status: 500, headers: { "content-type": "application/json" } });
+    const { bmi, category, profile } = await request.json();
+    const system = `You are a fitness and nutrition coach. Give personalized advice based on BMI and the user's goals. Be encouraging, specific, and actionable. Mention both nutrition and training tips.`;
+    const prompt = `BMI: ${bmi} (${category})\nGoal: ${profile?.goal ?? "fitness"}\nDiet: ${profile?.diet ?? "mixed"}\nPlace: ${profile?.place ?? "home"}\n\nGive 3-4 specific tips. Use plain text with short paragraphs, one tip per paragraph. No JSON, no markdown.`;
+    const result = await env.AI.run("@cf/meta/llama-4-scout-17b-16e-instruct", {
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: 1024,
+    });
+    const tips = aiText(result);
+    if (sub) callApi(sub, "/v1/tools/bmi-advice", "PUT", { plan: tips }).catch(() => {});
+    return new Response(JSON.stringify({ tips }), {
+      headers: { "content-type": "application/json" },
+    });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e?.message ?? String(e) }), {
+      status: 500, headers: { "content-type": "application/json" },
+    });
+  }
+}
+
+async function handleSleepAdvice(request: Request): Promise<Response> {
+  try {
+    const env = getCloudflareEnv(request);
+    const sub = await getUserSub(request, env);
+
+    if (sub) {
+      const res = await callApi(sub, "/v1/tools/sleep-advice", "GET");
+      if (res?.ok) {
+        const json = await res.json() as any;
+        const plan = json?.data?.plan;
+        if (plan) return new Response(JSON.stringify({ tips: typeof plan === "string" ? plan : JSON.stringify(plan) }), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+    }
+
+    if (!env?.AI) return new Response(JSON.stringify({ error: "AI unavailable" }), { status: 500, headers: { "content-type": "application/json" } });
+    const { avgSleep, logs } = await request.json();
+    const system = `You are a sleep coach. Analyze sleep patterns and give personalized tips to improve sleep quality.`;
+    const prompt = `Average sleep: ${avgSleep}h\nLast 7 days: ${JSON.stringify(logs)}\n\nGive 3 specific tips. Plain text with short paragraphs, one tip per paragraph. No JSON, no markdown.`;
+    const result = await env.AI.run("@cf/meta/llama-4-scout-17b-16e-instruct", {
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: 1024,
+    });
+    const tips = aiText(result);
+    if (sub) callApi(sub, "/v1/tools/sleep-advice", "PUT", { plan: tips }).catch(() => {});
+    return new Response(JSON.stringify({ tips }), {
+      headers: { "content-type": "application/json" },
+    });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e?.message ?? String(e) }), {
+      status: 500, headers: { "content-type": "application/json" },
+    });
+  }
+}
+
+async function handleFormAnalyze(request: Request): Promise<Response> {
+  try {
+    const env = getCloudflareEnv(request);
+    const sub = await getUserSub(request, env);
+
+    if (sub) {
+      const res = await callApi(sub, "/v1/tools/form-advice", "GET");
+      if (res?.ok) {
+        const json = await res.json() as any;
+        const plan = json?.data?.plan;
+        if (plan) return new Response(JSON.stringify({ analysis: typeof plan === "string" ? plan : JSON.stringify(plan) }), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+    }
+
+    if (!env?.AI) return new Response(JSON.stringify({ error: "AI unavailable" }), { status: 500, headers: { "content-type": "application/json" } });
+    const { exercise, description, profile } = await request.json();
+    const system = `You are an expert strength and conditioning coach. Analyze exercise form descriptions and give specific, actionable corrections. Focus on safety first, then effectiveness.`;
+    const prompt = `Exercise: ${exercise}\nHow the user describes their form: ${description ?? "N/A"}\nExperience: ${profile?.experience ?? "beginner"}\n\nProvide: 1) Common mistakes for this exercise 2) Specific form cues 3) Setup tips 4) Warning signs of bad form. Return as JSON with keys: mistakes (array), cues (array), setup (string), warnings (array).`;
+    const result = await env.AI.run("@cf/meta/llama-4-scout-17b-16e-instruct", {
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: 1024,
+    });
+    const analysis = aiText(result);
+    if (sub) callApi(sub, "/v1/tools/form-advice", "PUT", { plan: analysis }).catch(() => {});
+    return new Response(JSON.stringify({ analysis }), {
+      headers: { "content-type": "application/json" },
+    });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e?.message ?? String(e) }), {
+      status: 500, headers: { "content-type": "application/json" },
+    });
+  }
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
@@ -201,6 +357,18 @@ export default {
       }
       if (url.pathname === "/api/workout-plan" && request.method === "POST") {
         return await handleWorkoutPlan(request);
+      }
+      if (url.pathname === "/api/tools/injury" && request.method === "POST") {
+        return await handleInjuryAssessment(request);
+      }
+      if (url.pathname === "/api/tools/bmi-advice" && request.method === "POST") {
+        return await handleBMITips(request);
+      }
+      if (url.pathname === "/api/tools/sleep-advice" && request.method === "POST") {
+        return await handleSleepAdvice(request);
+      }
+      if (url.pathname === "/api/tools/form-analyze" && request.method === "POST") {
+        return await handleFormAnalyze(request);
       }
 
       const handler = await getServerEntry();

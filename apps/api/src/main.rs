@@ -74,6 +74,79 @@ async fn run_migrations(pool: &PgPool) {
     .await
     .expect("failed to create workout_plans index");
 
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS bmi_advice (
+            id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id    TEXT NOT NULL,
+            date       DATE NOT NULL,
+            plan       JSONB NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("failed to create bmi_advice table");
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS sleep_advice (
+            id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id    TEXT NOT NULL,
+            date       DATE NOT NULL,
+            plan       JSONB NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("failed to create sleep_advice table");
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS injury_advice (
+            id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id    TEXT NOT NULL,
+            date       DATE NOT NULL,
+            plan       JSONB NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("failed to create injury_advice table");
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS form_advice (
+            id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            user_id    TEXT NOT NULL,
+            date       DATE NOT NULL,
+            plan       JSONB NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at TIMESTAMPTZ not null default now()
+        );
+        "#,
+    )
+    .execute(pool)
+    .await
+    .expect("failed to create form_advice table");
+
+    sqlx::query(r#"CREATE UNIQUE INDEX IF NOT EXISTS idx_bmi_advice_user_date ON bmi_advice(user_id, date)"#)
+        .execute(pool).await.expect("failed to create bmi_advice index");
+    sqlx::query(r#"CREATE UNIQUE INDEX IF NOT EXISTS idx_sleep_advice_user_date ON sleep_advice(user_id, date)"#)
+        .execute(pool).await.expect("failed to create sleep_advice index");
+    sqlx::query(r#"CREATE UNIQUE INDEX IF NOT EXISTS idx_injury_advice_user_date ON injury_advice(user_id, date)"#)
+        .execute(pool).await.expect("failed to create injury_advice index");
+    sqlx::query(r#"CREATE UNIQUE INDEX IF NOT EXISTS idx_form_advice_user_date ON form_advice(user_id, date)"#)
+        .execute(pool).await.expect("failed to create form_advice index");
+
     tracing::info!("migrations complete");
 }
 

@@ -20,94 +20,59 @@ struct PlanRow {
     plan: Value,
 }
 
-pub async fn get_meal_plan(
-    auth: AuthUser,
-    State(state): State<AppState>,
-) -> Result<Response, AppError> {
-    let today = Utc::now().date_naive();
-    let row = sqlx::query_as::<_, PlanRow>(
-        r#"SELECT plan FROM meal_plans WHERE user_id = $1 AND date = $2"#,
-    )
-    .bind(&auth.user_id)
-    .bind(today)
-    .fetch_optional(&state.pool)
-    .await?;
+macro_rules! make_handlers {
+    ($table:ident, $get_fn:ident, $upsert_fn:ident) => {
+        pub async fn $get_fn(
+            auth: AuthUser,
+            State(state): State<AppState>,
+        ) -> Result<Response, AppError> {
+            let today = Utc::now().date_naive();
+            let table = stringify!($table);
+            let row = sqlx::query_as::<_, PlanRow>(
+                &format!("SELECT plan FROM {table} WHERE user_id = $1 AND date = $2"),
+            )
+            .bind(&auth.user_id)
+            .bind(today)
+            .fetch_optional(&state.pool)
+            .await?;
 
-    match row {
-        Some(r) => {
-            let resp = serde_json::json!({ "data": { "plan": r.plan } });
+            match row {
+                Some(r) => {
+                    let resp = serde_json::json!({ "data": { "plan": r.plan } });
+                    Ok((StatusCode::OK, AxumJson(resp)).into_response())
+                }
+                None => Err(AppError::NotFound),
+            }
+        }
+
+        pub async fn $upsert_fn(
+            auth: AuthUser,
+            State(state): State<AppState>,
+            AxumJson(payload): AxumJson<UpsertPlan>,
+        ) -> Result<Response, AppError> {
+            let today = Utc::now().date_naive();
+            let table = stringify!($table);
+
+            sqlx::query(
+                &format!(
+                    "INSERT INTO {table} (user_id, date, plan) VALUES ($1, $2, $3) ON CONFLICT (user_id, date) DO UPDATE SET plan = $3, updated_at = now()"
+                ),
+            )
+            .bind(&auth.user_id)
+            .bind(today)
+            .bind(&payload.plan)
+            .execute(&state.pool)
+            .await?;
+
+            let resp = serde_json::json!({ "data": { "ok": true } });
             Ok((StatusCode::OK, AxumJson(resp)).into_response())
         }
-        None => Err(AppError::NotFound),
-    }
+    };
 }
 
-pub async fn upsert_meal_plan(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    AxumJson(payload): AxumJson<UpsertPlan>,
-) -> Result<Response, AppError> {
-    let today = Utc::now().date_naive();
-
-    sqlx::query(
-        r#"INSERT INTO meal_plans (user_id, date, plan)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (user_id, date) DO UPDATE SET
-               plan = $3,
-               updated_at = now()"#,
-    )
-    .bind(&auth.user_id)
-    .bind(today)
-    .bind(&payload.plan)
-    .execute(&state.pool)
-    .await?;
-
-    let resp = serde_json::json!({ "data": { "ok": true } });
-    Ok((StatusCode::OK, AxumJson(resp)).into_response())
-}
-
-pub async fn get_workout_plan(
-    auth: AuthUser,
-    State(state): State<AppState>,
-) -> Result<Response, AppError> {
-    let today = Utc::now().date_naive();
-    let row = sqlx::query_as::<_, PlanRow>(
-        r#"SELECT plan FROM workout_plans WHERE user_id = $1 AND date = $2"#,
-    )
-    .bind(&auth.user_id)
-    .bind(today)
-    .fetch_optional(&state.pool)
-    .await?;
-
-    match row {
-        Some(r) => {
-            let resp = serde_json::json!({ "data": { "plan": r.plan } });
-            Ok((StatusCode::OK, AxumJson(resp)).into_response())
-        }
-        None => Err(AppError::NotFound),
-    }
-}
-
-pub async fn upsert_workout_plan(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    AxumJson(payload): AxumJson<UpsertPlan>,
-) -> Result<Response, AppError> {
-    let today = Utc::now().date_naive();
-
-    sqlx::query(
-        r#"INSERT INTO workout_plans (user_id, date, plan)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (user_id, date) DO UPDATE SET
-               plan = $3,
-               updated_at = now()"#,
-    )
-    .bind(&auth.user_id)
-    .bind(today)
-    .bind(&payload.plan)
-    .execute(&state.pool)
-    .await?;
-
-    let resp = serde_json::json!({ "data": { "ok": true } });
-    Ok((StatusCode::OK, AxumJson(resp)).into_response())
-}
+make_handlers!(meal_plans, get_meal_plan, upsert_meal_plan);
+make_handlers!(workout_plans, get_workout_plan, upsert_workout_plan);
+make_handlers!(bmi_advice, get_bmi_advice, upsert_bmi_advice);
+make_handlers!(sleep_advice, get_sleep_advice, upsert_sleep_advice);
+make_handlers!(injury_advice, get_injury_advice, upsert_injury_advice);
+make_handlers!(form_advice, get_form_advice, upsert_form_advice);

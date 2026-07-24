@@ -1,7 +1,5 @@
 pub mod ai_plans;
 pub mod auth;
-pub mod coach;
-pub mod coach_log;
 pub mod coach_sessions;
 pub mod health;
 pub mod logs;
@@ -32,9 +30,7 @@ pub fn routes(state: AppState) -> Router {
         .route("/v1/logs/today", axum::routing::put(logs::upsert_today))
         .route("/v1/logs", axum::routing::get(logs::get_range))
         .route("/v1/logs/streak", axum::routing::get(logs::get_streak))
-        // AI Coach (Epic 6)
-        .route("/v1/coach/chat", axum::routing::post(coach::chat))
-        .route("/v1/coach/log", axum::routing::post(coach_log::log))
+        // Coach Sessions
         .route(
             "/v1/coach/sessions",
             axum::routing::get(coach_sessions::list).post(coach_sessions::create),
@@ -46,6 +42,11 @@ pub fn routes(state: AppState) -> Router {
         // AI Plans (daily cached)
         .route("/v1/meal/today", axum::routing::get(ai_plans::get_meal_plan).put(ai_plans::upsert_meal_plan))
         .route("/v1/workout/today", axum::routing::get(ai_plans::get_workout_plan).put(ai_plans::upsert_workout_plan))
+        // AI Tools advice (daily cached)
+        .route("/v1/tools/bmi-advice", axum::routing::get(ai_plans::get_bmi_advice).put(ai_plans::upsert_bmi_advice))
+        .route("/v1/tools/sleep-advice", axum::routing::get(ai_plans::get_sleep_advice).put(ai_plans::upsert_sleep_advice))
+        .route("/v1/tools/injury-advice", axum::routing::get(ai_plans::get_injury_advice).put(ai_plans::upsert_injury_advice))
+        .route("/v1/tools/form-advice", axum::routing::get(ai_plans::get_form_advice).put(ai_plans::upsert_form_advice))
         // Payments (Epic 7)
         .route(
             "/v1/subscriptions/checkout",

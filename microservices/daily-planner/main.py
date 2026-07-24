@@ -180,6 +180,57 @@ def save_plan(conn, table: str, cf_sub: str, plan: list[dict]) -> None:
     conn.commit()
 
 
+def _generate_tips(system: str, prompt: str) -> list[str]:
+    result = _ai_retry(system, prompt + " Return ONLY a JSON array of strings, e.g. [\"tip1\", \"tip2\", \"tip3\"]. No markdown.", 1024)
+    if isinstance(result, list):
+        return result
+    return []
+
+
+def generate_bmi_advice(profile: dict) -> list[str]:
+    bmi = profile.get("bmi")
+    if not bmi:
+        weight = profile.get("weightKg", 70)
+        height = profile.get("heightCm", 170)
+        h_m = height / 100
+        bmi = round(weight / (h_m * h_m), 1) if h_m > 0 else 21.0
+
+    category = "Underweight" if bmi < 18.5 else "Normal" if bmi < 25 else "Overweight" if bmi < 30 else "Obese"
+    goal = profile.get("goal", "fitness")
+    diet = profile.get("diet", "mixed")
+    place = profile.get("place", "home")
+
+    system = "You are a fitness and nutrition coach. Give personalized advice based on BMI and goals."
+    prompt = f"BMI: {bmi} ({category}), Goal: {goal}, Diet: {diet}, Place: {place}. Give 3-4 specific tips."
+    return _generate_tips(system, prompt)
+
+
+def generate_sleep_advice(profile: dict, logs: list[dict]) -> list[str]:
+    sleep_vals = [l.get("sleep", 0) or 0 for l in logs if l.get("sleep")]
+    avg = round(sum(sleep_vals) / max(len(sleep_vals), 1), 1) if sleep_vals else 7
+    system = "You are a sleep coach. Analyze sleep patterns and give personalized tips."
+    prompt = f"Average sleep: {avg}h over last {len(logs)} days. Give 3 specific tips."
+    return _generate_tips(system, prompt)
+
+
+def generate_injury_prevention(profile: dict) -> list[str]:
+    exp = profile.get("experience", "beginner")
+    place = profile.get("place", "home")
+    goal = profile.get("goal", "fitness")
+    system = "You are a physio therapist. Give general injury prevention advice."
+    prompt = f"Experience: {exp}, Place: {place}, Goal: {goal}. Give 3 general injury prevention tips."
+    return _generate_tips(system, prompt)
+
+
+def generate_form_tips(profile: dict) -> list[str]:
+    exp = profile.get("experience", "beginner")
+    place = profile.get("place", "home")
+    goal = profile.get("goal", "fitness")
+    system = "You are a strength coach. Give general exercise form advice."
+    prompt = f"Experience: {exp}, Place: {place}, Goal: {goal}. Give 3 general form tips for common exercises."
+    return _generate_tips(system, prompt)
+
+
 def run():
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
     users = get_users(conn)
@@ -196,6 +247,8 @@ def run():
                 logger.warning("No profile for %s, skipping", cf_sub)
                 continue
 
+            recent_logs = get_recent_logs(conn, user_uuid, 7)
+
             # Generate meal plan
             meal_plan = generate_meal_plan(profile)
             save_plan(conn, "meal_plans", cf_sub, meal_plan)
@@ -205,6 +258,26 @@ def run():
             workout_plan = generate_workout_plan(profile)
             save_plan(conn, "workout_plans", cf_sub, workout_plan)
             logger.info("  Workout plan saved")
+
+            # BMI advice
+            bmi_advice = generate_bmi_advice(profile)
+            save_plan(conn, "bmi_advice", cf_sub, bmi_advice)
+            logger.info("  BMI advice saved")
+
+            # Sleep advice
+            sleep_advice = generate_sleep_advice(profile, recent_logs)
+            save_plan(conn, "sleep_advice", cf_sub, sleep_advice)
+            logger.info("  Sleep advice saved")
+
+            # General injury prevention
+            injury_advice = generate_injury_prevention(profile)
+            save_plan(conn, "injury_advice", cf_sub, injury_advice)
+            logger.info("  Injury prevention saved")
+
+            # General form tips
+            form_advice = generate_form_tips(profile)
+            save_plan(conn, "form_advice", cf_sub, form_advice)
+            logger.info("  Form tips saved")
 
         except Exception as e:
             logger.error("Failed for user %s: %s", cf_sub, e)
