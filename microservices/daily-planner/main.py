@@ -31,21 +31,21 @@ def get_users(conn) -> list[dict[str, Any]]:
         return cur.fetchall()
 
 
-def get_profile(conn, user_id: str) -> dict[str, Any] | None:
+def get_profile(conn, user_id) -> dict[str, Any] | None:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
-            "SELECT * FROM profiles WHERE user_id = %s::uuid",
+            "SELECT * FROM profiles WHERE user_id = %s",
             (user_id,),
         )
         return cur.fetchone()
 
 
-def get_recent_logs(conn, user_uuid: str, days: int = 7) -> list[dict[str, Any]]:
+def get_recent_logs(conn, user_uuid, days: int = 7) -> list[dict[str, Any]]:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute(
             """SELECT date, water, sleep, steps, protein_g, workout_done, weight_kg
                FROM daily_logs
-               WHERE user_id = %s::uuid AND date >= CURRENT_DATE - INTERVAL '%s days'
+               WHERE user_id = %s AND date >= CURRENT_DATE - INTERVAL '%s days'
                ORDER BY date DESC""",
             (user_uuid, days),
         )

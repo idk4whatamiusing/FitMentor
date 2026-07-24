@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
-import { INDIAN_MEAL_PLANS, COMMON_FOODS } from "@/utils/meals";
+import { COMMON_FOODS } from "@/utils/meals";
 import { useProfile, calcTargets } from "@/utils/profile";
 import { saveLog, ensureToday } from "@/utils/habits";
 import { loadCustomProteinTarget, saveCustomProteinTarget } from "@/utils/proteinTarget";
-import { Plus, Apple, Target, Pencil, Check } from "lucide-react";
+import { Plus, Apple, Target, Pencil, Check, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
+import type { MealPlan } from "@fitmentor/shared";
 
 export const Route = createFileRoute("/nutrition")({
   head: () => ({ meta: [{ title: "Nutrition — FitMentor" }] }),
@@ -20,6 +21,9 @@ function Nutrition() {
   const [today, setToday] = useState(() => ensureToday());
   const [customProtein, setCustomProtein] = useState(() => loadCustomProteinTarget());
   const [editingProtein, setEditingProtein] = useState(false);
+  const [aiPlans, setAiPlans] = useState<MealPlan[] | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState(false);
+  const [planAttempted, setPlanAttempted] = useState(false);
 
   useEffect(() => {
     setToday(ensureToday());
@@ -40,9 +44,40 @@ function Nutrition() {
   const targets = profile ? calcTargets(profile) : null;
   const effectiveProtein = customProtein ?? targets?.protein ?? 0;
 
-  const plans = INDIAN_MEAL_PLANS.filter((p) =>
-    profile?.diet === "veg" ? p.diet === "veg" : true,
-  );
+  const loadAI = useCallback(async () => {
+    if (!profile || !targets) return;
+    setPlanAttempted(true);
+    setLoadingPlan(true);
+    const ac = new AbortController();
+    const timer = setTimeout(() => ac.abort(), 20000);
+    try {
+      const res = await fetch("/api/meal-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          diet: profile.diet,
+          budgetPerDay: profile.budgetPerDay,
+          calories: targets.calories,
+          protein: targets.protein,
+          healthConditions: profile.healthConditions,
+        }),
+        signal: ac.signal,
+      });
+      const plans = await res.json();
+      const arr = Array.isArray(plans) ? plans : [plans];
+      if (arr.length > 0) setAiPlans(arr);
+    } catch (e) {
+      console.error("AI meal plan failed:", e);
+    }
+    clearTimeout(timer);
+    setLoadingPlan(false);
+  }, [profile, targets]);
+
+  useEffect(() => {
+    if (profile && targets && !planAttempted && !loadingPlan) loadAI();
+  }, [profile, targets, planAttempted, loadingPlan]);
+
+  const plans = aiPlans ?? [];
 
   return (
     <MobileShell>
@@ -121,6 +156,45 @@ function Nutrition() {
 
       {tab === "plans" && (
         <div className="space-y-3 px-5 py-4">
+          {loadingPlan && !aiPlans && (
+            <div className="flex items-center justify-center gap-2 rounded-2xl border border-primary/30 bg-primary/10 p-3 text-sm font-semibold text-primary backdrop-blur">
+              <Sparkles className="h-4 w-4 animate-pulse" />
+              Generating your plan…
+            </div>
+          )}
+          {loadingPlan && (
+            <div className="space-y-3">
+              {[1].map((i) => (
+                <div key={i} className="animate-pulse overflow-hidden rounded-2xl border border-white/10 bg-card/70">
+                  <div className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="h-5 w-40 rounded bg-primary/10" />
+                      <div className="h-5 w-24 rounded-full bg-primary/10" />
+                    </div>
+                  </div>
+                  <div className="divide-y divide-white/5">
+                    {[1, 2, 3, 4].map((j) => (
+                      <div key={j} className="flex items-center gap-3 p-3">
+                        <div className="flex-1 space-y-1">
+                          <div className="h-4 w-24 rounded bg-primary/10" />
+                          <div className="h-3 w-48 rounded bg-primary/5" />
+                        </div>
+                        <div className="space-y-1 text-right">
+                          <div className="h-3 w-16 rounded bg-primary/10" />
+                          <div className="h-3 w-12 rounded bg-primary/10" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!loadingPlan && plans.length === 0 && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {planAttempted ? "Failed to generate your meal plan." : "Set up your profile to get a meal plan."}
+            </p>
+          )}
           {plans.map((plan) => {
             const totals = plan.meals.reduce(
               (acc, m) => ({ k: acc.k + m.kcal, p: acc.p + m.protein }),

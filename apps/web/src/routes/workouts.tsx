@@ -2,10 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { useProfile } from "@/utils/profile";
-import { generateWorkoutPlan, EXERCISE_LIBRARY, type WorkoutDay } from "@/utils/workouts";
+import { EXERCISE_LIBRARY, type WorkoutDay } from "@/utils/workouts";
 import { saveLog, ensureToday } from "@/utils/habits";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronRight, Clock, Dumbbell, Trophy } from "lucide-react";
+import { Check, ChevronRight, Clock, Dumbbell, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/workouts")({
   head: () => ({ meta: [{ title: "Workouts — FitMentor" }] }),
@@ -15,11 +16,27 @@ export const Route = createFileRoute("/workouts")({
 function Workouts() {
   const [tab, setTab] = useState<"plan" | "library">("plan");
   const [plan, setPlan] = useState<WorkoutDay[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [openIdx, setOpenIdx] = useState<number | null>(0);
   const { profile } = useProfile();
 
   useEffect(() => {
-    if (profile) setPlan(generateWorkoutPlan(profile));
+    setFetchError(false);
+    if (!profile) { setLoading(false); return; }
+    setLoading(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    fetch("/api/workout-plan", {
+      method: "POST",
+      body: JSON.stringify(profile),
+      signal: controller.signal,
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(setPlan)
+      .catch(() => setFetchError(true))
+      .finally(() => { clearTimeout(timeout); setLoading(false); });
+    return () => { controller.abort(); clearTimeout(timeout); };
   }, [profile]);
 
   return (
@@ -37,7 +54,26 @@ function Workouts() {
 
       {tab === "plan" && (
         <div className="px-5 py-4 space-y-3">
-          {plan.map((day, i) => (
+          {loading && (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="animate-pulse rounded-2xl border border-white/10 bg-card/70 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-11 w-11 rounded-xl bg-primary/20" />
+                    <div className="flex-1 space-y-1.5">
+                      <div className="h-3 w-16 rounded bg-primary/10" />
+                      <div className="h-4 w-32 rounded bg-primary/10" />
+                      <div className="h-3 w-24 rounded bg-primary/10" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {!loading && plan.length === 0 && fetchError && (
+            <p className="py-8 text-center text-sm text-muted-foreground">Failed to generate workout plan.</p>
+          )}
+          {!loading && plan.map((day, i) => (
             <div key={i} className="overflow-hidden rounded-2xl border border-white/10 bg-card/70 backdrop-blur-xl transition hover:border-primary/30">
               <button
                 onClick={() => setOpenIdx(openIdx === i ? null : i)}
@@ -78,6 +114,7 @@ function Workouts() {
                     onClick={() => {
                       const log = ensureToday();
                       saveLog({ ...log, workoutDone: true });
+                      toast.success("Workout logged!");
                     }}
                   >
                     <Check className="mr-2 h-4 w-4" /> Mark complete
