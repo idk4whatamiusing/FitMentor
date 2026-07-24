@@ -101,11 +101,35 @@ def call_cf_ai(system: str, prompt: str, max_tokens: int = 2048) -> str:
         return raw.replace("```json", "").replace("```", "").strip()
 
 
+def _parse_health(profile: dict) -> str:
+    raw = profile.get("health_conditions") or profile.get("healthConditions", [])
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return raw.strip("[]\" ")
+    if isinstance(raw, list):
+        return ", ".join(raw)
+    return str(raw) if raw else "none"
+
+
+def _ai_retry(system: str, prompt: str, max_tokens: int = 2048, retries: int = 3) -> list | dict:
+    for attempt in range(retries):
+        raw = call_cf_ai(system, prompt, max_tokens)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as e:
+            if attempt < retries - 1:
+                logger.warning("AI JSON parse error (attempt %d): %s — retrying", attempt + 1, e)
+                continue
+            raise
+    return []
+
+
 def generate_meal_plan(profile: dict) -> list[dict]:
     diet = profile.get("diet", "mixed")
     budget = profile.get("budget_per_day") or profile.get("budgetPerDay", 150)
-    health = profile.get("health_conditions") or profile.get("healthConditions", [])
-    health_str = ", ".join(health) if health else "none"
+    health_str = _parse_health(profile)
 
     system = (
         'You are a meal planner for Indian beginners. '
@@ -116,8 +140,7 @@ def generate_meal_plan(profile: dict) -> list[dict]:
     )
     prompt = f"Diet: {diet}, budget: INR {budget}/day, health: {health_str}"
 
-    raw = call_cf_ai(system, prompt, 2048)
-    parsed = json.loads(raw)
+    parsed = _ai_retry(system, prompt, 2048)
     meals = parsed.get("meals") if isinstance(parsed, dict) and isinstance(parsed.get("meals"), list) else (parsed if isinstance(parsed, list) else [])
     plan_id = f"plan-{date.today().isoformat()}"
     return [{"id": plan_id, "title": "Today's Plan", "budgetPerDay": budget, "diet": diet, "meals": meals}]
@@ -128,8 +151,7 @@ def generate_workout_plan(profile: dict) -> list[dict]:
     goal = profile.get("goal", "fitness")
     place = profile.get("place", "home")
     exp = profile.get("experience", "beginner")
-    health = profile.get("health_conditions") or profile.get("healthConditions", [])
-    health_str = ", ".join(health) if health else "none"
+    health_str = _parse_health(profile)
 
     system = (
         f"You are a fitness coach for Indian beginners. "
@@ -141,8 +163,7 @@ def generate_workout_plan(profile: dict) -> list[dict]:
     )
     prompt = f"Goal: {goal}, place: {place}, experience: {exp}, health: {health_str}"
 
-    raw = call_cf_ai(system, prompt, 4096)
-    return json.loads(raw)
+    return _ai_retry(system, prompt, 4096)
 
 
 def save_plan(conn, table: str, cf_sub: str, plan: list[dict]) -> None:
