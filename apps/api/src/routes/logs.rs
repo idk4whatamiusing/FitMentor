@@ -91,7 +91,7 @@ pub async fn upsert_today(
     .fetch_one(&state.pool)
     .await?;
 
-    state.cache.invalidate_today(user.id).await;
+    state.cache.invalidate_today(&user.id.to_string()).await;
     state.cache.delete(&format!("cache:today:{}", auth.user_id)).await;
 
     let response = serde_json::json!({ "data": { "log": log } });

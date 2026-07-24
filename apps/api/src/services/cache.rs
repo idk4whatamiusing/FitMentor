@@ -44,12 +44,12 @@ impl CacheService {
         let _: Result<(), _> = redis::cmd("DEL").arg(key).query_async(&mut conn).await;
     }
 
-    pub async fn invalidate_user(&self, user_id: i32) {
+    pub async fn invalidate_user(&self, user_id: &str) {
         self.delete(&format!("cache:user:{user_id}")).await;
         self.delete(&format!("cache:profile:{user_id}")).await;
     }
 
-    pub async fn invalidate_today(&self, user_id: i32) {
+    pub async fn invalidate_today(&self, user_id: &str) {
         self.delete(&format!("cache:today:{user_id}")).await;
     }
 }
