@@ -21,10 +21,16 @@ pub struct DailyLog {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateDailyLog {
+    #[serde(alias = "water")]
     pub water: Option<i16>,
+    #[serde(alias = "sleep")]
     pub sleep: Option<i16>,
+    #[serde(alias = "steps")]
     pub steps: Option<i32>,
+    #[serde(alias = "protein_g")]
     pub protein_g: Option<i16>,
+    #[serde(alias = "workout_done")]
     pub workout_done: Option<bool>,
+    #[serde(alias = "weight_kg")]
     pub weight_kg: Option<f32>,
 }
