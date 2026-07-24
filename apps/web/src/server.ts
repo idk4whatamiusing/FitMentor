@@ -135,20 +135,43 @@ async function handleWorkoutPlan(request: Request): Promise<Response> {
   }
 }
 
-async function handleInjuryPost(request: Request): Promise<Response> {
-  return new Response(JSON.stringify({ error: "use GET /api/tools/injury-advice to get stored advice" }), { status: 400, headers: { "content-type": "application/json" } });
+async function proxyGetAdvice(request: Request, apiPath: string): Promise<Response> {
+  try {
+    const env = getCloudflareEnv(request);
+    const sub = await getUserSub(request, env);
+    if (!sub) return new Response(JSON.stringify({ error: "not authenticated" }), { status: 401, headers: { "content-type": "application/json" } });
+
+    const apiUrl = process.env.API_URL || "https://16-112-132-239.sslip.io";
+    const apiKey = process.env.API_SHARED_SECRET;
+    const headers: Record<string, string> = {
+      "X-Api-Key": apiKey ?? "",
+      "X-User-Id": sub,
+      "Content-Type": "application/json",
+    };
+    const res = await fetch(`${apiUrl}${apiPath}`, { method: "GET", headers });
+    if (!res.ok) return new Response(JSON.stringify({ tips: [] }), { headers: { "content-type": "application/json" } });
+    const json = await res.json();
+    const plan = json?.data?.plan ?? [];
+    return new Response(JSON.stringify({ tips: Array.isArray(plan) ? plan : [] }), { headers: { "content-type": "application/json" } });
+  } catch {
+    return new Response(JSON.stringify({ tips: [] }), { headers: { "content-type": "application/json" } });
+  }
 }
 
-async function handleBMIPost(request: Request): Promise<Response> {
-  return new Response(JSON.stringify({ error: "use GET /api/tools/bmi-advice to get stored advice" }), { status: 400, headers: { "content-type": "application/json" } });
+async function handleBMIGet(request: Request): Promise<Response> {
+  return proxyGetAdvice(request, "/v1/tools/bmi-advice");
 }
 
-async function handleSleepPost(request: Request): Promise<Response> {
-  return new Response(JSON.stringify({ error: "use GET /api/tools/sleep-advice to get stored advice" }), { status: 400, headers: { "content-type": "application/json" } });
+async function handleSleepGet(request: Request): Promise<Response> {
+  return proxyGetAdvice(request, "/v1/tools/sleep-advice");
 }
 
-async function handleFormPost(request: Request): Promise<Response> {
-  return new Response(JSON.stringify({ error: "use GET /api/tools/form-advice to get stored advice" }), { status: 400, headers: { "content-type": "application/json" } });
+async function handleInjuryGet(request: Request): Promise<Response> {
+  return proxyGetAdvice(request, "/v1/tools/injury-advice");
+}
+
+async function handleFormGet(request: Request): Promise<Response> {
+  return proxyGetAdvice(request, "/v1/tools/form-advice");
 }
 
 export default {
@@ -161,17 +184,17 @@ export default {
       if (url.pathname === "/api/workout-plan" && request.method === "POST") {
         return await handleWorkoutPlan(request);
       }
-      if (url.pathname === "/api/tools/injury" && request.method === "POST") {
-        return await handleInjuryPost(request);
+      if (url.pathname === "/api/tools/injury" && request.method === "GET") {
+        return await handleInjuryGet(request);
       }
-      if (url.pathname === "/api/tools/bmi-advice" && request.method === "POST") {
-        return await handleBMIPost(request);
+      if (url.pathname === "/api/tools/bmi-advice" && request.method === "GET") {
+        return await handleBMIGet(request);
       }
-      if (url.pathname === "/api/tools/sleep-advice" && request.method === "POST") {
-        return await handleSleepPost(request);
+      if (url.pathname === "/api/tools/sleep-advice" && request.method === "GET") {
+        return await handleSleepGet(request);
       }
-      if (url.pathname === "/api/tools/form-analyze" && request.method === "POST") {
-        return await handleFormPost(request);
+      if (url.pathname === "/api/tools/form-analyze" && request.method === "GET") {
+        return await handleFormGet(request);
       }
 
       const handler = await getServerEntry();

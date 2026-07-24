@@ -124,12 +124,10 @@ function BMIAnalyzer() {
   const getAiRecommendations = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/tools/bmi-advice", {
-        method: "POST",
-        body: JSON.stringify({ bmi: bmi.toFixed(1), category, profile }),
-      });
+      const res = await fetch("/api/tools/bmi-advice", { method: "GET" });
       const data = await res.json();
-      setAiTips(data.tips ?? data.error ?? "No advice available");
+      const tips = Array.isArray(data.tips) ? data.tips : Array.isArray(data) ? data : [];
+      setAiTips(tips.length > 0 ? tips.join("\n") : data.error ?? "No advice available yet. Generate a plan first.");
     } catch {
       setAiTips("Failed to get AI recommendations. Try again.");
     }
@@ -258,12 +256,10 @@ function SleepTracker() {
   const getSleepTips = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/tools/sleep-advice", {
-        method: "POST",
-        body: JSON.stringify({ avgSleep, logs }),
-      });
+      const res = await fetch("/api/tools/sleep-advice", { method: "GET" });
       const data = await res.json();
-      setAiTips(data.tips ?? data.error ?? "No advice available");
+      const tips = Array.isArray(data.tips) ? data.tips : Array.isArray(data) ? data : [];
+      setAiTips(tips.length > 0 ? tips.join("\n") : data.error ?? "No advice available yet. Generate a plan first.");
     } catch {
       setAiTips("Failed to get AI advice. Try again.");
     }
@@ -417,12 +413,10 @@ function InjuryAssessment() {
     if (!painArea) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/tools/injury", {
-        method: "POST",
-        body: JSON.stringify({ area: painArea, description, profile }),
-      });
+      const res = await fetch("/api/tools/injury", { method: "GET" });
       const data = await res.json();
-      setAdvice(data.advice ?? data.error ?? "No advice available");
+      const tips = Array.isArray(data.tips) ? data.tips : Array.isArray(data) ? data : [];
+      setAdvice(tips.length > 0 ? tips.join("\n") : data.error ?? "No advice available yet. Generate a plan first.");
     } catch {
       setAdvice("Failed to get AI advice. Try again.");
     }
@@ -687,12 +681,10 @@ function FormAnalyzer() {
     if (!exercise) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/tools/form-analyze", {
-        method: "POST",
-        body: JSON.stringify({ exercise, description, profile }),
-      });
+      const res = await fetch("/api/tools/form-analyze", { method: "GET" });
       const data = await res.json();
-      setAnalysis(data.analysis ?? data.error ?? "No analysis available");
+      const tips = Array.isArray(data.tips) ? data.tips : Array.isArray(data) ? data : [];
+      setAnalysis(tips.length > 0 ? tips.join("\n") : data.error ?? "No analysis available yet. Generate a plan first.");
     } catch {
       setAnalysis("Failed to analyze. Try again.");
     }

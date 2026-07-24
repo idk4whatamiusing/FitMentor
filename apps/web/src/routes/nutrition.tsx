@@ -63,8 +63,9 @@ function Nutrition() {
         }),
         signal: ac.signal,
       });
-      const plans = await res.json();
-      const arr = Array.isArray(plans) ? plans : [plans];
+      const json = await res.json();
+      const raw = json?.data?.plan ?? json;
+      const arr = Array.isArray(raw) ? raw : [raw];
       if (arr.length > 0) setAiPlans(arr);
     } catch (e) {
       console.error("AI meal plan failed:", e);
