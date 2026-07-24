@@ -1,6 +1,7 @@
 use axum::extract::{State, Json as AxumJson};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use serde::Deserialize;
 
 use crate::auth::middleware::AuthUser;
 use crate::error::AppError;
