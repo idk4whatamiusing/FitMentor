@@ -190,6 +190,33 @@ def generate_form_tips(profile: dict) -> list[str]:
     return _generate_tips(system, prompt)
 
 
+def get_users(conn) -> list[dict]:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SELECT id, cf_access_sub, name FROM users")
+        return cur.fetchall()
+
+
+def get_user_by_cf_sub(conn, cf_sub: str) -> dict | None:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SELECT id, cf_access_sub, name FROM users WHERE cf_access_sub = %s", (cf_sub,))
+        return cur.fetchone()
+
+
+def get_profile(conn, user_id) -> dict | None:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SELECT * FROM profiles WHERE user_id = %s", (str(user_id),))
+        return cur.fetchone()
+
+
+def get_recent_logs(conn, user_id, days: int = 7) -> list[dict]:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT * FROM daily_logs WHERE user_id = %s ORDER BY date DESC LIMIT %s",
+            (str(user_id), days),
+        )
+        return cur.fetchall()
+
+
 def generate_for_user(conn, cf_sub: str) -> None:
     user = get_user_by_cf_sub(conn, cf_sub)
     if not user:
