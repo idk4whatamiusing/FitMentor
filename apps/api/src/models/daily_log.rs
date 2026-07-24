@@ -9,9 +9,9 @@ pub struct DailyLog {
     pub user_id: Uuid,
     pub date: NaiveDate,
     pub water: i16,
-    pub sleep: f32,
+    pub sleep: i16,
     pub steps: i32,
-    pub protein_g: f32,
+    pub protein_g: i16,
     pub workout_done: bool,
     pub weight_kg: Option<f32>,
     pub created_at: Option<DateTime<Utc>>,
@@ -22,9 +22,9 @@ pub struct DailyLog {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateDailyLog {
     pub water: Option<i16>,
-    pub sleep: Option<f32>,
+    pub sleep: Option<i16>,
     pub steps: Option<i32>,
-    pub protein_g: Option<f32>,
+    pub protein_g: Option<i16>,
     pub workout_done: Option<bool>,
     pub weight_kg: Option<f32>,
 }
