@@ -55,8 +55,8 @@ export const syncSubscription = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const h = await headers();
-    const res = await fetch(`${API_URL}/v1/subscriptions/checkout`, {
-      method: "POST",
+    const res = await fetch(`${API_URL}/v1/user/subscription`, {
+      method: "PUT",
       headers: h,
       body: JSON.stringify(data),
     });

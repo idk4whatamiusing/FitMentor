@@ -219,3 +219,37 @@ pub async fn update_protein_target(
 
     Ok((StatusCode::OK, AxumJson(response)).into_response())
 }
+
+#[derive(Deserialize)]
+pub struct SubscriptionInput {
+    pub tier: String,
+    pub status: Option<String>,
+}
+
+pub async fn upsert_subscription(
+    auth: AuthUser,
+    State(state): State<AppState>,
+    AxumJson(input): AxumJson<SubscriptionInput>,
+) -> Result<Response, AppError> {
+    let user = get_user_by_cf_sub(&state.pool, &auth.user_id).await?;
+    let status = input.status.as_deref().unwrap_or("active");
+
+    sqlx::query(
+        r#"INSERT INTO subscriptions (user_id, tier, status, current_period_start, current_period_end)
+           VALUES ($1, $2, $3, now(), now() + interval '30 days')
+           ON CONFLICT (user_id) DO UPDATE SET
+               tier = EXCLUDED.tier,
+               status = EXCLUDED.status,
+               current_period_start = now(),
+               current_period_end = now() + interval '30 days',
+               updated_at = now()"#,
+    )
+    .bind(user.id)
+    .bind(&input.tier)
+    .bind(status)
+    .execute(&state.pool)
+    .await?;
+
+    let response = serde_json::json!({ "ok": true });
+    Ok((StatusCode::OK, AxumJson(response)).into_response())
+}

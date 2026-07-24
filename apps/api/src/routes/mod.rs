@@ -26,6 +26,10 @@ pub fn routes(state: AppState) -> Router {
             "/v1/user/profile/protein-target",
             axum::routing::put(user::update_protein_target),
         )
+        .route(
+            "/v1/user/subscription",
+            axum::routing::put(user::upsert_subscription),
+        )
         // Daily Logs
         .route("/v1/logs/today", axum::routing::get(logs::get_today))
         .route("/v1/logs/today", axum::routing::put(logs::upsert_today))
