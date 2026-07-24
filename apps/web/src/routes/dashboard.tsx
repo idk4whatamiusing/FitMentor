@@ -4,7 +4,8 @@ import { Flame, Dumbbell, Apple, TrendingUp, Sparkles, ChevronRight } from "luci
 import { loadProfile, saveProfile, calcTargets, GOAL_LABEL, type Profile } from "@/utils/profile";
 import { ensureToday, computeStreak, type DailyLog } from "@/utils/habits";
 import { generateWorkoutPlan } from "@/utils/workouts";
-import { fetchProfile } from "@/services/sync";
+import { getClient } from "@/lib/graphql/client";
+import { ME_QUERY } from "@/lib/graphql/queries";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DailyHabits } from "@/components/dashboard/DailyHabits";
 import { CoachChat } from "@/components/dashboard/CoachChat";
@@ -25,11 +26,18 @@ useEffect(() => {
   const init = async () => {
     let p = loadProfile();
     if (!p) {
-      const profile = await fetchProfile();
-      if (profile) {
-        saveProfile(profile);
-        p = profile;
-      } else {
+      try {
+        const client = getClient();
+        const data = await client.request<{ me: { profile: Profile | null } }>(ME_QUERY);
+        const profile = data.me.profile;
+        if (profile && profile.name) {
+          saveProfile(profile);
+          p = profile;
+        } else {
+          navigate({ to: "/onboarding" });
+          return;
+        }
+      } catch {
         navigate({ to: "/onboarding" });
         return;
       }

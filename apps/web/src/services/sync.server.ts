@@ -100,3 +100,15 @@ export const fetchWorkoutCompletions = createServerFn({ method: "POST" }).handle
     return res.json();
   },
 );
+
+export const fetchSubscription = createServerFn({ method: "POST" }).handler(
+  async () => {
+    const h = await headers();
+    const res = await fetch(`${API_URL}/v1/user/subscription`, {
+      method: "GET",
+      headers: h,
+    });
+    if (!res.ok) return { data: { subscription: null } };
+    return res.json();
+  },
+);

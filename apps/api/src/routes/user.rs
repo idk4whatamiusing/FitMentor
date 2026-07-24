@@ -60,7 +60,8 @@ pub async fn get_me(
     auth: AuthUser,
     State(state): State<AppState>,
 ) -> Result<Response, AppError> {
-    let user = upsert_user(&state.pool, &auth.user_id, &auth.email).await?;
+    let pool = state.shard_router.get_pool_for_user(&auth.user_id);
+    let user = upsert_user(pool, &auth.user_id, &auth.email).await?;
 
     let cache_key = format!("cache:user:{}", user.id);
     if let Some(cached) = state.cache.get(&cache_key).await {
@@ -73,7 +74,7 @@ pub async fn get_me(
         r#"INSERT INTO profiles (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING"#,
     )
     .bind(user.id)
-    .execute(&state.pool)
+    .execute(pool)
     .await;
 
     let profile = sqlx::query_as::<_, Profile>(
@@ -83,7 +84,7 @@ pub async fn get_me(
            FROM profiles WHERE user_id = $1"#,
     )
     .bind(user.id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(pool)
     .await?;
 
     let response = serde_json::json!({
@@ -108,7 +109,8 @@ pub async fn check_user_exists(
     auth: AuthUser,
     State(state): State<AppState>,
 ) -> Result<Response, AppError> {
-    let exists = get_user_by_cf_sub(&state.pool, &auth.user_id).await.is_ok();
+    let pool = state.shard_router.get_pool_for_user(&auth.user_id);
+    let exists = get_user_by_cf_sub(pool, &auth.user_id).await.is_ok();
     Ok((StatusCode::OK, AxumJson(serde_json::json!({ "exists": exists }))).into_response())
 }
 
@@ -117,7 +119,8 @@ pub async fn update_profile(
     State(state): State<AppState>,
     AxumJson(input): AxumJson<UpdateProfile>,
 ) -> Result<Response, AppError> {
-    let user = get_user_by_cf_sub(&state.pool, &auth.user_id).await?;
+    let pool = state.shard_router.get_pool_for_user(&auth.user_id);
+    let user = get_user_by_cf_sub(pool, &auth.user_id).await?;
 
     let profile = sqlx::query_as::<_, Profile>(
         r#"UPDATE profiles SET
@@ -152,7 +155,7 @@ pub async fn update_profile(
     .bind(input.days_per_week)
     .bind(input.budget_per_day.map(|v| v as i16))
     .bind(&input.health_conditions)
-    .fetch_one(&state.pool)
+    .fetch_one(pool)
     .await?;
 
     state.cache.invalidate_user(&user.id.to_string()).await;
@@ -193,7 +196,8 @@ pub async fn update_protein_target(
     State(state): State<AppState>,
     AxumJson(input): AxumJson<ProteinTarget>,
 ) -> Result<Response, AppError> {
-    let user = get_user_by_cf_sub(&state.pool, &auth.user_id).await?;
+    let pool = state.shard_router.get_pool_for_user(&auth.user_id);
+    let user = get_user_by_cf_sub(pool, &auth.user_id).await?;
 
     sqlx::query(
         r#"UPDATE profiles SET custom_protein_g = $2, updated_at = now()
@@ -201,7 +205,7 @@ pub async fn update_protein_target(
     )
     .bind(user.id)
     .bind(input.protein_g)
-    .execute(&state.pool)
+    .execute(pool)
     .await?;
 
     state.cache.invalidate_user(&user.id.to_string()).await;
@@ -232,7 +236,8 @@ pub async fn upsert_subscription(
     State(state): State<AppState>,
     AxumJson(input): AxumJson<SubscriptionInput>,
 ) -> Result<Response, AppError> {
-    let user = get_user_by_cf_sub(&state.pool, &auth.user_id).await?;
+    let pool = state.shard_router.get_pool_for_user(&auth.user_id);
+    let user = get_user_by_cf_sub(pool, &auth.user_id).await?;
     let status = input.status.as_deref().unwrap_or("active");
 
     // Check if subscription exists
@@ -240,7 +245,7 @@ pub async fn upsert_subscription(
         "SELECT EXISTS(SELECT 1 FROM subscriptions WHERE user_id = $1)",
     )
     .bind(user.id)
-    .fetch_one(&state.pool)
+    .fetch_one(pool)
     .await?;
 
     if existing {
@@ -250,7 +255,7 @@ pub async fn upsert_subscription(
         .bind(user.id)
         .bind(&input.tier)
         .bind(status)
-        .execute(&state.pool)
+        .execute(pool)
         .await?;
     } else {
         sqlx::query(
@@ -259,10 +264,41 @@ pub async fn upsert_subscription(
         .bind(user.id)
         .bind(&input.tier)
         .bind(status)
-        .execute(&state.pool)
+        .execute(pool)
         .await?;
     }
 
     let response = serde_json::json!({ "ok": true });
+    Ok((StatusCode::OK, AxumJson(response)).into_response())
+}
+
+pub async fn get_subscription(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> Result<Response, AppError> {
+    let pool = state.shard_router.get_pool_for_user(&auth.user_id);
+    let user = get_user_by_cf_sub(pool, &auth.user_id).await?;
+
+    let sub = sqlx::query_as::<_, crate::models::user::Subscription>(
+        "SELECT id, user_id, polar_sub_id, tier, status, current_period_start, current_period_end, cancel_at_period_end
+         FROM subscriptions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
+    )
+    .bind(user.id)
+    .fetch_optional(pool)
+    .await?;
+
+    let response = serde_json::json!({
+        "data": {
+            "subscription": sub.map(|s| serde_json::json!({
+                "id": s.id,
+                "tier": s.tier,
+                "status": s.status,
+                "currentPeriodStart": s.current_period_start,
+                "currentPeriodEnd": s.current_period_end,
+                "cancelAtPeriodEnd": s.cancel_at_period_end,
+            }))
+        }
+    });
+
     Ok((StatusCode::OK, AxumJson(response)).into_response())
 }

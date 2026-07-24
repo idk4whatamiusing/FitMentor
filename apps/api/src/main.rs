@@ -2,6 +2,7 @@ mod auth;
 mod config;
 mod db;
 mod error;
+mod graphql;
 mod models;
 mod routes;
 mod services;
@@ -9,25 +10,94 @@ mod services;
 use auth::jwt::JwtValidator;
 use axum::http::header;
 use axum::http::Method;
+use axum::Router;
 use config::Config;
-use sqlx::PgPool;
+use db::shard::ShardRouter;
+use graphql::schema::create_schema;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tracing_subscriber::EnvFilter;
 
 use crate::services::cache::CacheService;
 
+async fn graphiql() -> impl axum::response::IntoResponse {
+    axum::response::Html(async_graphql::http::GraphiQLSource::build()
+        .endpoint("/graphql")
+        .finish())
+}
+
+async fn graphql_handler(
+    state: axum::extract::State<AppState>,
+    headers: axum::http::HeaderMap,
+    req: async_graphql_axum::GraphQLRequest,
+) -> async_graphql_axum::GraphQLResponse {
+    let schema = create_schema();
+
+    // Extract auth user from headers
+    let user = extract_auth_user(&state, &headers).await;
+
+    let gql_ctx = graphql::context::GqlContext::new(
+        state.shard_router.clone(),
+        state.cache.clone(),
+        user,
+    );
+    schema.execute(req.into_inner().data(gql_ctx)).await.into()
+}
+
+async fn extract_auth_user(
+    state: &AppState,
+    headers: &axum::http::HeaderMap,
+) -> Option<auth::middleware::AuthUser> {
+    // Try API key auth first
+    if !state.api_shared_secret.is_empty() {
+        if let Some(api_key) = headers.get("x-api-key").and_then(|v| v.to_str().ok()) {
+            if api_key == state.api_shared_secret {
+                let user_id = headers
+                    .get("x-user-id")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("")
+                    .to_string();
+                let email = headers
+                    .get("x-user-email")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("")
+                    .to_string();
+                return Some(auth::middleware::AuthUser { user_id, email });
+            }
+        }
+    }
+
+    // Try JWT auth
+    let token = headers
+        .get("cf-access-jwt-assertion")
+        .or_else(|| headers.get("authorization"))
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.strip_prefix("Bearer ").or(Some(s)))?;
+
+    let claims: auth::jwt::Claims = state.jwt_validator.validate(token).await.ok()?;
+
+    Some(auth::middleware::AuthUser {
+        user_id: claims.sub,
+        email: claims.email,
+    })
+}
+
 #[derive(Clone)]
 pub struct AppState {
-    pub pool: PgPool,
+    pub shard_router: Arc<ShardRouter>,
     pub cache: CacheService,
     pub jwt_validator: Arc<JwtValidator>,
+    pub polar_access_token: String,
     pub polar_webhook_secret: String,
+    pub polar_premium_product_id: String,
+    pub polar_premium_price_id: String,
+    pub polar_pro_product_id: String,
+    pub polar_pro_price_id: String,
     pub api_shared_secret: String,
     pub planner_url: String,
 }
 
-async fn run_migrations(pool: &PgPool) {
+async fn run_migrations(pool: &sqlx::PgPool) {
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS meal_plans (
@@ -161,11 +231,19 @@ async fn main() {
 
     let config = Config::from_env();
 
-    let pool = db::create_pool(&config.database_url)
-        .await
-        .expect("failed to connect to database");
+    // Initialize shard router: use DATABASE_SHARD_URLS if set, otherwise fall back to DATABASE_URL
+    let shard_urls = if config.database_shard_urls.is_empty() {
+        vec![config.database_url.clone()]
+    } else {
+        config.database_shard_urls.clone()
+    };
 
-    run_migrations(&pool).await;
+    let shard_router = db::create_shard_router(&shard_urls)
+        .await
+        .expect("failed to create shard router");
+
+    // Run migrations on primary shard
+    run_migrations(shard_router.primary_pool()).await;
 
     let cache = services::cache::CacheService::new(&config.redis_url).await;
 
@@ -175,10 +253,15 @@ async fn main() {
     ));
 
     let state = AppState {
-        pool,
+        shard_router: Arc::new(shard_router),
         cache,
         jwt_validator,
+        polar_access_token: config.polar_access_token,
         polar_webhook_secret: config.polar_webhook_secret,
+        polar_premium_product_id: config.polar_premium_product_id,
+        polar_premium_price_id: config.polar_premium_price_id,
+        polar_pro_product_id: config.polar_pro_product_id,
+        polar_pro_price_id: config.polar_pro_price_id,
         api_shared_secret: config.api_shared_secret,
         planner_url: config.planner_url,
     };
@@ -202,7 +285,16 @@ async fn main() {
             "x-user-email".parse().unwrap(),
         ]);
 
-    let app = routes::routes(state).layer(cors);
+    let graphql_routes = Router::new()
+        .route(
+            "/graphql",
+            axum::routing::get(graphiql).post(graphql_handler),
+        );
+
+    let app = routes::routes()
+        .merge(graphql_routes)
+        .layer(cors)
+        .with_state(state);
 
     let addr = format!("0.0.0.0:{}", config.port);
     let listener = tokio::net::TcpListener::bind(&addr)

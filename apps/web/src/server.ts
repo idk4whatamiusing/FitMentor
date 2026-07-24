@@ -174,6 +174,37 @@ async function handleFormGet(request: Request): Promise<Response> {
   return proxyGetAdvice(request, "/v1/tools/form-advice");
 }
 
+async function handleCheckout(request: Request): Promise<Response> {
+  try {
+    const env = getCloudflareEnv(request);
+    const sub = await getUserSub(request, env);
+    if (!sub) return new Response(JSON.stringify({ error: "not authenticated" }), { status: 401, headers: { "content-type": "application/json" } });
+
+    const body = await request.json().catch(() => ({}));
+    const tier = body.tier;
+    if (tier !== "premium" && tier !== "pro") {
+      return new Response(JSON.stringify({ error: "Invalid tier" }), { status: 400, headers: { "content-type": "application/json" } });
+    }
+
+    const apiUrl = process.env.API_URL || "https://16-112-132-239.sslip.io";
+    const apiKey = process.env.API_SHARED_SECRET;
+    const headers: Record<string, string> = {
+      "X-Api-Key": apiKey ?? "",
+      "X-User-Id": sub,
+      "Content-Type": "application/json",
+    };
+    const res = await fetch(`${apiUrl}/v1/subscriptions/checkout`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ tier }),
+    });
+    const data = await res.json();
+    return new Response(JSON.stringify(data), { headers: { "content-type": "application/json" } });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e?.message ?? String(e) }), { status: 500, headers: { "content-type": "application/json" } });
+  }
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
@@ -195,6 +226,9 @@ export default {
       }
       if (url.pathname === "/api/tools/form-analyze" && request.method === "GET") {
         return await handleFormGet(request);
+      }
+      if (url.pathname === "/api/checkout" && request.method === "POST") {
+        return await handleCheckout(request);
       }
 
       const handler = await getServerEntry();

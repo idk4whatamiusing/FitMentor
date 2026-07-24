@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { MobileShell } from "@/components/MobileShell";
 import { useProfile, calcTargets, GOAL_LABEL } from "@/utils/profile";
 import { logout, forgetDevice } from "@/utils/oauth";
@@ -11,6 +12,7 @@ import {
   clearSubscription,
   type PlanTier,
 } from "@/utils/subscription";
+import { fetchSubscription } from "@/services/sync.server";
 import { Button } from "@/components/ui/button";
 import {
   Crown,
@@ -67,11 +69,38 @@ function ProfilePage() {
   const [showPayment, setShowPayment] = useState(false);
   const [selectedTier, setSelectedTier] = useState<PlanTier | null>(null);
   const nav = useNavigate();
+  const getSub = useServerFn(fetchSubscription);
 
   useEffect(() => {
     setSub(loadSubscription());
     const handler = () => setSub(loadSubscription());
     window.addEventListener("fitmentor:subscription", handler);
+
+    // Check if returning from Polar checkout
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") {
+      // Fetch subscription from API
+      getSub()
+        .then((json: any) => {
+          const srv = json?.data?.subscription;
+          if (srv && srv.tier !== "free") {
+            const now = new Date();
+            const expiry = new Date(srv.currentPeriodEnd || now);
+            saveSubscription({
+              tier: srv.tier as PlanTier,
+              startDate: now.toISOString(),
+              expiryDate: expiry.toISOString(),
+              paymentMethod: "polar",
+            });
+            setSub(loadSubscription());
+            toast.success(`${getPlanName(srv.tier)} plan activated!`);
+          }
+        })
+        .catch(() => {});
+      // Clean up URL
+      window.history.replaceState({}, "", "/profile");
+    }
+
     return () => window.removeEventListener("fitmentor:subscription", handler);
   }, []);
 
@@ -218,16 +247,11 @@ function ProfilePage() {
       </div>
 
       {showPayment && selectedTier && (
-        <PaymentModal
+        <PolarCheckout
           tier={selectedTier}
           onClose={() => {
             setShowPayment(false);
             setSelectedTier(null);
-          }}
-          onSuccess={() => {
-            setShowPayment(false);
-            setSelectedTier(null);
-            setSub(loadSubscription());
           }}
         />
       )}
@@ -250,153 +274,64 @@ const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; icon: typeof CreditCa
   { id: "netbanking", label: "Net Banking", icon: Building },
 ];
 
-function PaymentModal({
+function PolarCheckout({
   tier,
   onClose,
-  onSuccess,
 }: {
   tier: PlanTier;
   onClose: () => void;
-  onSuccess: () => void;
 }) {
-  const [step, setStep] = useState<PaymentStep>("select");
-  const [method, setMethod] = useState<PaymentMethod | null>(null);
-  const [upiId, setUpiId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const plan = PLANS.find((p) => p.tier === tier);
 
-  const handlePay = () => {
-    if (!method) return;
-    setStep("processing");
-    setTimeout(() => {
-      const now = new Date();
-      const expiry = new Date(now);
-      expiry.setMonth(expiry.getMonth() + 1);
-      saveSubscription({
-        tier,
-        startDate: now.toISOString(),
-        expiryDate: expiry.toISOString(),
-        paymentMethod: method,
+  useEffect(() => {
+    fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tier }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.checkout_url) {
+          window.location.href = data.checkout_url;
+        } else {
+          setError(data.error || "Failed to create checkout session");
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        setError("Failed to connect to payment server");
+        setLoading(false);
       });
-      setStep("success");
-      toast.success(`${plan?.name} plan activated!`);
-      setTimeout(onSuccess, 2000);
-    }, 2000);
-  };
+  }, [tier]);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-t-3xl bg-card p-6 pb-20 shadow-xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">
-            {step === "success" ? "Payment Successful" : `Pay ₹${plan?.price}`}
-          </h2>
-          {step !== "processing" && (
-            <button
-              onClick={onClose}
-              className="rounded-full p-1 text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
+          <h2 className="text-lg font-bold">Subscribe to {plan?.name}</h2>
+          <button
+            onClick={onClose}
+            className="rounded-full p-1 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
-        {step === "select" && (
-          <div className="mt-5 space-y-3">
-            <p className="text-sm text-muted-foreground">
-              {plan?.name} — <span className="font-bold text-foreground">₹{plan?.price}</span>/
-              {plan?.period}
-            </p>
-            <p className="text-xs text-muted-foreground">Choose payment method:</p>
-            {PAYMENT_OPTIONS.map((opt) => {
-              const Icon = opt.icon;
-              return (
-                <button
-                  key={opt.id}
-                  onClick={() => setMethod(opt.id)}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-xl border p-3.5 text-left transition",
-                    method === opt.id
-                      ? "border-primary bg-primary/10"
-                      : "border-border/60 bg-background hover:border-primary/40",
-                  )}
-                >
-                  <Icon className="h-5 w-5 text-primary" />
-                  <span className="font-medium">{opt.label}</span>
-                  {method === opt.id && <Check className="ml-auto h-4 w-4 text-primary" />}
-                </button>
-              );
-            })}
-            {method === "upi" && (
-              <div className="rounded-xl border border-border/60 bg-background p-3">
-                <p className="text-xs text-muted-foreground">Enter UPI ID</p>
-                <input
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  placeholder="example@paytm"
-                  className="mt-1 w-full bg-transparent text-sm font-medium outline-none"
-                />
-              </div>
-            )}
-            {method === "card" && (
-              <div className="space-y-2 rounded-xl border border-border/60 bg-background p-3">
-                <input
-                  placeholder="Card number"
-                  className="w-full bg-transparent text-sm outline-none"
-                />
-                <div className="flex gap-2">
-                  <input
-                    placeholder="MM/YY"
-                    className="flex-1 bg-transparent text-sm outline-none"
-                  />
-                  <input placeholder="CVV" className="flex-1 bg-transparent text-sm outline-none" />
-                </div>
-              </div>
-            )}
-            {method === "netbanking" && (
-              <div className="rounded-xl border border-border/60 bg-background p-3">
-                <select className="w-full bg-transparent text-sm outline-none">
-                  <option>Select your bank</option>
-                  <option>SBI</option>
-                  <option>HDFC</option>
-                  <option>ICICI</option>
-                  <option>Axis</option>
-                  <option>Kotak</option>
-                  <option>Yes Bank</option>
-                </select>
-              </div>
-            )}
-            <Button
-              className="mt-2 h-12 w-full text-base font-semibold"
-              onClick={handlePay}
-              disabled={!method}
-            >
-              Pay ₹{plan?.price}
-            </Button>
-            <p className="text-center text-[10px] text-muted-foreground">
-              🔒 Secured via simulated payment gateway
-            </p>
-          </div>
-        )}
-
-        {step === "processing" && (
+        {loading && (
           <div className="mt-10 flex flex-col items-center gap-4 py-8">
             <Loader className="h-10 w-10 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Processing payment...</p>
-            <p className="text-xs text-muted-foreground">
-              Please wait while we verify your payment
-            </p>
+            <p className="text-sm text-muted-foreground">Redirecting to checkout...</p>
           </div>
         )}
 
-        {step === "success" && (
-          <div className="mt-10 flex flex-col items-center gap-4 py-8">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20">
-              <Check className="h-8 w-8 text-green-500" />
-            </div>
-            <p className="text-lg font-bold">{plan?.name} Activated! 🎉</p>
-            <p className="text-center text-sm text-muted-foreground">
-              You now have access to all {plan?.name} features. Enjoy your journey!
-            </p>
+        {error && (
+          <div className="mt-5 space-y-3">
+            <p className="text-sm text-red-400">{error}</p>
+            <Button variant="outline" className="w-full" onClick={onClose}>
+              Close
+            </Button>
           </div>
         )}
       </div>

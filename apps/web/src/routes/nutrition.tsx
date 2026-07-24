@@ -9,6 +9,8 @@ import { Plus, Apple, Target, Pencil, Check, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
 import type { MealPlan } from "@fitmentor/shared";
+import { getClient } from "@/lib/graphql/client";
+import { TODAY_AI_PLAN_QUERY } from "@/lib/graphql/queries";
 
 export const Route = createFileRoute("/nutrition")({
   head: () => ({ meta: [{ title: "Nutrition — FitMentor" }] }),
@@ -48,29 +50,18 @@ function Nutrition() {
     if (!profile || !targets) return;
     setPlanAttempted(true);
     setLoadingPlan(true);
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), 20000);
     try {
-      const res = await fetch("/api/meal-plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          diet: profile.diet,
-          budgetPerDay: profile.budgetPerDay,
-          calories: targets.calories,
-          protein: targets.protein,
-          healthConditions: profile.healthConditions,
-        }),
-        signal: ac.signal,
-      });
-      const json = await res.json();
-      const raw = json?.data?.plan ?? json;
-      const arr = Array.isArray(raw) ? raw : [raw];
-      if (arr.length > 0) setAiPlans(arr);
+      const client = getClient();
+      const data = await client.request<{ todayAiPlan: { plan: unknown } | null }>(
+        TODAY_AI_PLAN_QUERY,
+        { table: "meal_plans" },
+      );
+      const raw = data?.todayAiPlan?.plan;
+      const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      if (arr.length > 0) setAiPlans(arr as MealPlan[]);
     } catch (e) {
       console.error("AI meal plan failed:", e);
     }
-    clearTimeout(timer);
     setLoadingPlan(false);
   }, [profile, targets]);
 

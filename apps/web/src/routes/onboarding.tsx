@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,7 +11,8 @@ import {
   type Experience,
   type Gender,
 } from "@/utils/profile";
-import { syncProfile } from "@/services/sync";
+import { getClient } from "@/lib/graphql/client";
+import { UPDATE_PROFILE_MUTATION } from "@/lib/graphql/mutations";
 import { ChevronLeft } from "lucide-react";
 import { cn } from "@/utils/cn";
 import logoImg from "@/assets/logo-v2.png";
@@ -38,7 +38,6 @@ const HEALTH_OPTIONS = [
 function Onboarding() {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>(0);
-  const sync = useServerFn(syncProfile);
   const [draft, setDraft] = useState<Partial<Profile>>({
     daysPerWeek: 4,
     budgetPerDay: 150,
@@ -84,8 +83,27 @@ function Onboarding() {
       createdAt: new Date().toISOString(),
     };
     saveProfile(p);
-    const r = await sync({ data: p });
-    if (!r.ok) console.error("syncProfile failed:", r.error);
+    try {
+      const client = getClient();
+      await client.request(UPDATE_PROFILE_MUTATION, {
+        input: {
+          name: p.name,
+          age: p.age,
+          gender: p.gender,
+          heightCm: p.heightCm,
+          weightKg: p.weightKg,
+          goal: p.goal,
+          place: p.place,
+          experience: p.experience,
+          diet: p.diet,
+          daysPerWeek: p.daysPerWeek,
+          budgetPerDay: p.budgetPerDay,
+          healthConditions: p.healthConditions,
+        },
+      });
+    } catch (e) {
+      console.error("syncProfile failed:", e);
+    }
     navigate({ to: "/dashboard" });
   };
 

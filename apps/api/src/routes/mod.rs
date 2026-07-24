@@ -12,7 +12,7 @@ use axum::Router;
 
 use crate::AppState;
 
-pub fn routes(state: AppState) -> Router {
+pub fn routes() -> Router<AppState> {
     Router::new()
         // Health
         .route("/v1/health", axum::routing::get(health::health))
@@ -29,7 +29,7 @@ pub fn routes(state: AppState) -> Router {
         )
         .route(
             "/v1/user/subscription",
-            axum::routing::put(user::upsert_subscription),
+            axum::routing::put(user::upsert_subscription).get(user::get_subscription),
         )
         // Daily Logs
         .route("/v1/logs/today", axum::routing::get(logs::get_today))
@@ -66,5 +66,4 @@ pub fn routes(state: AppState) -> Router {
             "/v1/webhooks/polar",
             axum::routing::post(payments::webhook_handler),
         )
-        .with_state(state)
 }

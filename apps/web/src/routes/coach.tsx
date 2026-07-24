@@ -9,14 +9,15 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Sparkles, Send, Menu, Plus, Trash2, History, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
+import { getClient } from "@/lib/graphql/client";
 import {
-  listSessions,
-  createSession,
-  loadSession,
-  deleteSession,
-  type SessionListItem,
-  type SessionMessage,
-} from "@/services/coach-sessions.server";
+  COACH_SESSIONS_QUERY,
+  COACH_SESSION_QUERY,
+} from "@/lib/graphql/queries";
+import {
+  CREATE_COACH_SESSION_MUTATION,
+  DELETE_COACH_SESSION_MUTATION,
+} from "@/lib/graphql/mutations";
 
 export const Route = createFileRoute("/coach")({
   head: () => ({ meta: [{ title: "AI Coach — FitMentor" }] }),
@@ -24,6 +25,12 @@ export const Route = createFileRoute("/coach")({
 });
 
 type Msg = { role: "user" | "assistant"; content: string };
+
+type SessionListItem = {
+  id: string;
+  title: string;
+  messageCount: number;
+};
 
 const STARTERS = [
   "How much protein do I need?",
@@ -45,18 +52,15 @@ function Coach() {
   const endRef = useRef<HTMLDivElement>(null);
   const { profile } = useProfile();
 
-  const list = useServerFn(listSessions);
-  const create = useServerFn(createSession);
-  const load = useServerFn(loadSession);
-  const del = useServerFn(deleteSession);
-
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true);
     try {
-      setSessions(await list());
+      const client = getClient();
+      const data = await client.request<{ coachSessions: SessionListItem[] }>(COACH_SESSIONS_QUERY);
+      setSessions(data.coachSessions);
     } catch { /* ignore */ }
     setSessionsLoading(false);
-  }, [list]);
+  }, []);
 
   useEffect(() => {
     loadSessions();
@@ -68,9 +72,18 @@ function Coach() {
 
   async function switchSession(id: string) {
     try {
-      const full = await load({ data: { id } });
-      const msgs: Msg[] = (full.messages || []).map((m: SessionMessage) => ({
-        role: m.role,
+      const client = getClient();
+      const data = await client.request<{ coachSession: { messages: Array<{ role: string; content: string }> } | null }>(
+        COACH_SESSION_QUERY,
+        { id },
+      );
+      const full = data.coachSession;
+      if (!full) {
+        toast.error("Could not load session");
+        return;
+      }
+      const msgs: Msg[] = (full.messages || []).map((m) => ({
+        role: m.role as "user" | "assistant",
         content: m.content,
       }));
       setMessages(msgs);
@@ -90,7 +103,8 @@ function Coach() {
   async function removeSession(e: React.MouseEvent, id: string) {
     e.stopPropagation();
     try {
-      await del({ data: { id } });
+      const client = getClient();
+      await client.request<{ deleteCoachSession: boolean }>(DELETE_COACH_SESSION_MUTATION, { id });
       if (activeId === id) {
         setMessages([]);
         setActiveId(null);
@@ -109,8 +123,9 @@ function Coach() {
     let sid = activeId;
     if (!sid) {
       try {
-        const created = await create({ data: {} });
-        sid = created.id;
+        const client = getClient();
+        const data = await client.request<{ createCoachSession: { id: string } }>(CREATE_COACH_SESSION_MUTATION);
+        sid = data.createCoachSession.id;
         setActiveId(sid);
       } catch {
         toast.error("Could not create session");
@@ -191,7 +206,7 @@ function Coach() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{s.title}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatDate(s.created_at)} · {s.message_count} messages
+                          {s.title} · {s.messageCount} messages
                         </p>
                       </div>
                       <button

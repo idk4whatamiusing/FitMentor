@@ -26,6 +26,8 @@ import {
   Dumbbell,
 } from "lucide-react";
 import { toast } from "sonner";
+import { getClient } from "@/lib/graphql/client";
+import { TODAY_AI_PLAN_QUERY } from "@/lib/graphql/queries";
 
 export const Route = createFileRoute("/tools")({
   head: () => ({ meta: [{ title: "AI Tools — FitMentor" }] }),
@@ -124,10 +126,10 @@ function BMIAnalyzer() {
   const getAiRecommendations = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/tools/bmi-advice", { method: "GET" });
-      const data = await res.json();
-      const tips = Array.isArray(data.tips) ? data.tips : Array.isArray(data) ? data : [];
-      setAiTips(tips.length > 0 ? tips.join("\n") : data.error ?? "No advice available yet. Generate a plan first.");
+      const client = getClient();
+      const data = await client.request<{ todayAiPlan: { plan: string[] } | null }>(TODAY_AI_PLAN_QUERY, { table: "bmi_advice" });
+      const tips = data.todayAiPlan?.plan;
+      setAiTips(tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.");
     } catch {
       setAiTips("Failed to get AI recommendations. Try again.");
     }
@@ -256,10 +258,10 @@ function SleepTracker() {
   const getSleepTips = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/tools/sleep-advice", { method: "GET" });
-      const data = await res.json();
-      const tips = Array.isArray(data.tips) ? data.tips : Array.isArray(data) ? data : [];
-      setAiTips(tips.length > 0 ? tips.join("\n") : data.error ?? "No advice available yet. Generate a plan first.");
+      const client = getClient();
+      const data = await client.request<{ todayAiPlan: { plan: string[] } | null }>(TODAY_AI_PLAN_QUERY, { table: "sleep_advice" });
+      const tips = data.todayAiPlan?.plan;
+      setAiTips(tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.");
     } catch {
       setAiTips("Failed to get AI advice. Try again.");
     }
@@ -413,10 +415,10 @@ function InjuryAssessment() {
     if (!painArea) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/tools/injury", { method: "GET" });
-      const data = await res.json();
-      const tips = Array.isArray(data.tips) ? data.tips : Array.isArray(data) ? data : [];
-      setAdvice(tips.length > 0 ? tips.join("\n") : data.error ?? "No advice available yet. Generate a plan first.");
+      const client = getClient();
+      const data = await client.request<{ todayAiPlan: { plan: string[] } | null }>(TODAY_AI_PLAN_QUERY, { table: "injury_advice" });
+      const tips = data.todayAiPlan?.plan;
+      setAdvice(tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.");
     } catch {
       setAdvice("Failed to get AI advice. Try again.");
     }
@@ -681,10 +683,10 @@ function FormAnalyzer() {
     if (!exercise) return;
     setLoading(true);
     try {
-      const res = await fetch("/api/tools/form-analyze", { method: "GET" });
-      const data = await res.json();
-      const tips = Array.isArray(data.tips) ? data.tips : Array.isArray(data) ? data : [];
-      setAnalysis(tips.length > 0 ? tips.join("\n") : data.error ?? "No analysis available yet. Generate a plan first.");
+      const client = getClient();
+      const data = await client.request<{ todayAiPlan: { plan: string[] } | null }>(TODAY_AI_PLAN_QUERY, { table: "form_advice" });
+      const tips = data.todayAiPlan?.plan;
+      setAnalysis(tips && tips.length > 0 ? tips.join("\n") : "No analysis available yet. Generate a plan first.");
     } catch {
       setAnalysis("Failed to analyze. Try again.");
     }
