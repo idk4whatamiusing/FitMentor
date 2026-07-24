@@ -33,7 +33,7 @@ function Workouts() {
       signal: controller.signal,
     })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then(setPlan)
+      .then((json) => setPlan(Array.isArray(json) ? json : json?.data?.plan ?? []))
       .catch(() => setFetchError(true))
       .finally(() => { clearTimeout(timeout); setLoading(false); });
     return () => { controller.abort(); clearTimeout(timeout); };
