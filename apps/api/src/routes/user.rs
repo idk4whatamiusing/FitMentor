@@ -9,9 +9,6 @@ use crate::models::user::User;
 use crate::AppState;
 
 fn profile_to_value(p: Profile) -> serde_json::Value {
-    let hc = p.health_conditions
-        .as_deref()
-        .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok());
     serde_json::json!({
         "id": p.id,
         "userId": p.user_id,
@@ -26,7 +23,7 @@ fn profile_to_value(p: Profile) -> serde_json::Value {
         "diet": p.diet,
         "daysPerWeek": p.days_per_week,
         "budgetPerDay": p.budget_per_day,
-        "healthConditions": hc,
+        "healthConditions": p.health_conditions,
         "customProteinG": p.custom_protein_g,
         "createdAt": p.created_at,
         "updatedAt": p.updated_at,
@@ -121,10 +118,6 @@ pub async fn update_profile(
 ) -> Result<Response, AppError> {
     let user = get_user_by_cf_sub(&state.pool, &auth.user_id).await?;
 
-    let hc_str = input.health_conditions
-        .as_ref()
-        .and_then(|v| serde_json::to_string(v).ok());
-
     let profile = sqlx::query_as::<_, Profile>(
         r#"UPDATE profiles SET
             name = COALESCE($2, name),
@@ -149,15 +142,15 @@ pub async fn update_profile(
     .bind(&input.name)
     .bind(input.age)
     .bind(&input.gender)
-    .bind(input.height_cm)
-    .bind(input.weight_kg)
+    .bind(input.height_cm.map(|v| v as i16))
+    .bind(input.weight_kg.map(|v| v as i16))
     .bind(&input.goal)
     .bind(&input.place)
     .bind(&input.experience)
     .bind(&input.diet)
     .bind(input.days_per_week)
-    .bind(input.budget_per_day)
-    .bind(hc_str.as_deref())
+    .bind(input.budget_per_day.map(|v| v as i16))
+    .bind(&input.health_conditions)
     .fetch_one(&state.pool)
     .await?;
 
