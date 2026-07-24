@@ -6,6 +6,7 @@ pub mod health;
 pub mod logs;
 pub mod payments;
 pub mod user;
+pub mod workout_complete;
 
 use axum::Router;
 
@@ -53,6 +54,8 @@ pub fn routes(state: AppState) -> Router {
         .route("/v1/tools/sleep-advice", axum::routing::get(ai_plans::get_sleep_advice).put(ai_plans::upsert_sleep_advice))
         .route("/v1/tools/injury-advice", axum::routing::get(ai_plans::get_injury_advice).put(ai_plans::upsert_injury_advice))
         .route("/v1/tools/form-advice", axum::routing::get(ai_plans::get_form_advice).put(ai_plans::upsert_form_advice))
+        // Workout completions
+        .route("/v1/workout/complete", axum::routing::post(workout_complete::complete))
         // Payments (Epic 7)
         .route(
             "/v1/subscriptions/checkout",

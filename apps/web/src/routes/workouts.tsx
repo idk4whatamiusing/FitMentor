@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { MobileShell } from "@/components/MobileShell";
 import { useProfile } from "@/utils/profile";
 import { EXERCISE_LIBRARY, type WorkoutDay } from "@/utils/workouts";
 import { saveLog, ensureToday } from "@/utils/habits";
+import { syncWorkoutComplete } from "@/services/sync.server";
 import { Button } from "@/components/ui/button";
 import { Check, ChevronRight, Clock, Dumbbell, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -114,6 +116,7 @@ function Workouts() {
                     onClick={() => {
                       const log = ensureToday();
                       saveLog({ ...log, workoutDone: true });
+                      syncWorkoutComplete({ data: { day_index: i, title: day.title } }).catch(() => {});
                       toast.success("Workout logged!");
                     }}
                   >

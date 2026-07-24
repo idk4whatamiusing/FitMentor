@@ -66,3 +66,25 @@ export const syncSubscription = createServerFn({ method: "POST" })
     }
     return res.json();
   });
+
+export const syncWorkoutComplete = createServerFn({ method: "POST" })
+  .validator(
+    (d: unknown) =>
+      d as {
+        day_index: number;
+        title: string;
+      },
+  )
+  .handler(async ({ data }) => {
+    const h = await headers();
+    const res = await fetch(`${API_URL}/v1/workout/complete`, {
+      method: "POST",
+      headers: h,
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "?");
+      throw new Error(`sync workout complete failed: ${res.status} ${text}`);
+    }
+    return res.json();
+  });
