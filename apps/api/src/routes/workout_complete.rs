@@ -12,7 +12,7 @@ pub struct WorkoutCompleteRequest {
     pub title: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, sqlx::FromRow)]
 pub struct WorkoutCompletionItem {
     pub day_index: i16,
     pub title: String,
