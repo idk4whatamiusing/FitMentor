@@ -1,8 +1,9 @@
-// Lightweight habit & streak tracking in localStorage.
+// Habit & streak tracking — localStorage + API sync.
 const KEY = "fitmentor.habits.v1";
 
 export type { DailyLog } from "@fitmentor/shared";
 import type { DailyLog } from "@fitmentor/shared";
+import { syncDailyLog } from "@/services/sync.server";
 
 export function todayKey() {
   return new Date().toISOString().slice(0, 10);
@@ -22,6 +23,18 @@ export function saveLog(log: DailyLog) {
   all[log.date] = log;
   localStorage.setItem(KEY, JSON.stringify(all));
   window.dispatchEvent(new Event("fitmentor:logs"));
+
+  // Sync to API (fire-and-forget)
+  syncDailyLog({
+    data: {
+      water: log.water,
+      sleep: log.sleep,
+      steps: log.steps,
+      protein_g: log.proteinG,
+      workout_done: log.workoutDone,
+      weight_kg: log.weightKg ?? null,
+    },
+  }).catch(() => {});
 }
 
 export function ensureToday(): DailyLog {
