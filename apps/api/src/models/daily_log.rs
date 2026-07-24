@@ -8,7 +8,7 @@ pub struct DailyLog {
     pub id: Uuid,
     pub user_id: Uuid,
     pub date: NaiveDate,
-    pub water: i32,
+    pub water: i16,
     pub sleep: f32,
     pub steps: i32,
     pub protein_g: f32,
@@ -21,7 +21,7 @@ pub struct DailyLog {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateDailyLog {
-    pub water: Option<i32>,
+    pub water: Option<i16>,
     pub sleep: Option<f32>,
     pub steps: Option<i32>,
     pub protein_g: Option<f32>,
