@@ -60,7 +60,7 @@ export const getDiscordAuthUrl = createServerFn({ method: "GET" })
   .handler(async (ctx) => {
     const mode = ctx.data.mode;
     const clientId = process.env.DISCORD_CLIENT_ID || "";
-    const redirectUri = `${process.env.APP_URL || "http://localhost:3000"}/auth/discord/callback`;
+    const redirectUri = `${process.env.APP_URL || "https://fitmentor-7lx.pages.dev"}/auth/discord/callback`;
     const url = new URL("https://discord.com/api/oauth2/authorize");
     url.searchParams.set("client_id", clientId);
     url.searchParams.set("redirect_uri", redirectUri);
@@ -79,7 +79,7 @@ export const exchangeDiscordCode = createServerFn({ method: "POST" })
 
     const clientId = process.env.DISCORD_CLIENT_ID || "";
     const clientSecret = process.env.DISCORD_CLIENT_SECRET || "";
-    const redirectUri = `${process.env.APP_URL || "http://localhost:3000"}/auth/discord/callback`;
+    const redirectUri = `${process.env.APP_URL || "https://fitmentor-7lx.pages.dev"}/auth/discord/callback`;
 
     const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
       method: "POST",
