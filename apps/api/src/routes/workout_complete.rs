@@ -20,12 +20,20 @@ pub async fn complete(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let today = Utc::now().date_naive();
 
+    // Look up the UUID from cf_access_sub
+    let uuid: uuid::Uuid = sqlx::query_scalar(
+        "SELECT id FROM users WHERE cf_access_sub = $1",
+    )
+    .bind(&user_id)
+    .fetch_one(&state.pool)
+    .await?;
+
     sqlx::query(
         "INSERT INTO workout_completions (user_id, date, day_index, title)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (user_id, date, day_index) DO NOTHING",
     )
-    .bind(&user_id)
+    .bind(uuid)
     .bind(today)
     .bind(req.day_index)
     .bind(&req.title)
