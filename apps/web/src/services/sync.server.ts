@@ -88,3 +88,15 @@ export const syncWorkoutComplete = createServerFn({ method: "POST" })
     }
     return res.json();
   });
+
+export const fetchWorkoutCompletions = createServerFn({ method: "POST" }).handler(
+  async () => {
+    const h = await headers();
+    const res = await fetch(`${API_URL}/v1/workout/completions`, {
+      method: "GET",
+      headers: h,
+    });
+    if (!res.ok) return { data: { completions: [] } };
+    return res.json();
+  },
+);

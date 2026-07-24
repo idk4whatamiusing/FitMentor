@@ -1,6 +1,6 @@
 use axum::{extract::State, Json};
 use chrono::Utc;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::auth::middleware::AuthUser;
 use crate::error::AppError;
@@ -8,6 +8,12 @@ use crate::AppState;
 
 #[derive(Deserialize)]
 pub struct WorkoutCompleteRequest {
+    pub day_index: i16,
+    pub title: String,
+}
+
+#[derive(Serialize)]
+pub struct WorkoutCompletionItem {
     pub day_index: i16,
     pub title: String,
 }
@@ -20,7 +26,6 @@ pub async fn complete(
 ) -> Result<Json<serde_json::Value>, AppError> {
     let today = Utc::now().date_naive();
 
-    // Look up the UUID from cf_access_sub
     let uuid: uuid::Uuid = sqlx::query_scalar(
         "SELECT id FROM users WHERE cf_access_sub = $1",
     )
@@ -41,4 +46,30 @@ pub async fn complete(
     .await?;
 
     Ok(Json(serde_json::json!({"ok": true})))
+}
+
+/// GET /v1/workout/completions — get today's completed workout days.
+pub async fn completions(
+    State(state): State<AppState>,
+    AuthUser { user_id, .. }: AuthUser,
+) -> Result<Json<serde_json::Value>, AppError> {
+    let today = Utc::now().date_naive();
+
+    let uuid: uuid::Uuid = sqlx::query_scalar(
+        "SELECT id FROM users WHERE cf_access_sub = $1",
+    )
+    .bind(&user_id)
+    .fetch_one(&state.pool)
+    .await?;
+
+    let rows = sqlx::query_as::<_, WorkoutCompletionItem>(
+        "SELECT day_index, title FROM workout_completions
+         WHERE user_id = $1 AND date = $2",
+    )
+    .bind(uuid)
+    .bind(today)
+    .fetch_all(&state.pool)
+    .await?;
+
+    Ok(Json(serde_json::json!({ "data": { "completions": rows } })))
 }
