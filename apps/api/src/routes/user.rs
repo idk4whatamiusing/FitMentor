@@ -235,21 +235,33 @@ pub async fn upsert_subscription(
     let user = get_user_by_cf_sub(&state.pool, &auth.user_id).await?;
     let status = input.status.as_deref().unwrap_or("active");
 
-    sqlx::query(
-        r#"INSERT INTO subscriptions (user_id, tier, status, current_period_start, current_period_end)
-           VALUES ($1, $2, $3, now(), now() + interval '30 days')
-           ON CONFLICT (user_id) DO UPDATE SET
-               tier = EXCLUDED.tier,
-               status = EXCLUDED.status,
-               current_period_start = now(),
-               current_period_end = now() + interval '30 days',
-               updated_at = now()"#,
+    // Check if subscription exists
+    let existing = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM subscriptions WHERE user_id = $1)",
     )
     .bind(user.id)
-    .bind(&input.tier)
-    .bind(status)
-    .execute(&state.pool)
+    .fetch_one(&state.pool)
     .await?;
+
+    if existing {
+        sqlx::query(
+            "UPDATE subscriptions SET tier = $2, status = $3, current_period_start = now(), current_period_end = now() + interval '30 days', updated_at = now() WHERE user_id = $1",
+        )
+        .bind(user.id)
+        .bind(&input.tier)
+        .bind(status)
+        .execute(&state.pool)
+        .await?;
+    } else {
+        sqlx::query(
+            "INSERT INTO subscriptions (user_id, tier, status, current_period_start, current_period_end) VALUES ($1, $2, $3, now(), now() + interval '30 days')",
+        )
+        .bind(user.id)
+        .bind(&input.tier)
+        .bind(status)
+        .execute(&state.pool)
+        .await?;
+    }
 
     let response = serde_json::json!({ "ok": true });
     Ok((StatusCode::OK, AxumJson(response)).into_response())
