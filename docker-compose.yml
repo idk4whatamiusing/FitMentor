@@ -75,6 +75,19 @@ services:
     environment:
       SUPERMEMORY_API_KEY: ${SUPERMEMORY_API_KEY:-}
 
+  planner:
+    build:
+      context: .
+      dockerfile: microservices/daily-planner/Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://fitmentor:fitmentor@postgres:5432/fitmentor}
+      CF_ACCOUNT_ID: ${CF_ACCOUNT_ID:-}
+      CF_API_TOKEN: ${CF_API_TOKEN:-}
+      PORT: "8002"
+      MODE: "http"
+
   tigerbeetle:
     image: ghcr.io/tigerbeetle/tigerbeetle
     ports:

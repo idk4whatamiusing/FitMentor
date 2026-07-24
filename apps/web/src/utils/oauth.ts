@@ -104,7 +104,7 @@ export const exchangeDiscordCode = createServerFn({ method: "POST" })
 
     const sub = `discord:${discordUser.id}`;
     const email = discordUser.email || `${discordUser.username}@discord`;
-    const apiUrl = process.env.API_URL || "https://ham-apollo-situations-consolidated.trycloudflare.com";
+    const apiUrl = process.env.API_URL || "https://16-112-132-239.sslip.io";
     const apiKey = process.env.API_SHARED_SECRET || "";
 
     if (state === "signup" && apiKey) {

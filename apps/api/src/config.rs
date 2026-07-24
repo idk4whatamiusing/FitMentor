@@ -34,7 +34,7 @@ impl Config {
             api_shared_secret: std::env::var("API_SHARED_SECRET")
                 .unwrap_or_default(),
             planner_url: std::env::var("PLANNER_URL")
-                .unwrap_or_else(|_| "http://localhost:8080".into()),
+                .unwrap_or_else(|_| "http://planner:8002".into()),
         }
     }
 }
