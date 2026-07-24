@@ -24,6 +24,7 @@ pub struct AppState {
     pub jwt_validator: Arc<JwtValidator>,
     pub polar_webhook_secret: String,
     pub api_shared_secret: String,
+    pub planner_url: String,
 }
 
 async fn run_migrations(pool: &PgPool) {
@@ -179,6 +180,7 @@ async fn main() {
         jwt_validator,
         polar_webhook_secret: config.polar_webhook_secret,
         api_shared_secret: config.api_shared_secret,
+        planner_url: config.planner_url,
     };
 
     let cors = CorsLayer::new()

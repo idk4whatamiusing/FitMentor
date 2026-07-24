@@ -10,6 +10,8 @@ pub struct Config {
     pub polar_webhook_secret: String,
     // Shared secret for trusted server-to-server calls from frontend
     pub api_shared_secret: String,
+    // Daily planner URL for triggering plan generation
+    pub planner_url: String,
 }
 
 impl Config {
@@ -31,6 +33,8 @@ impl Config {
                 .unwrap_or_default(),
             api_shared_secret: std::env::var("API_SHARED_SECRET")
                 .unwrap_or_default(),
+            planner_url: std::env::var("PLANNER_URL")
+                .unwrap_or_else(|_| "http://localhost:8080".into()),
         }
     }
 }
