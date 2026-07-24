@@ -1,18 +1,10 @@
-"""
-Daily planner — scheduled batch job that generates AI meal & workout plans
-for all users and saves to PostgreSQL. Runs once per day.
-
-Environment variables:
-  DATABASE_URL          — Postgres connection string
-  CF_ACCOUNT_ID         — Cloudflare account ID
-  CF_API_TOKEN          — Cloudflare API token (Workers AI:Run permission)
-"""
-
 import os
 import json
 import logging
 from datetime import date
 from typing import Any
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse
 
 import httpx
 import psycopg2
@@ -29,6 +21,15 @@ def get_users(conn) -> list[dict[str, Any]]:
     with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
         cur.execute("SELECT id, cf_access_sub, email, name FROM users")
         return cur.fetchall()
+
+
+def get_user_by_cf_sub(conn, cf_sub: str) -> dict[str, Any] | None:
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT id, cf_access_sub, email, name FROM users WHERE cf_access_sub = %s",
+            (cf_sub,),
+        )
+        return cur.fetchone()
 
 
 def get_profile(conn, user_id) -> dict[str, Any] | None:
@@ -231,60 +232,130 @@ def generate_form_tips(profile: dict) -> list[str]:
     return _generate_tips(system, prompt)
 
 
+def generate_for_user(conn, cf_sub: str) -> None:
+    user = get_user_by_cf_sub(conn, cf_sub)
+    if not user:
+        logger.warning("User %s not found, skipping", cf_sub)
+        return
+
+    user_uuid = user["id"]
+    logger.info("Processing user %s (%s)", user["name"], cf_sub)
+
+    profile = get_profile(conn, user_uuid)
+    if not profile:
+        logger.warning("No profile for %s, skipping", cf_sub)
+        return
+
+    recent_logs = get_recent_logs(conn, user_uuid, 7)
+
+    meal_plan = generate_meal_plan(profile)
+    save_plan(conn, "meal_plans", cf_sub, meal_plan)
+    logger.info("  Meal plan saved")
+
+    workout_plan = generate_workout_plan(profile)
+    save_plan(conn, "workout_plans", cf_sub, workout_plan)
+    logger.info("  Workout plan saved")
+
+    bmi_advice = generate_bmi_advice(profile)
+    save_plan(conn, "bmi_advice", cf_sub, bmi_advice)
+    logger.info("  BMI advice saved")
+
+    sleep_advice = generate_sleep_advice(profile, recent_logs)
+    save_plan(conn, "sleep_advice", cf_sub, sleep_advice)
+    logger.info("  Sleep advice saved")
+
+    injury_advice = generate_injury_prevention(profile)
+    save_plan(conn, "injury_advice", cf_sub, injury_advice)
+    logger.info("  Injury prevention saved")
+
+    form_advice = generate_form_tips(profile)
+    save_plan(conn, "form_advice", cf_sub, form_advice)
+    logger.info("  Form tips saved")
+
+
 def run():
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
     users = get_users(conn)
     logger.info("Loaded %d users", len(users))
 
     for user in users:
-        cf_sub = user["cf_access_sub"]
-        user_uuid = user["id"]
-        logger.info("Processing user %s (%s)", user["name"], cf_sub)
-
         try:
-            profile = get_profile(conn, user_uuid)
-            if not profile:
-                logger.warning("No profile for %s, skipping", cf_sub)
-                continue
-
-            recent_logs = get_recent_logs(conn, user_uuid, 7)
-
-            # Generate meal plan
-            meal_plan = generate_meal_plan(profile)
-            save_plan(conn, "meal_plans", cf_sub, meal_plan)
-            logger.info("  Meal plan saved")
-
-            # Generate workout plan
-            workout_plan = generate_workout_plan(profile)
-            save_plan(conn, "workout_plans", cf_sub, workout_plan)
-            logger.info("  Workout plan saved")
-
-            # BMI advice
-            bmi_advice = generate_bmi_advice(profile)
-            save_plan(conn, "bmi_advice", cf_sub, bmi_advice)
-            logger.info("  BMI advice saved")
-
-            # Sleep advice
-            sleep_advice = generate_sleep_advice(profile, recent_logs)
-            save_plan(conn, "sleep_advice", cf_sub, sleep_advice)
-            logger.info("  Sleep advice saved")
-
-            # General injury prevention
-            injury_advice = generate_injury_prevention(profile)
-            save_plan(conn, "injury_advice", cf_sub, injury_advice)
-            logger.info("  Injury prevention saved")
-
-            # General form tips
-            form_advice = generate_form_tips(profile)
-            save_plan(conn, "form_advice", cf_sub, form_advice)
-            logger.info("  Form tips saved")
-
+            generate_for_user(conn, user["cf_access_sub"])
         except Exception as e:
-            logger.error("Failed for user %s: %s", cf_sub, e)
+            logger.error("Failed for user %s: %s", user["cf_access_sub"], e)
 
     conn.close()
     logger.info("Done")
 
 
+class GenerateHandler(BaseHTTPRequestHandler):
+    conn: psycopg2.extensions.connection | None = None
+
+    def do_POST(self):
+        path = urlparse(self.path).path
+        if path != "/generate":
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(b'{"error":"not found"}')
+            return
+
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length) if length else b"{}"
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(b'{"error":"invalid json"}')
+            return
+
+        cf_sub = data.get("user_id")
+        if not cf_sub:
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(b'{"error":"missing user_id"}')
+            return
+
+        conn = type(self).conn
+        if not conn:
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b'{"error":"no database connection"}')
+            return
+
+        try:
+            generate_for_user(conn, cf_sub)
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"status":"ok"}')
+        except Exception as e:
+            logger.error("HTTP generate failed for %s: %s", cf_sub, e)
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": str(e)}).encode())
+
+    def log_message(self, fmt, *args):
+        logger.info(fmt, *args)
+
+
+def serve():
+    port = int(os.environ.get("PORT", "8080"))
+    conn = psycopg2.connect(os.environ["DATABASE_URL"])
+    GenerateHandler.conn = conn
+    server = HTTPServer(("0.0.0.0", port), GenerateHandler)
+    logger.info("HTTP server listening on port %d", port)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        conn.close()
+        server.server_close()
+
+
 if __name__ == "__main__":
-    run()
+    mode = os.environ.get("MODE", "batch")
+    if mode == "http":
+        serve()
+    else:
+        run()

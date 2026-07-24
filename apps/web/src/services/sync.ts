@@ -10,7 +10,7 @@ export const fetchProfile = createServerFn({ method: "GET" }).handler(async () =
   if (!raw) return null;
   const session = await getSession(raw);
   if (!session) return null;
-  const apiUrl = process.env.API_URL || "https://16-112-225-113.sslip.io";
+  const apiUrl = process.env.API_URL || "https://16-112-132-239.sslip.io";
   const apiKey = process.env.API_SHARED_SECRET;
   if (!apiKey) return null;
   const res = await fetch(`${apiUrl}/v1/user/me`, {
@@ -36,7 +36,7 @@ export const syncProfile = createServerFn({ method: "POST" })
     const session = await getSession(raw);
     if (!session) return { ok: false, error: "invalid_session" } as const;
 
-    const apiUrl = process.env.API_URL || "https://16-112-225-113.sslip.io";
+    const apiUrl = process.env.API_URL || "https://16-112-132-239.sslip.io";
     const apiKey = process.env.API_SHARED_SECRET;
     if (!apiKey) return { ok: false, error: "api_key_not_configured" } as const;
 

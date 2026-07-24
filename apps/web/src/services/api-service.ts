@@ -1,6 +1,6 @@
 import type { DailyLog, Profile } from "@fitmentor/shared";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "https://16-112-225-113.sslip.io";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://16-112-132-239.sslip.io";
 
 function authHeaders(token?: string): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };

@@ -24,7 +24,7 @@ pub async fn discord_login(
 ) -> Result<Response, AppError> {
     let client_id = std::env::var("DISCORD_CLIENT_ID").unwrap_or_default();
     let redirect_uri = format!("{}/v1/auth/callback", 
-        std::env::var("API_URL").unwrap_or_else(|_| "https://16-112-225-113.sslip.io".to_string())
+        std::env::var("API_URL").unwrap_or_else(|_| "https://16-112-132-239.sslip.io".to_string())
     );
     
     let mut url = url::Url::parse("https://discord.com/api/oauth2/authorize").unwrap();
@@ -59,7 +59,7 @@ pub async fn discord_callback(
     let client_secret = std::env::var("DISCORD_CLIENT_SECRET").unwrap_or_default();
     let app_url = std::env::var("APP_URL").unwrap_or_else(|_| "https://fitmentor-7lx.pages.dev".to_string());
     let redirect_uri = format!("{}/v1/auth/callback", 
-        std::env::var("API_URL").unwrap_or_else(|_| "https://16-112-225-113.sslip.io".to_string())
+        std::env::var("API_URL").unwrap_or_else(|_| "https://16-112-132-239.sslip.io".to_string())
     );
     
     let client = reqwest::Client::new();
