@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Dumbbell, Brain, Apple, TrendingUp, ChevronRight } from "lucide-react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitReveal } from "./SplitReveal";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
@@ -64,6 +66,7 @@ export function AbyssalWrap({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const depthRef = useRef<HTMLSpanElement>(null);
   const [depth, setDepth] = useState(0);
+  const [activeLabel, setActiveLabel] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ref.current || !depthRef.current) return;
@@ -96,8 +99,44 @@ export function AbyssalWrap({ children }: { children: React.ReactNode }) {
         }
       );
     });
+
+    const wordWrappers = ref.current.querySelectorAll("[data-abyss-words]");
+    wordWrappers.forEach((wrapper) => {
+      const wordEls = wrapper.querySelectorAll(":scope > span > span");
+      gsap.fromTo(
+        wordEls,
+        { y: "110%", opacity: 0 },
+        {
+          y: "0%",
+          opacity: 1,
+          duration: 0.6,
+          ease: "power3.out",
+          stagger: 0.025,
+          scrollTrigger: {
+            trigger: wrapper as HTMLElement,
+            start: "top 88%",
+            toggleActions: "play none none reverse",
+          },
+        }
+      );
+    });
+
+    const sectionTriggers = Array.from(
+      ref.current.querySelectorAll<HTMLElement>("section[data-section-name]")
+    ).map((section) =>
+      ScrollTrigger.create({
+        trigger: section,
+        start: "top 50%",
+        end: "bottom 50%",
+        onToggle: (self) => {
+          if (self.isActive) setActiveLabel(section.dataset.sectionName ?? null);
+        },
+      })
+    );
+
     return () => {
       trigger.kill();
+      sectionTriggers.forEach((t) => t.kill());
       ScrollTrigger.getAll().forEach((t) => t.kill());
     };
   }, []);
@@ -108,8 +147,25 @@ export function AbyssalWrap({ children }: { children: React.ReactNode }) {
         <ParticleCanvas />
       </div>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[oklch(0.06_0.05_265/0.6)]" />
-      {/* depth counter */}
-      <div className="pointer-events-none sticky top-0 z-10 flex justify-end px-5 pt-4 lg:px-10">
+      {/* section breadcrumb + depth counter */}
+      <div className="pointer-events-none sticky top-0 z-10 flex items-center justify-between px-5 pt-4 lg:px-10">
+        <AnimatePresence mode="wait">
+          {activeLabel ? (
+            <motion.div
+              key={activeLabel}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              transition={{ duration: 0.25 }}
+              className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs uppercase tracking-[0.15em] text-white/60 backdrop-blur"
+            >
+              <span>☰</span>
+              <span>{activeLabel}</span>
+            </motion.div>
+          ) : (
+            <span />
+          )}
+        </AnimatePresence>
         <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 backdrop-blur">
           <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.72_0.16_195)] shadow-[0_0_8px_oklch(0.68_0.14_205)]" />
           <span ref={depthRef} className="tabular-nums">{depth.toString().padStart(3, "0")}m</span>
@@ -153,11 +209,11 @@ function AbyssStep({ n, title, desc }: { n: number; title: string; desc: string 
 
 export function AbyssalFeatures() {
   return (
-    <section className="relative px-5 py-20 lg:px-10 lg:py-24">
+    <section data-section-name="Features" className="relative px-5 py-20 lg:px-10 lg:py-24">
       <div className="mx-auto max-w-6xl">
         <div data-abyss className="mx-auto max-w-2xl text-center">
-          <p className="text-xs uppercase tracking-[0.2em] text-[oklch(0.72_0.16_195)]">Where nobody else has looked</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white lg:text-4xl">Drift below the noise</h2>
+          <SplitReveal as="p" className="text-xs uppercase tracking-[0.2em] text-[oklch(0.72_0.16_195)]">Where nobody else has looked</SplitReveal>
+          <SplitReveal as="h2" className="mt-3 block text-3xl font-bold tracking-tight text-white lg:text-4xl">Drift below the noise</SplitReveal>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-white/60">Bioluminescent particles find their way in water that has never seen daylight. Your data does the same — scattered logs become a figure you can navigate by.</p>
         </div>
         <div className="mx-auto mt-12 grid max-w-5xl grid-cols-2 gap-4 lg:grid-cols-4">
@@ -173,11 +229,11 @@ export function AbyssalFeatures() {
 
 export function AbyssalHowItWorks() {
   return (
-    <section className="relative px-5 py-20 lg:px-10">
+    <section data-section-name="How it works" className="relative px-5 py-20 lg:px-10">
       <div className="mx-auto max-w-6xl lg:flex lg:items-start lg:justify-between lg:gap-12">
         <div data-abyss className="lg:w-[420px]">
-          <p className="text-xs uppercase tracking-[0.2em] text-[oklch(0.72_0.16_195)]">How it moves</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-white">Three strokes to the surface</h2>
+          <SplitReveal as="p" className="text-xs uppercase tracking-[0.2em] text-[oklch(0.72_0.16_195)]">How it moves</SplitReveal>
+          <SplitReveal as="h2" className="mt-3 block text-3xl font-bold tracking-tight text-white">Three strokes to the surface</SplitReveal>
           <p className="mt-3 text-sm leading-relaxed text-white/60">Scroll is the tide. Each section rises as you fall, like light finding you.</p>
           <div className="mt-8 flex items-center gap-2 text-xs text-white/50">
             <ChevronRight className="h-4 w-4" /> Scroll to feel the drift
@@ -195,15 +251,15 @@ export function AbyssalHowItWorks() {
 
 export function AbyssalCTA({ loggedIn, checking }: { loggedIn: boolean; checking: boolean }) {
   return (
-    <section className="relative px-5 py-20 text-center lg:px-10">
+    <section data-section-name="Get started" className="relative px-5 py-20 text-center lg:px-10">
       <div
         data-abyss
         className="relative mx-auto max-w-2xl overflow-hidden rounded-[2rem] border border-white/10 bg-[oklch(0.14_0.03_250/0.7)] p-10 backdrop-blur-xl shadow-abyss"
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,oklch(0.68_0.14_205/0.15),transparent_60%)]" />
         <div className="relative">
-          <p className="text-xs uppercase tracking-[0.2em] text-[oklch(0.72_0.16_195)]">Ready to drift?</p>
-          <h2 className="mt-3 text-3xl font-bold text-white">Stop adding. Start surfacing.</h2>
+          <SplitReveal as="p" className="text-xs uppercase tracking-[0.2em] text-[oklch(0.72_0.16_195)]">Ready to drift?</SplitReveal>
+          <SplitReveal as="h2" className="mt-3 block text-3xl font-bold text-white">Stop adding. Start surfacing.</SplitReveal>
           <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-white/60">You don’t need another dashboard. You need one that gets out of your way — until it glows.</p>
           {checking ? null : (
             <a

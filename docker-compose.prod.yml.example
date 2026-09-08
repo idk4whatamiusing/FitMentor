@@ -12,6 +12,7 @@
 
 services:
   api:
+    image: ghcr.io/idk4whatamiusing/fitmentor-api:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: api/Dockerfile
@@ -43,6 +44,7 @@ services:
       - redis
 
   ws:
+    image: ghcr.io/idk4whatamiusing/fitmentor-ws:${IMAGE_TAG:-latest}
     build:
       context: realtime
       dockerfile: Dockerfile
@@ -61,6 +63,7 @@ services:
     restart: unless-stopped
 
   planner:
+    image: ghcr.io/idk4whatamiusing/fitmentor-planner:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: microservices/daily-planner/Dockerfile

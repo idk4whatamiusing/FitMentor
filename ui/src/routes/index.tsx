@@ -2,8 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { checkSession } from "@/utils/oauth";
 import { OasisHero } from "@/components/landing/OasisHero";
+import { AbyssalReveal } from "@/components/landing/AbyssalReveal";
 import { AbyssalWrap, AbyssalFeatures, AbyssalHowItWorks, AbyssalCTA } from "@/components/landing/AbyssalSection";
 import Lenis from "lenis";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -32,14 +35,14 @@ function Landing() {
 
   useEffect(() => {
     const lenis = new Lenis({ lerp: 0.075, smoothWheel: true });
-    let rafId = 0;
+    lenis.on("scroll", ScrollTrigger.update);
     const raf = (time: number) => {
-      lenis.raf(time);
-      rafId = requestAnimationFrame(raf);
+      lenis.raf(time * 1000); // gsap.ticker gives seconds; Lenis expects ms
     };
-    rafId = requestAnimationFrame(raf);
+    gsap.ticker.add(raf);
+    gsap.ticker.lagSmoothing(0);
     return () => {
-      cancelAnimationFrame(rafId);
+      gsap.ticker.remove(raf);
       lenis.destroy();
     };
   }, []);
@@ -47,6 +50,7 @@ function Landing() {
   return (
     <div className="min-h-screen bg-oasis text-foreground">
       <OasisHero loggedIn={loggedIn} checking={checking} />
+      <AbyssalReveal />
       <AbyssalWrap>
         <AbyssalFeatures />
         <AbyssalHowItWorks />

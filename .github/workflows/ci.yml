@@ -87,9 +87,34 @@ jobs:
       - run: gleam build
       - run: gleam check
 
+  images:
+    name: Build backend images
+    needs: [shared, web, api, ws]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build api, ws, planner
+        run: IMAGE_TAG=${{ github.sha }} docker compose build api ws planner
+      - name: Push :sha and :latest
+        run: |
+          for svc in api ws planner; do
+            docker push ghcr.io/idk4whatamiusing/fitmentor-$svc:${{ github.sha }}
+            docker tag ghcr.io/idk4whatamiusing/fitmentor-$svc:${{ github.sha }} ghcr.io/idk4whatamiusing/fitmentor-$svc:latest
+            docker push ghcr.io/idk4whatamiusing/fitmentor-$svc:latest
+          done
+
   deploy:
     name: Deploy backend to EC2
-    needs: [shared, web, api, ws]
+    needs: [shared, web, api, ws, images]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
@@ -119,7 +144,7 @@ jobs:
             --instance-ids "$INSTANCE_ID" \
             --document-name AWS-RunShellScript \
             --comment "fitmentor deploy ${{ github.sha }}" \
-            --parameters '{"commands":["set -e","cd /opt/fitmentor","if [ ! -d .git ]; then git init -q; git remote add origin https://github.com/idk4whatamiusing/FitMentor.git; fi","git fetch origin main","git reset --hard origin/main","sed -i \"s|apps/api/Dockerfile|api/Dockerfile|; s|context: apps/ws|context: realtime|\" docker-compose.prod.yml","docker compose -f docker-compose.prod.yml build api ws planner","docker compose -f docker-compose.prod.yml up -d","for i in $(seq 1 36); do if curl -sf http://localhost:3000/v1/health; then echo; echo DEPLOY_OK; exit 0; fi; sleep 10; done","echo DEPLOY_HEALTHCHECK_FAILED","docker compose -f docker-compose.prod.yml logs --tail=50 api","exit 1"]}' \
+            --parameters '{"commands":["set -e","cd /opt/fitmentor","if [ ! -d .git ]; then git init -q; git remote add origin https://github.com/idk4whatamiusing/FitMentor.git; fi","git fetch origin main","git reset --hard origin/main","sed -i \"s|apps/api/Dockerfile|api/Dockerfile|; s|context: apps/ws|context: realtime|\" docker-compose.prod.yml","docker pull ghcr.io/idk4whatamiusing/fitmentor-api:${{ github.sha }}","docker pull ghcr.io/idk4whatamiusing/fitmentor-ws:${{ github.sha }}","docker pull ghcr.io/idk4whatamiusing/fitmentor-planner:${{ github.sha }}","docker tag ghcr.io/idk4whatamiusing/fitmentor-api:${{ github.sha }} fitmentor-api","docker tag ghcr.io/idk4whatamiusing/fitmentor-ws:${{ github.sha }} fitmentor-ws","docker tag ghcr.io/idk4whatamiusing/fitmentor-planner:${{ github.sha }} fitmentor-planner","docker compose -f docker-compose.prod.yml up -d","docker rmi ghcr.io/idk4whatamiusing/fitmentor-api:${{ github.sha }} ghcr.io/idk4whatamiusing/fitmentor-ws:${{ github.sha }} ghcr.io/idk4whatamiusing/fitmentor-planner:${{ github.sha }} || true","docker image prune -f","for i in $(seq 1 36); do if curl -sf http://localhost:3000/v1/health; then echo; echo DEPLOY_OK; exit 0; fi; sleep 10; done","echo DEPLOY_HEALTHCHECK_FAILED","docker compose -f docker-compose.prod.yml logs --tail=50 api","exit 1"]}' \
             --query 'Command.CommandId' --output text)
           echo "SSM command: $COMMAND_ID"
           for i in $(seq 1 120); do
