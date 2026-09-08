@@ -79,6 +79,11 @@ jobs:
         with:
           otp-version: "27"
           gleam-version: "1.17.0"
+      - name: Install rebar3 (needed for Erlang deps)
+        run: |
+          curl -fsSL -o rebar3 https://github.com/erlang/rebar3/releases/download/3.24.0/rebar3
+          chmod +x rebar3
+          sudo mv rebar3 /usr/local/bin/rebar3
       - run: gleam build
       - run: gleam check
 
