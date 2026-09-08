@@ -1,5 +1,5 @@
 {
   "name": "fitmentor",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"]
+  "workspaces": ["apps/*", "ui", "packages/*"]
 }

@@ -24,11 +24,11 @@
 
 ### Frontend (Cloudflare Pages)
 
-1. Build: `npm run build` in `apps/web/` (runs vite build + nitro prerender)
+1. Build: `npm run build` in `ui/` (runs vite build + nitro prerender)
 2. Deploy: `wrangler pages deploy dist --project-name fitmentor`
 3. Credentials and state: `~/.wrangler/` contains KV namespace metadata, cache, and workflow state.
 4. KV bindings: `fitmentor_sessions` (ID: `c365fd20f0a9408899b3a01024529941`) for session storage.
-5. Wrangler config: `apps/web/wrangler.toml` defines KV namespace and AI binding.
+5. Wrangler config: `ui/wrangler.toml` defines KV namespace and AI binding.
 6. Environment variables set in Cloudflare Pages (via API/wrangler, not in repo): `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (secret), `SESSION_SECRET` (secret), `APP_URL`, `API_SHARED_SECRET` (secret), `API_URL`, `WS_URL`.
 7. The `API_URL` env var points to the EC2 instance's sslip.io address (Caddy TLS termination).
 
@@ -51,11 +51,11 @@ Both run on the same EC2 instance as the backend API.
 
 ## Key Files
 
-- `apps/web/wrangler.toml` — Cloudflare Pages config, KV/AI bindings
-- `apps/web/.wrangler/state/v3/` — Local wrangler state (KV, cache, workflows)
-- `apps/web/dist/` — Built frontend assets
-- `apps/api/src/` — Rust Axum server source
-- `apps/ws/` — Gleam WebSocket service (not currently deployed via Fly.io)
+- `ui/wrangler.toml` — Cloudflare Pages config, KV/AI bindings
+- `ui/.wrangler/state/v3/` — Local wrangler state (KV, cache, workflows)
+- `ui/dist/` — Built frontend assets
+- `api/` — Go server source (rewritten from Rust Axum)
+- `realtime/` — Gleam WebSocket service (not currently deployed via Fly.io)
 - `microservices/daily-planner/` — Python daily planner
 - `apps/ingest-python/` — Python ingest service
 - `docker-compose.yml` — Dev Docker Compose (local Redis, API, WS, ingest, planner, TigerBeetle)

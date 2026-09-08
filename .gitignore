@@ -44,12 +44,12 @@ dist-ssr
 android/
 capacitor.config.*
 
-# Rust
-apps/api/target/
-apps/api/*.db
+# Go
+/api/fitmentor-api
+api/*.db
 
 # Gleam
-apps/ws/build/
+realtime/build/
 build/
 
 # AI agent config

@@ -7,7 +7,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: api/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -31,7 +31,7 @@ services:
 
   ws:
     build:
-      context: apps/ws
+      context: realtime
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
