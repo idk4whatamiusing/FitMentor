@@ -40,20 +40,121 @@ async function resolveSession(): Promise<{ sub: string; email: string } | null> 
   return resolveSessionFromToken(raw, ip);
 }
 
-export const proxyGraphQL = createServerFn({ method: "POST" })
-  .validator((d: unknown) => d as { query: string; variables?: Record<string, unknown> })
+
+export const proxyWorkoutPlan = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await resolveSession();
+  if (!session) return { error: "not authenticated" };
+  const res = await fetch(`${apiUrl()}/v1/workout/today`, { method: "GET", headers: authHeaders(session.sub) });
+  if (!res.ok) return { error: "workout plan not found" };
+  return await res.json();
+});
+
+export const proxyToolAdvice = createServerFn({ method: "GET" })
+  .validator((d: unknown) => d as { path: string })
   .handler(async ({ data }) => {
     const session = await resolveSession();
-    if (!session) return { errors: [{ message: "Unauthorized" }] };
+    if (!session) return { tips: [] };
+    const res = await fetch(`${apiUrl()}${data.path}`, { method: "GET", headers: authHeaders(session.sub) });
+    if (!res.ok) return { tips: [] };
+    const json = await res.json();
+    const plan = json?.data?.plan ?? [];
+    return { tips: Array.isArray(plan) ? plan : [] };
+  });
 
-    const res = await fetch(`${apiUrl()}/graphql`, {
-      method: "POST",
+// ---------------------------------------------------------------------------
+// REST proxies (GraphQL was removed when the backend moved to Workers + D1)
+// ---------------------------------------------------------------------------
+
+export const proxyMe = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await resolveSession();
+  if (!session) return { error: "not authenticated" };
+  const res = await fetch(`${apiUrl()}/v1/user/me`, {
+    method: "GET",
+    headers: authHeaders(session.sub, session.email),
+  });
+  if (!res.ok) return { error: "not found" };
+  const body = await res.json();
+  return body?.data ?? { user: null, profile: null };
+});
+
+export const proxyUpdateProfile = createServerFn({ method: "POST" })
+  .validator((d: unknown) => d as Record<string, unknown>)
+  .handler(async ({ data }) => {
+    const session = await resolveSession();
+    if (!session) return { error: "not authenticated" };
+    const res = await fetch(`${apiUrl()}/v1/user/profile`, {
+      method: "PUT",
       headers: authHeaders(session.sub, session.email),
       body: JSON.stringify(data),
     });
+    if (!res.ok) return { error: "update failed" };
+    const body = await res.json();
+    return body?.data ?? {};
+  });
+
+export const proxyCoachSessions = createServerFn({ method: "GET" }).handler(async () => {
+  const session = await resolveSession();
+  if (!session) return [];
+  const res = await fetch(`${apiUrl()}/v1/coach/sessions`, {
+    method: "GET",
+    headers: authHeaders(session.sub, session.email),
+  });
+  if (!res.ok) return [];
+  return (await res.json()) as Array<{ id: string; title: string; message_count: number }>;
+});
+
+export const proxyCoachSession = createServerFn({ method: "POST" })
+  .validator((d: unknown) => d as { id: string })
+  .handler(async ({ data }) => {
+    const session = await resolveSession();
+    if (!session) return null;
+    const res = await fetch(`${apiUrl()}/v1/coach/sessions/${encodeURIComponent(data.id)}`, {
+      method: "GET",
+      headers: authHeaders(session.sub, session.email),
+    });
+    if (!res.ok) return null;
     return await res.json();
   });
 
+export const proxyDeleteCoachSession = createServerFn({ method: "POST" })
+  .validator((d: unknown) => d as { id: string })
+  .handler(async ({ data }) => {
+    const session = await resolveSession();
+    if (!session) return false;
+    const res = await fetch(`${apiUrl()}/v1/coach/sessions/${encodeURIComponent(data.id)}`, {
+      method: "DELETE",
+      headers: authHeaders(session.sub, session.email),
+    });
+    return res.ok;
+  });
+
+export const proxyRenameCoachSession = createServerFn({ method: "POST" })
+  .validator((d: unknown) => d as { id: string; title: string })
+  .handler(async ({ data }) => {
+    const session = await resolveSession();
+    if (!session) return null;
+    const res = await fetch(`${apiUrl()}/v1/coach/sessions/${encodeURIComponent(data.id)}`, {
+      method: "PATCH",
+      headers: authHeaders(session.sub, session.email),
+      body: JSON.stringify({ title: data.title }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  });
+
+export const proxyCreateCoachSession = createServerFn({ method: "POST" })
+  .validator((d: unknown) => (d ?? {}) as { title?: string })
+  .handler(async ({ data }) => {
+    const session = await resolveSession();
+    if (!session) return null;
+    const res = await fetch(`${apiUrl()}/v1/coach/sessions`, {
+      method: "POST",
+      headers: authHeaders(session.sub, session.email),
+      body: JSON.stringify({ title: data?.title }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  });
 export const proxyCheckout = createServerFn({ method: "POST" })
   .validator((d: unknown) => d as { tier: string })
   .handler(async ({ data }) => {
@@ -81,22 +182,3 @@ export const proxyMealPlan = createServerFn({ method: "GET" }).handler(async () 
   return await res.json();
 });
 
-export const proxyWorkoutPlan = createServerFn({ method: "GET" }).handler(async () => {
-  const session = await resolveSession();
-  if (!session) return { error: "not authenticated" };
-  const res = await fetch(`${apiUrl()}/v1/workout/today`, { method: "GET", headers: authHeaders(session.sub) });
-  if (!res.ok) return { error: "workout plan not found" };
-  return await res.json();
-});
-
-export const proxyToolAdvice = createServerFn({ method: "GET" })
-  .validator((d: unknown) => d as { path: string })
-  .handler(async ({ data }) => {
-    const session = await resolveSession();
-    if (!session) return { tips: [] };
-    const res = await fetch(`${apiUrl()}${data.path}`, { method: "GET", headers: authHeaders(session.sub) });
-    if (!res.ok) return { tips: [] };
-    const json = await res.json();
-    const plan = json?.data?.plan ?? [];
-    return { tips: Array.isArray(plan) ? plan : [] };
-  });

@@ -11,8 +11,7 @@ import {
   type Experience,
   type Gender,
 } from "@/utils/profile";
-import { getClient } from "@/lib/graphql/client";
-import { UPDATE_PROFILE_MUTATION } from "@/lib/graphql/mutations";
+import { proxyUpdateProfile } from "@/services/api-proxy";
 import { ChevronLeft } from "lucide-react";
 import { cn } from "@/utils/cn";
 import logoImg from "@/assets/logo-v2.png";
@@ -84,20 +83,19 @@ function Onboarding() {
     };
     saveProfile(p);
     try {
-      const client = getClient();
-      await client.request(UPDATE_PROFILE_MUTATION, {
-        input: {
+      await proxyUpdateProfile({
+        data: {
           name: p.name,
-          age: p.age,
-          gender: p.gender,
-          heightCm: p.heightCm,
-          weightKg: p.weightKg,
-          goal: p.goal,
-          place: p.place,
-          experience: p.experience,
-          diet: p.diet,
-          daysPerWeek: p.daysPerWeek,
-          budgetPerDay: p.budgetPerDay,
+        age: p.age,
+        gender: p.gender,
+        heightCm: p.heightCm,
+        weightKg: p.weightKg,
+        goal: p.goal,
+        place: p.place,
+        experience: p.experience,
+        diet: p.diet,
+        daysPerWeek: p.daysPerWeek,
+        budgetPerDay: p.budgetPerDay,
           healthConditions: p.healthConditions,
         },
       });

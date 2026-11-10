@@ -8,9 +8,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Sparkles, Send, Menu, Plus, Trash2, History, MessageSquare, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
-import { getClient } from "@/lib/graphql/client";
-import { COACH_SESSIONS_QUERY, COACH_SESSION_QUERY } from "@/lib/graphql/queries";
-import { CREATE_COACH_SESSION_MUTATION, DELETE_COACH_SESSION_MUTATION, UPDATE_COACH_SESSION_TITLE_MUTATION } from "@/lib/graphql/mutations";
+import {
+  proxyCoachSessions,
+  proxyCoachSession,
+  proxyCreateCoachSession,
+  proxyDeleteCoachSession,
+  proxyRenameCoachSession,
+} from "@/services/api-proxy";
 import { askCoach, generateChatTitle } from "@/services/coach-functions";
 import { useServerFn } from "@tanstack/react-start";
 
@@ -81,9 +85,12 @@ function Coach() {
   const loadSessions = useCallback(async () => {
     setSessionsLoading(true);
     try {
-      const client = getClient();
-      const data = await client.request<{ coachSessions: SessionListItem[] }>(COACH_SESSIONS_QUERY);
-      setSessions(data.coachSessions);
+      const rows = (await proxyCoachSessions()) as Array<{
+        id: string;
+        title: string;
+        message_count: number;
+      }>;
+      setSessions(rows.map((r) => ({ id: r.id, title: r.title, messageCount: r.message_count })));
     } catch { /* ignore */ }
     setSessionsLoading(false);
   }, []);
@@ -104,9 +111,9 @@ function Coach() {
 
   async function switchSession(id: string) {
     try {
-      const client = getClient();
-      const data = await client.request<{ coachSession: { messages: Array<{ role: string; content: string }> } | null }>(COACH_SESSION_QUERY, { id });
-      const full = data.coachSession;
+      const full = (await proxyCoachSession({ data: { id } })) as {
+        messages: Array<{ role: string; content: string }>;
+      } | null;
       if (!full) {
         toast.error("Could not load session");
         return;
@@ -132,8 +139,7 @@ function Coach() {
   async function removeSession(e: React.MouseEvent, id: string) {
     e.stopPropagation();
     try {
-      const client = getClient();
-      await client.request<{ deleteCoachSession: boolean }>(DELETE_COACH_SESSION_MUTATION, { id });
+      await proxyDeleteCoachSession({ data: { id } });
       if (activeId === id) {
         setMessages([]);
         setActiveId(null);
@@ -150,8 +156,7 @@ function Coach() {
     if (currentTitle && currentTitle !== "New Chat") return;
     try {
       const { title } = await genTitle({ data: { userMessage: userText } });
-      const client = getClient();
-      await client.request(UPDATE_COACH_SESSION_TITLE_MUTATION, { id: sid, title });
+      await proxyRenameCoachSession({ data: { id: sid, title } });
       loadSessions();
     } catch {
       // non-critical
@@ -167,9 +172,9 @@ function Coach() {
     let createdNow = false;
     if (!sid) {
       try {
-        const client = getClient();
-        const data = await client.request<{ createCoachSession: { id: string } }>(CREATE_COACH_SESSION_MUTATION);
-        sid = data.createCoachSession.id;
+        const created = (await proxyCreateCoachSession({ data: {} })) as { id: string } | null;
+        if (!created) throw new Error("create failed");
+        sid = created.id;
         setActiveId(sid);
         createdNow = true;
       } catch {
@@ -211,8 +216,7 @@ function Coach() {
     const clean = next.trim().slice(0, 40);
     if (!clean || clean === cur) return;
     try {
-      const client = getClient();
-      await client.request(UPDATE_COACH_SESSION_TITLE_MUTATION, { id, title: clean });
+      await proxyRenameCoachSession({ data: { id, title: clean } });
       setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, title: clean } : s)));
     } catch {
       toast.error("Could not rename");

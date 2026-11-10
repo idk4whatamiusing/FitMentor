@@ -9,8 +9,7 @@ import { syncWorkoutDone } from "@/services/sync";
 import { Button } from "@/components/ui/button";
 import { Check, ChevronRight, Clock, Dumbbell, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { getClient } from "@/lib/graphql/client";
-import { TODAY_AI_PLAN_QUERY } from "@/lib/graphql/queries";
+import { proxyWorkoutPlan } from "@/services/api-proxy";
 
 export const Route = createFileRoute("/workouts")({
   head: () => ({ meta: [{ title: "Workouts — FitMentor" }] }),
@@ -31,10 +30,10 @@ function Workouts() {
     setFetchError(false);
     if (!profile) { setLoading(false); return; }
     setLoading(true);
-    getClient()
-      .request<{ todayAiPlan: { plan: WorkoutDay[] } | null }>(TODAY_AI_PLAN_QUERY, { table: "workout_plans" })
+    proxyWorkoutPlan()
       .then((data) => {
-        const plan = data.todayAiPlan?.plan;
+        const body = data as { data?: { plan?: WorkoutDay[] }; plan?: WorkoutDay[] };
+        const plan = body?.data?.plan ?? body?.plan;
         setPlan(Array.isArray(plan) ? plan : []);
       })
       .catch(() => setFetchError(true))

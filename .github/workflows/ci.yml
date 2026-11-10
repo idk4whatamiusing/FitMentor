@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -48,131 +49,49 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy ui/dist --project-name=fitmentor
+          command: pages deploy dist --project-name=fitmentor --branch main
 
   api:
-    name: Go API
+    name: Rust Worker (api)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: api
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          go-version: "1.25"
-          cache-dependency-path: api/go.sum
-      - run: go build ./...
-      - run: go vet ./...
-      - run: test -z "$(gofmt -l .)"
-      - run: go test ./...
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: api
+      - run: cargo fmt --check
+      - run: cargo check --target wasm32-unknown-unknown
+      - run: cargo clippy --target wasm32-unknown-unknown -- -D warnings
 
-  ws:
-    name: Gleam WS
+  deploy:
+    name: Deploy Worker
+    needs: [api, web]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: realtime
+        working-directory: api
     steps:
       - uses: actions/checkout@v4
-      - uses: erlef/setup-beam@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          otp-version: "27"
-          gleam-version: "1.17.0"
-      - name: Install rebar3 (needed for Erlang deps)
-        run: |
-          curl -fsSL -o rebar3 https://github.com/erlang/rebar3/releases/download/3.24.0/rebar3
-          chmod +x rebar3
-          sudo mv rebar3 /usr/local/bin/rebar3
-      - run: gleam build
-      - run: gleam check
-
-  images:
-    name: Build backend images
-    needs: [shared, web, api, ws]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build api, ws, planner
-        run: IMAGE_TAG=${{ github.sha }} docker compose build api ws planner
-      - name: Push :sha and :latest
-        run: |
-          for svc in api ws planner; do
-            docker push ghcr.io/idk4whatamiusing/fitmentor-$svc:${{ github.sha }}
-            docker tag ghcr.io/idk4whatamiusing/fitmentor-$svc:${{ github.sha }} ghcr.io/idk4whatamiusing/fitmentor-$svc:latest
-            docker push ghcr.io/idk4whatamiusing/fitmentor-$svc:latest
-          done
-
-  deploy:
-    name: Deploy backend to EC2
-    needs: [shared, web, api, ws, images]
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    env:
-      AWS_REGION: ap-south-2
-    steps:
-      - uses: aws-actions/configure-aws-credentials@v4
+          workspaces: api
+      - name: Install worker-build
+        run: cargo install worker-build --locked
+      - uses: cloudflare/wrangler-action@v3
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Discover prod instance
-        id: ec2
-        run: |
-          INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters 'Name=tag:Name,Values=fitmentor-prod' 'Name=instance-state-name,Values=running' \
-            --query 'Reservations[0].Instances[0].InstanceId' --output text)
-          if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
-            echo "fitmentor-prod instance not found" >&2
-            exit 1
-          fi
-          echo "instance-id=$INSTANCE_ID" >> "$GITHUB_OUTPUT"
-      - name: Deploy over SSM
-        env:
-          INSTANCE_ID: ${{ steps.ec2.outputs.instance-id }}
-        run: |
-          COMMAND_ID=$(aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name AWS-RunShellScript \
-            --comment "fitmentor deploy ${{ github.sha }}" \
-            --parameters '{"commands":["set -e","cd /opt/fitmentor","if [ ! -d .git ]; then git init -q; git remote add origin https://github.com/idk4whatamiusing/FitMentor.git; fi","git fetch origin main","git reset --hard origin/main","sed -i \"s|apps/api/Dockerfile|api/Dockerfile|; s|context: apps/ws|context: realtime|\" docker-compose.prod.yml","docker pull ghcr.io/idk4whatamiusing/fitmentor-api:${{ github.sha }}","docker pull ghcr.io/idk4whatamiusing/fitmentor-ws:${{ github.sha }}","docker pull ghcr.io/idk4whatamiusing/fitmentor-planner:${{ github.sha }}","docker tag ghcr.io/idk4whatamiusing/fitmentor-api:${{ github.sha }} fitmentor-api","docker tag ghcr.io/idk4whatamiusing/fitmentor-ws:${{ github.sha }} fitmentor-ws","docker tag ghcr.io/idk4whatamiusing/fitmentor-planner:${{ github.sha }} fitmentor-planner","docker compose -f docker-compose.prod.yml up -d","docker rmi ghcr.io/idk4whatamiusing/fitmentor-api:${{ github.sha }} ghcr.io/idk4whatamiusing/fitmentor-ws:${{ github.sha }} ghcr.io/idk4whatamiusing/fitmentor-planner:${{ github.sha }} || true","docker image prune -f","for i in $(seq 1 36); do if curl -sf http://localhost:3000/v1/health; then echo; echo DEPLOY_OK; exit 0; fi; sleep 10; done","echo DEPLOY_HEALTHCHECK_FAILED","docker compose -f docker-compose.prod.yml logs --tail=50 api","exit 1"]}' \
-            --query 'Command.CommandId' --output text)
-          echo "SSM command: $COMMAND_ID"
-          for i in $(seq 1 120); do
-            STATUS=$(aws ssm get-command-invocation \
-              --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
-              --query Status --output text 2>/dev/null || echo InProgress)
-            case "$STATUS" in
-              Success)
-                echo "--- deploy output ---"
-                aws ssm get-command-invocation \
-                  --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
-                  --query StandardOutputContent --output text
-                exit 0
-                ;;
-              Failed|Cancelled|TimedOut)
-                echo "--- deploy failed: $STATUS ---"
-                aws ssm get-command-invocation \
-                  --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
-                  --query StandardOutputContent --output text
-                aws ssm get-command-invocation \
-                  --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" \
-                  --query StandardErrorContent --output text
-                exit 1
-                ;;
-              *)
-                sleep 10
-                ;;
-            esac
-          done
-          echo "timed out waiting for SSM command" >&2
-          exit 1
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: api
+          command: deploy
+          wranglerVersion: "4"

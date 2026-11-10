@@ -6,8 +6,7 @@ import { loadLogs, saveLog, todayKey, last7, type DailyLog } from "@/utils/habit
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/utils/cn";
-import { getClient } from "@/lib/graphql/client";
-import { TODAY_AI_PLAN_QUERY } from "@/lib/graphql/queries";
+import { proxyToolAdvice } from "@/services/api-proxy";
 import {
   Scale,
   Moon,
@@ -122,9 +121,8 @@ function BMIAnalyzer() {
   const getAiRecommendations = async () => {
     setLoading(true);
     try {
-      const client = getClient();
-      const data = await client.request<{ todayAiPlan: { plan: string[] } | null }>(TODAY_AI_PLAN_QUERY, { table: "bmi_advice" });
-      const tips = data.todayAiPlan?.plan;
+      const data = await proxyToolAdvice({ data: { path: "/v1/tools/bmi-advice" } });
+      const tips = data.tips;
       setAiTips(tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.");
     } catch {
       setAiTips("Failed to get AI recommendations. Try again.");
@@ -256,9 +254,8 @@ function SleepTracker() {
   const getSleepTips = async () => {
     setLoading(true);
     try {
-      const client = getClient();
-      const data = await client.request<{ todayAiPlan: { plan: string[] } | null }>(TODAY_AI_PLAN_QUERY, { table: "sleep_advice" });
-      const tips = data.todayAiPlan?.plan;
+      const data = await proxyToolAdvice({ data: { path: "/v1/tools/sleep-advice" } });
+      const tips = data.tips;
       setAiTips(tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.");
     } catch {
       setAiTips("Failed to get AI advice. Try again.");
@@ -414,9 +411,8 @@ function InjuryAssessment() {
     if (!painArea) return;
     setLoading(true);
     try {
-      const client = getClient();
-      const data = await client.request<{ todayAiPlan: { plan: string[] } | null }>(TODAY_AI_PLAN_QUERY, { table: "injury_advice" });
-      const tips = data.todayAiPlan?.plan;
+      const data = await proxyToolAdvice({ data: { path: "/v1/tools/injury-advice" } });
+      const tips = data.tips;
       setAdvice(tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.");
     } catch {
       setAdvice("Failed to get AI advice. Try again.");
@@ -684,9 +680,8 @@ function FormAnalyzer() {
     if (!exercise) return;
     setLoading(true);
     try {
-      const client = getClient();
-      const data = await client.request<{ todayAiPlan: { plan: string[] } | null }>(TODAY_AI_PLAN_QUERY, { table: "form_advice" });
-      const tips = data.todayAiPlan?.plan;
+      const data = await proxyToolAdvice({ data: { path: "/v1/tools/form-advice" } });
+      const tips = data.tips;
       setAnalysis(tips && tips.length > 0 ? tips.join("\n") : "No analysis available yet. Generate a plan first.");
     } catch {
       setAnalysis("Failed to analyze. Try again.");

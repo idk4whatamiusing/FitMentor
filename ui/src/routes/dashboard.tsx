@@ -4,8 +4,8 @@ import { Flame, Dumbbell, Apple, TrendingUp, Sparkles, ChevronRight } from "luci
 import { loadProfile, saveProfile, calcTargets, GOAL_LABEL, type Profile } from "@/utils/profile";
 import { ensureToday, computeStreak, type DailyLog } from "@/utils/habits";
 import { generateWorkoutPlan } from "@/utils/workouts";
-import { getClient } from "@/lib/graphql/client";
-import { ME_QUERY } from "@/lib/graphql/queries";
+import { useServerFn } from "@tanstack/react-start";
+import { proxyMe } from "@/services/api-proxy";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { DailyHabits } from "@/components/dashboard/DailyHabits";
 import { CoachChat } from "@/components/dashboard/CoachChat";
@@ -20,15 +20,15 @@ function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [log, setLog] = useState<DailyLog | null>(null);
   const [streak, setStreak] = useState(0);
+  const meFn = useServerFn(proxyMe);
 
 useEffect(() => {
   const init = async () => {
     let p = loadProfile();
     if (!p) {
       try {
-        const client = getClient();
-        const data = await client.request<{ me: { profile: Profile | null } }>(ME_QUERY);
-        const profile = data.me?.profile;
+        const data = (await meFn()) as { profile?: Profile | null };
+        const profile = data?.profile;
         if (profile && profile.name) {
           saveProfile(profile);
           p = profile;

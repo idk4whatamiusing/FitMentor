@@ -9,8 +9,7 @@ import { Plus, Apple, Target, Pencil, Check, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Slider } from "@/components/ui/slider";
 import type { MealPlan } from "@fitmentor/shared";
-import { getClient } from "@/lib/graphql/client";
-import { TODAY_AI_PLAN_QUERY } from "@/lib/graphql/queries";
+import { proxyMealPlan } from "@/services/api-proxy";
 
 export const Route = createFileRoute("/nutrition")({
   head: () => ({ meta: [{ title: "Nutrition — FitMentor" }] }),
@@ -51,9 +50,8 @@ function Nutrition() {
     setPlanAttempted(true);
     setLoadingPlan(true);
     try {
-      const client = getClient();
-      const data = await client.request<{ todayAiPlan: { plan: unknown } | null }>(TODAY_AI_PLAN_QUERY, { table: "meal_plans" });
-      const raw = data.todayAiPlan?.plan;
+      const data = (await proxyMealPlan()) as { data?: { plan?: unknown }; plan?: unknown };
+      const raw = data?.data?.plan ?? data?.plan;
       const arr = Array.isArray(raw) ? raw : raw ? [raw] : [];
       if (arr.length > 0) setAiPlans(arr as MealPlan[]);
     } catch (e) {
