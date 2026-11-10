@@ -49,7 +49,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=fitmentor --branch main
+          command: pages deploy ui/dist --project-name=fitmentor --branch main
 
   api:
     name: Rust Worker (api)
