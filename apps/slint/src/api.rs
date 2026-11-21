@@ -2,21 +2,76 @@
 
 use serde::Deserialize;
 use std::env;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 const DEFAULT_API_URL: &str =
     "https://vfvwjpw567ghnqwknc2m74thx40jmpiw.lambda-url.ap-south-1.on.aws";
 
 static TOKEN: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+static STORAGE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 fn token_cell() -> &'static Mutex<Option<String>> {
     TOKEN.get_or_init(|| Mutex::new(None))
 }
 
+pub fn set_storage_dir(dir: PathBuf) {
+    let _ = STORAGE_DIR.set(dir);
+}
+
+fn storage_dir() -> Option<PathBuf> {
+    if let Some(dir) = STORAGE_DIR.get() {
+        return Some(dir.clone());
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        env::var("HOME")
+            .ok()
+            .map(|home| PathBuf::from(home).join(".fitmentor"))
+    }
+    #[cfg(target_os = "android")]
+    {
+        None
+    }
+}
+
+fn token_path() -> Option<PathBuf> {
+    storage_dir().map(|dir| dir.join("token"))
+}
+
 pub fn set_token(token: Option<String>) {
     if let Ok(mut slot) = token_cell().lock() {
-        *slot = token;
+        *slot = token.clone();
     }
+    let Some(path) = token_path() else {
+        return;
+    };
+    match token {
+        Some(token) => {
+            if let Some(parent) = path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            if fs::write(&path, token).is_ok() {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+                }
+            }
+        }
+        None => {
+            let _ = fs::remove_file(path);
+        }
+    }
+}
+
+pub fn load_token() -> Option<String> {
+    let path = token_path()?;
+    fs::read_to_string(path)
+        .ok()
+        .map(|token| token.trim().to_string())
+        .filter(|token| !token.is_empty())
 }
 
 fn token() -> Option<String> {
@@ -222,4 +277,100 @@ pub fn exchange_google(id_token: &str) -> Result<(String, User), String> {
                 .to_string(),
         },
     ))
+}
+
+// ── Profile / subscription ─────────────────────────────────────────
+
+#[derive(Debug, Default, Clone)]
+pub struct Profile {
+    pub name: String,
+    pub email: String,
+    pub age: i64,
+    pub height_cm: i64,
+    pub weight_kg: i64,
+    pub goal: String,
+    pub diet: String,
+    pub place: String,
+    pub experience: String,
+    pub days_per_week: i64,
+    pub budget_per_day: i64,
+    pub tier: String,
+}
+
+pub fn fetch_profile() -> Result<Profile, String> {
+    let response = authorized_get("/v1/user/me")?;
+    let value: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse profile: {error}"))?;
+    let data = value.get("data").cloned().unwrap_or_default();
+    let user = data.get("user").cloned().unwrap_or_default();
+    let profile = data.get("profile").cloned().unwrap_or_default();
+
+    let tier = match authorized_get("/v1/user/subscription")
+        .ok()
+        .and_then(|response| response.into_json::<serde_json::Value>().ok())
+    {
+        Some(value) => value
+            .get("data")
+            .and_then(|data| data.get("subscription"))
+            .and_then(|subscription| subscription.get("tier"))
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("free")
+            .to_string(),
+        None => "free".to_string(),
+    };
+
+    Ok(Profile {
+        name: user
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("Friend")
+            .to_string(),
+        email: user
+            .get("email")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        age: profile
+            .get("age")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        height_cm: profile
+            .get("heightCm")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        weight_kg: profile
+            .get("weightKg")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        goal: profile
+            .get("goal")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        diet: profile
+            .get("diet")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        place: profile
+            .get("place")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        experience: profile
+            .get("experience")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        days_per_week: profile
+            .get("daysPerWeek")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        budget_per_day: profile
+            .get("budgetPerDay")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        tier,
+    })
 }

@@ -103,10 +103,24 @@ export component AppWindow inherits Window {
     in-out property <string> device-user-code: "";
     in-out property <string> device-url: "";
     in-out property <string> auth-status: "";
+    in-out property <string> profile-name: "Friend";
+    in-out property <string> profile-email: "";
+    in-out property <int> profile-age: 0;
+    in-out property <int> profile-height: 0;
+    in-out property <int> profile-weight: 0;
+    in-out property <string> profile-goal: "";
+    in-out property <string> profile-diet: "";
+    in-out property <string> profile-place: "";
+    in-out property <string> profile-experience: "";
+    in-out property <int> profile-days: 0;
+    in-out property <int> profile-budget: 0;
+    in-out property <string> profile-tier: "Free";
 
     callback refresh();
     callback sign-in();
     callback google-sign-in();
+    callback load-profile();
+    callback sign-out();
     callback add-water();
     callback add-steps();
     callback add-protein();
@@ -313,18 +327,91 @@ export component AppWindow inherits Window {
         }
 
         if root.tab == 4 : VerticalLayout {
-            spacing: 8px;
+            spacing: 10px;
+
             Text {
-                text: "Profile";
+                text: root.profile-name;
                 color: #f8fafc;
                 font-size: 28px;
                 font-weight: 700;
             }
             Text {
-                text: "Plan, targets, and payment status will live here.";
+                text: root.profile-email;
                 color: #94a3b8;
-                font-size: 14px;
-                wrap: word-wrap;
+                font-size: 13px;
+            }
+
+            Rectangle {
+                border-radius: 16px;
+                background: #0d1622;
+                border-width: 1px;
+                border-color: #1e293b;
+
+                VerticalLayout {
+                    padding: 14px;
+                    spacing: 6px;
+
+                    Text {
+                        text: "Current plan";
+                        color: #94a3b8;
+                        font-size: 11px;
+                    }
+                    Text {
+                        text: root.profile-tier;
+                        color: #fbbf24;
+                        font-size: 24px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: "Goal: \{root.profile-goal}  ·  \{root.profile-diet}  ·  \{root.profile-days}x/week";
+                        color: #94a3b8;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 10px;
+                StatCard {
+                    title: "Age";
+                    value: "\{root.profile-age} yrs";
+                    accent: #38bdf8;
+                }
+                StatCard {
+                    title: "Height";
+                    value: "\{root.profile-height} cm";
+                    accent: #a78bfa;
+                }
+            }
+            HorizontalLayout {
+                spacing: 10px;
+                StatCard {
+                    title: "Weight";
+                    value: "\{root.profile-weight} kg";
+                    accent: #34d399;
+                }
+                StatCard {
+                    title: "Budget";
+                    value: "₹\{root.profile-budget}/day";
+                    accent: #fbbf24;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                QuickButton {
+                    label: "Refresh profile";
+                    clicked => {
+                        root.load-profile();
+                    }
+                }
+                QuickButton {
+                    label: "Sign out";
+                    clicked => {
+                        root.sign-out();
+                    }
+                }
             }
         }
 

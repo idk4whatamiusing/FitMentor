@@ -75,3 +75,13 @@ cd api
 set -a && . ../.env && set +a
 cargo run --bin mint-token -- google:... you@example.com
 ```
+
+## Token persistence
+
+The FitMentor JWT is stored on disk after sign-in (desktop:
+`~/.fitmentor/token`, Android: the app's internal data directory) with
+`0600` permissions on Unix. The app auto-signs-in on launch and clears the
+token when you tap **Sign out** in the You tab.
+
+The You tab loads `/v1/user/me` and `/v1/user/subscription` to show the
+profile and current plan.
