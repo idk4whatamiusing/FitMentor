@@ -61,3 +61,14 @@ _bmad-output/
 
 # Redis
 dump.rdb
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Python
+__pycache__/
+*.pyc

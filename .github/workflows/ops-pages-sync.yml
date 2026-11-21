@@ -1,0 +1,73 @@
+name: Ops - Pages env + D1 export
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: Lambda Function URL
+        required: true
+        default: https://vfvwjpw567ghnqwknc2m74thx40jmpiw.lambda-url.ap-south-1.on.aws
+      export_d1:
+        description: Export D1 to a downloadable artifact
+        type: boolean
+        default: true
+      redeploy_pages:
+        description: Redeploy Pages after updating env vars
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync Pages + export D1
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT: fitmentor
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Verify Cloudflare access
+        run: npx --yes wrangler@4.116.0 pages project list
+
+      - name: Set Pages environment variables
+        env:
+          API_URL: ${{ inputs.api_url }}
+          API_SHARED_SECRET: ${{ secrets.API_SHARED_SECRET }}
+          APP_URL: https://fitmentor-ey9.pages.dev
+        run: |
+          printf '%s' "$API_URL" | npx --yes wrangler@4.116.0 pages secret put API_URL --project-name "$PROJECT"
+          printf '%s' "$API_SHARED_SECRET" | npx --yes wrangler@4.116.0 pages secret put API_SHARED_SECRET --project-name "$PROJECT"
+          printf '%s' "$APP_URL" | npx --yes wrangler@4.116.0 pages secret put APP_URL --project-name "$PROJECT"
+
+      - name: Export D1
+        if: ${{ inputs.export_d1 }}
+        run: npx --yes wrangler@4.116.0 d1 export fitmentor --remote --output=d1-dump.sql
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.export_d1 }}
+        with:
+          name: d1-dump
+          path: d1-dump.sql
+          if-no-files-found: error
+
+      - name: Build UI
+        if: ${{ inputs.redeploy_pages }}
+        working-directory: ui
+        run: |
+          npm ci
+          npm run build
+
+      - name: Redeploy Pages
+        if: ${{ inputs.redeploy_pages }}
+        working-directory: ui
+        run: npx --yes wrangler@4.116.0 pages deploy dist --project-name "$PROJECT" --branch main

@@ -1,0 +1,61 @@
+name: Deploy Lambda
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - "infra/**"
+      - ".github/workflows/deploy-lambda.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-lambda-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deploy:
+    name: Build & deploy API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: api
+
+      - name: Install cargo-lambda (and Zig)
+        run: curl -fsSL https://cargo-lambda.info/install.sh | sh
+
+      - name: Build Lambda packages
+        working-directory: api
+        run: cargo lambda build --release --output-format zip
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.16.4"
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: fitmentor-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform apply
+        working-directory: infra/app
+        env:
+          TF_VAR_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_api_shared_secret: ${{ secrets.API_SHARED_SECRET }}
+        run: |
+          terraform init -input=false
+          terraform apply -auto-approve -input=false

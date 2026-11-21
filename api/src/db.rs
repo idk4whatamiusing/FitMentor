@@ -1,85 +1,30 @@
-//! D1 helpers. D1 is SQLite; ids are TEXT, JSON is TEXT.
+//! CockroachDB (Postgres wire) connection pool.
+//!
+//! The cluster certificate is embedded in the binary and written to `/tmp` on
+//! cold start so the deployment package stays a single `bootstrap` executable.
 
-use serde::de::DeserializeOwned;
-use wasm_bindgen::JsValue;
-use worker::*;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgSslMode};
+use sqlx::PgPool;
+use std::time::Duration;
 
-pub fn js(s: &str) -> JsValue {
-    JsValue::from_str(s)
-}
+const COCKROACH_ROOT_CERT: &str = include_str!("../certs/root.crt");
+const CERT_PATH: &str = "/tmp/fitmentor-cockroach-root.crt";
 
-pub fn js_opt(s: Option<&str>) -> JsValue {
-    match s {
-        Some(v) => JsValue::from_str(v),
-        None => JsValue::NULL,
+pub async fn connect(database_url: &str) -> Result<PgPool, sqlx::Error> {
+    let mut opts: PgConnectOptions = database_url.parse()?;
+
+    if opts.get_host().contains("cockroachlabs.cloud") {
+        std::fs::write(CERT_PATH, COCKROACH_ROOT_CERT).map_err(sqlx::Error::Io)?;
+        opts = opts
+            .ssl_mode(PgSslMode::VerifyFull)
+            .ssl_root_cert(CERT_PATH);
     }
-}
 
-pub fn js_num(n: i64) -> JsValue {
-    JsValue::from_f64(n as f64)
-}
-
-pub fn js_opt_num(n: Option<i64>) -> JsValue {
-    match n {
-        Some(v) => JsValue::from_f64(v as f64),
-        None => JsValue::NULL,
-    }
-}
-
-pub fn js_opt_f64(n: Option<f64>) -> JsValue {
-    match n {
-        Some(v) => JsValue::from_f64(v),
-        None => JsValue::NULL,
-    }
-}
-
-pub fn js_bool(b: bool) -> JsValue {
-    JsValue::from_bool(b)
-}
-
-/// Fetch a single row, mapping "no rows" to Ok(None).
-pub async fn first<T: DeserializeOwned>(
-    db: &D1Database,
-    sql: &str,
-    binds: &[JsValue],
-) -> Result<Option<T>> {
-    let stmt = db.prepare(sql);
-    let stmt = if binds.is_empty() {
-        stmt
-    } else {
-        stmt.bind(binds)?
-    };
-    stmt.first::<T>(None).await
-}
-
-/// Fetch all rows.
-pub async fn all<T: DeserializeOwned>(
-    db: &D1Database,
-    sql: &str,
-    binds: &[JsValue],
-) -> Result<Vec<T>> {
-    let stmt = db.prepare(sql);
-    let stmt = if binds.is_empty() {
-        stmt
-    } else {
-        stmt.bind(binds)?
-    };
-    let result = stmt.all().await?;
-    result.results::<T>()
-}
-
-/// Execute a write; returns rows written.
-pub async fn run(db: &D1Database, sql: &str, binds: &[JsValue]) -> Result<u64> {
-    let stmt = db.prepare(sql);
-    let stmt = if binds.is_empty() {
-        stmt
-    } else {
-        stmt.bind(binds)?
-    };
-    let result = stmt.run().await?;
-    Ok(result.meta()?.and_then(|m| m.changes).unwrap_or(0) as u64)
-}
-
-pub fn db(env: &Env) -> Result<D1Database> {
-    env.d1("DB")
+    PgPoolOptions::new()
+        .max_connections(4)
+        .acquire_timeout(Duration::from_secs(8))
+        .idle_timeout(Duration::from_secs(300))
+        .max_lifetime(Duration::from_secs(1800))
+        .connect_with(opts)
+        .await
 }

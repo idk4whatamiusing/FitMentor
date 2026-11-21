@@ -1,8 +1,9 @@
-//! Row types as D1 returns them (SQLite: TEXT ids, INTEGER ints, REAL floats).
+//! Row types. CockroachDB columns are TEXT/BIGINT/DOUBLE PRECISION so the
+//! Rust types (and API response shapes) match the previous D1 implementation.
 
 use serde::Deserialize;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, sqlx::FromRow)]
 pub struct UserRow {
     pub id: String,
     pub cf_access_sub: String,
@@ -11,7 +12,7 @@ pub struct UserRow {
     pub created_at: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, sqlx::FromRow)]
 pub struct ProfileRow {
     pub id: String,
     pub user_id: String,
@@ -32,7 +33,7 @@ pub struct ProfileRow {
     pub updated_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, sqlx::FromRow)]
 pub struct DailyLogRow {
     pub id: String,
     pub user_id: String,
@@ -47,7 +48,7 @@ pub struct DailyLogRow {
     pub updated_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, sqlx::FromRow)]
 pub struct SessionRow {
     pub id: String,
     pub user_id: String,

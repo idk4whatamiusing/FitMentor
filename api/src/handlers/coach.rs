@@ -1,227 +1,213 @@
 //! Coach sessions + coach log.
 
-use chrono::Utc;
+use axum::body::Bytes;
+use axum::extract::{Path, State};
+use axum::http::HeaderMap;
+use axum::Json;
+use serde_json::{json, Value};
 use uuid::Uuid;
-use worker::*;
 
+use crate::app::AppState;
 use crate::auth;
-use crate::db;
-use crate::handlers::{bad_request, internal, not_found, unauthorized};
+use crate::error::{ApiError, ApiResult};
 use crate::models::SessionRow;
 
-fn json_resp(v: serde_json::Value) -> Response {
-    Response::from_json(&v).unwrap_or_else(|_| Response::empty().unwrap())
+fn json_resp(value: Value) -> Json<Value> {
+    Json(value)
 }
 
-pub async fn list(req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let env = &ctx.env;
-    let auth_user = match auth::require_user(&req, env).await {
-        Ok(u) => u,
-        Err(_) => return Ok(unauthorized()),
-    };
-    let d = db::db(env)?;
-    let rows = db::all::<SessionRow>(
-        &d,
+pub async fn list(State(state): State<AppState>, headers: HeaderMap) -> ApiResult {
+    let auth_user = auth::require_user(&headers, &state.config)?;
+    let rows = sqlx::query_as::<_, SessionRow>(
         "SELECT id, user_id, title, messages, created_at, updated_at
-         FROM chat_sessions WHERE user_id = ? ORDER BY updated_at DESC",
-        &[db::js(&auth_user.user_id)],
+         FROM chat_sessions WHERE user_id = $1 ORDER BY updated_at DESC",
     )
+    .bind(&auth_user.user_id)
+    .fetch_all(&state.pool)
     .await?;
-    let items: Vec<serde_json::Value> = rows
+
+    let items: Vec<Value> = rows
         .iter()
-        .map(|r| {
-            let count = serde_json::from_str::<Vec<serde_json::Value>>(&r.messages)
-                .map(|v| v.len())
+        .map(|row| {
+            let count = serde_json::from_str::<Vec<Value>>(&row.messages)
+                .map(|messages| messages.len())
                 .unwrap_or(0);
-            serde_json::json!({
-                "id": r.id,
-                "title": r.title,
+            json!({
+                "id": row.id,
+                "title": row.title,
                 "message_count": count,
-                "created_at": r.created_at,
+                "created_at": row.created_at,
             })
         })
         .collect();
-    Ok(json_resp(serde_json::Value::Array(items)))
+
+    Ok(json_resp(Value::Array(items)))
 }
 
-pub async fn create(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let env = &ctx.env;
-    let auth_user = match auth::require_user(&req, env).await {
-        Ok(u) => u,
-        Err(_) => return Ok(unauthorized()),
-    };
-    let body: serde_json::Value = req.json().await.unwrap_or_else(|_| serde_json::json!({}));
+pub async fn create(State(state): State<AppState>, headers: HeaderMap, body: Bytes) -> ApiResult {
+    let auth_user = auth::require_user(&headers, &state.config)?;
+    let body: Value = serde_json::from_slice(&body).unwrap_or_else(|_| json!({}));
     let title = body
         .get("title")
-        .and_then(|v| v.as_str())
+        .and_then(Value::as_str)
         .unwrap_or("New Chat")
         .to_string();
-    let d = db::db(env)?;
+
     let id = Uuid::new_v4().to_string();
-    if let Err(e) = db::run(
-        &d,
-        "INSERT INTO chat_sessions (id, user_id, title) VALUES (?, ?, ?)",
-        &[db::js(&id), db::js(&auth_user.user_id), db::js(&title)],
-    )
-    .await
-    {
-        return Ok(internal(&e.to_string()));
-    }
-    Ok(json_resp(serde_json::json!({ "id": id })))
+    sqlx::query("INSERT INTO chat_sessions (id, user_id, title) VALUES ($1, $2, $3)")
+        .bind(&id)
+        .bind(&auth_user.user_id)
+        .bind(&title)
+        .execute(&state.pool)
+        .await?;
+
+    Ok(json_resp(json!({ "id": id })))
 }
 
-pub async fn get(req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let env = &ctx.env;
-    let auth_user = match auth::require_user(&req, env).await {
-        Ok(u) => u,
-        Err(_) => return Ok(unauthorized()),
-    };
-    let id = ctx.param("id").cloned().unwrap_or_default();
-    let d = db::db(env)?;
-    let row = db::first::<SessionRow>(
-        &d,
+pub async fn get(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> ApiResult {
+    let auth_user = auth::require_user(&headers, &state.config)?;
+    let row = sqlx::query_as::<_, SessionRow>(
         "SELECT id, user_id, title, messages, created_at, updated_at
-         FROM chat_sessions WHERE id = ? AND user_id = ?",
-        &[db::js(&id), db::js(&auth_user.user_id)],
+         FROM chat_sessions WHERE id = $1 AND user_id = $2",
     )
+    .bind(&id)
+    .bind(&auth_user.user_id)
+    .fetch_optional(&state.pool)
     .await?;
+
     match row {
-        Some(r) => Ok(json_resp(serde_json::json!({
-            "id": r.id,
-            "user_id": r.user_id,
-            "title": r.title,
-            "messages": serde_json::from_str::<serde_json::Value>(&r.messages).unwrap_or(serde_json::json!([])),
-            "created_at": r.created_at,
-            "updated_at": r.updated_at,
+        Some(row) => Ok(json_resp(json!({
+            "id": row.id,
+            "user_id": row.user_id,
+            "title": row.title,
+            "messages": serde_json::from_str::<Value>(&row.messages).unwrap_or(json!([])),
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
         }))),
-        None => Ok(not_found()),
+        None => Err(ApiError::NotFound),
     }
 }
 
-pub async fn delete(req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let env = &ctx.env;
-    let auth_user = match auth::require_user(&req, env).await {
-        Ok(u) => u,
-        Err(_) => return Ok(unauthorized()),
-    };
-    let id = ctx.param("id").cloned().unwrap_or_default();
-    let d = db::db(env)?;
-    let changed = db::run(
-        &d,
-        "DELETE FROM chat_sessions WHERE id = ? AND user_id = ?",
-        &[db::js(&id), db::js(&auth_user.user_id)],
-    )
-    .await?;
-    if changed == 0 {
-        return Ok(not_found());
+pub async fn delete(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> ApiResult {
+    let auth_user = auth::require_user(&headers, &state.config)?;
+    let result = sqlx::query("DELETE FROM chat_sessions WHERE id = $1 AND user_id = $2")
+        .bind(&id)
+        .bind(&auth_user.user_id)
+        .execute(&state.pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(ApiError::NotFound);
     }
-    Ok(json_resp(serde_json::json!({ "ok": true })))
+    Ok(json_resp(json!({ "ok": true })))
 }
 
 /// PATCH /v1/coach/sessions/:id — replaces the GraphQL `updateCoachSessionTitle`.
-pub async fn rename(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let env = &ctx.env;
-    let auth_user = match auth::require_user(&req, env).await {
-        Ok(u) => u,
-        Err(_) => return Ok(unauthorized()),
-    };
-    let body: serde_json::Value = match req.json().await {
-        Ok(b) => b,
-        Err(_) => return Ok(bad_request("invalid json")),
-    };
+pub async fn rename(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    body: Bytes,
+) -> ApiResult {
+    let auth_user = auth::require_user(&headers, &state.config)?;
+    let body: Value =
+        serde_json::from_slice(&body).map_err(|_| ApiError::BadRequest("invalid json".into()))?;
+
     let title = body
         .get("title")
-        .and_then(|v| v.as_str())
+        .and_then(Value::as_str)
         .unwrap_or("")
         .trim();
     let clean: String = title.chars().take(40).collect();
     if clean.is_empty() {
-        return Ok(bad_request("Title cannot be empty"));
+        return Err(ApiError::BadRequest("Title cannot be empty".into()));
     }
-    let id = ctx.param("id").cloned().unwrap_or_default();
-    let d = db::db(env)?;
-    let changed = db::run(
-        &d,
-        "UPDATE chat_sessions SET title = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?",
-        &[db::js(&clean), db::js(&id), db::js(&auth_user.user_id)],
+
+    let result = sqlx::query(
+        "UPDATE chat_sessions SET title = $1, updated_at = now()::text WHERE id = $2 AND user_id = $3",
     )
+    .bind(&clean)
+    .bind(&id)
+    .bind(&auth_user.user_id)
+    .execute(&state.pool)
     .await?;
-    if changed == 0 {
-        return Ok(not_found());
+
+    if result.rows_affected() == 0 {
+        return Err(ApiError::NotFound);
     }
-    let row = db::first::<SessionRow>(
-        &d,
-        "SELECT id, user_id, title, messages, created_at, updated_at FROM chat_sessions WHERE id = ?",
-        &[db::js(&id)],
+
+    let row = sqlx::query_as::<_, SessionRow>(
+        "SELECT id, user_id, title, messages, created_at, updated_at FROM chat_sessions WHERE id = $1",
     )
+    .bind(&id)
+    .fetch_optional(&state.pool)
     .await?
-    .ok_or_else(|| Error::RustError("not found".into()))?;
-    Ok(json_resp(serde_json::json!({
+    .ok_or(ApiError::NotFound)?;
+
+    Ok(json_resp(json!({
         "id": row.id,
         "user_id": row.user_id,
         "title": row.title,
-        "messages": serde_json::from_str::<serde_json::Value>(&row.messages).unwrap_or(serde_json::json!([])),
+        "messages": serde_json::from_str::<Value>(&row.messages).unwrap_or(json!([])),
     })))
 }
 
 /// POST /v1/coach/log — stores the container tag and appends the assistant reply.
-pub async fn log(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    let env = &ctx.env;
-    let auth_user = match auth::require_user(&req, env).await {
-        Ok(u) => u,
-        Err(_) => return Ok(unauthorized()),
-    };
-    let body: serde_json::Value = match req.json().await {
-        Ok(b) => b,
-        Err(_) => return Ok(bad_request("invalid json")),
-    };
-    let d = db::db(env)?;
+pub async fn log(State(state): State<AppState>, headers: HeaderMap, body: Bytes) -> ApiResult {
+    let auth_user = auth::require_user(&headers, &state.config)?;
+    let body: Value =
+        serde_json::from_slice(&body).map_err(|_| ApiError::BadRequest("invalid json".into()))?;
+
     let container_tag = body
         .get("container_tag")
-        .and_then(|v| v.as_str())
+        .and_then(Value::as_str)
         .unwrap_or("");
-    let reply = body.get("reply").and_then(|v| v.as_str()).unwrap_or("");
+    let reply = body.get("reply").and_then(Value::as_str).unwrap_or("");
     let session_id = body
         .get("session_id")
-        .and_then(|v| v.as_str())
+        .and_then(Value::as_str)
         .unwrap_or("")
         .to_string();
     if container_tag.is_empty() {
-        return Ok(bad_request("missing container_tag"));
+        return Err(ApiError::BadRequest("missing container_tag".into()));
     }
+
     let row_id = Uuid::new_v4().to_string();
-    let _ = db::run(
-        &d,
-        "INSERT INTO coach_logs (id, user_id, container_tag) VALUES (?, ?, ?)
+    let _ = sqlx::query(
+        "INSERT INTO coach_logs (id, user_id, container_tag) VALUES ($1, $2, $3)
          ON CONFLICT (user_id, container_tag) DO NOTHING",
-        &[
-            db::js(&row_id),
-            db::js(&auth_user.user_id),
-            db::js(container_tag),
-        ],
     )
+    .bind(&row_id)
+    .bind(&auth_user.user_id)
+    .bind(container_tag)
+    .execute(&state.pool)
     .await;
 
     if !session_id.is_empty() {
-        let mut msgs: Vec<serde_json::Value> = body
+        let mut messages: Vec<Value> = body
             .get("messages")
-            .and_then(|m| m.as_array())
+            .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
-        msgs.push(serde_json::json!({ "role": "assistant", "content": reply }));
-        let encoded = serde_json::to_string(&msgs).unwrap_or_else(|_| "[]".into());
-        let _ = db::run(
-            &d,
-            "UPDATE chat_sessions SET messages = ?, updated_at = ? WHERE id = ? AND user_id = ?",
-            &[
-                db::js(&encoded),
-                db::js(&Utc::now().format("%Y-%m-%d %H:%M:%S").to_string()),
-                db::js(&session_id),
-                db::js(&auth_user.user_id),
-            ],
+        messages.push(json!({ "role": "assistant", "content": reply }));
+        let encoded = serde_json::to_string(&messages).unwrap_or_else(|_| "[]".into());
+        let _ = sqlx::query(
+            "UPDATE chat_sessions SET messages = $1, updated_at = now()::text WHERE id = $2 AND user_id = $3",
         )
+        .bind(&encoded)
+        .bind(&session_id)
+        .bind(&auth_user.user_id)
+        .execute(&state.pool)
         .await;
     }
 
-    Ok(json_resp(serde_json::json!({ "ok": true })))
+    Ok(json_resp(json!({ "ok": true })))
 }
