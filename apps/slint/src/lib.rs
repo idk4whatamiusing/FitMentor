@@ -311,11 +311,72 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     });
 
     let handle = ui.as_weak();
+    ui.on_load_workout(move || {
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::fetch_workout();
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match result {
+                        Ok(days) => {
+                            let items: Vec<WorkoutDay> = days
+                                .iter()
+                                .map(|day| WorkoutDay {
+                                    day_index: day.day_index as i32,
+                                    title: day.title.clone().into(),
+                                    focus: day.focus.clone().into(),
+                                    summary: day.summary.clone().into(),
+                                    completed: day.completed,
+                                })
+                                .collect();
+                            let empty = items.is_empty();
+                            ui.set_workout_days(ModelRc::new(VecModel::from(items)));
+                            ui.set_workout_status(if empty {
+                                "No workout plan yet — the daily planner will fill this after it runs.".into()
+                            } else {
+                                "Today's workout".into()
+                            });
+                        }
+                        Err(error) => ui.set_workout_status(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
+    ui.on_complete_workout(move |day_index, title| {
+        let title = title.to_string();
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::complete_workout(day_index as i64, &title);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match result {
+                        Ok(()) => {
+                            ui.set_workout_status("Day marked complete".into());
+                            ui.invoke_load_workout();
+                        }
+                        Err(error) => ui.set_workout_status(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
     ui.on_set_tab(move |tab| {
         if let Some(ui) = handle.upgrade() {
             ui.set_tab(tab);
             if tab == 1 {
                 ui.invoke_load_nutrition();
+            }
+            if tab == 2 {
+                ui.invoke_load_workout();
             }
             if tab == 4 {
                 ui.invoke_load_profile();

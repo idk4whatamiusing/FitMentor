@@ -91,3 +91,9 @@ profile and current plan.
 The Food tab calculates daily targets (Mifflin-St Jeor + activity) and loads
 today's AI meal plan from `GET /v1/meal/today`. It shows calories, protein,
 carbs, fat, and each meal's items/macros; **Refresh** reloads both.
+
+## Workouts
+
+The Train tab loads `GET /v1/workout/today`, shows each day's focus and
+exercise summary, marks completed days from `/v1/workout/completions`, and
+posts completions to `/v1/workout/complete`.

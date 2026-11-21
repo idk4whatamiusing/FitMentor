@@ -627,3 +627,138 @@ pub fn fetch_meal_plan() -> Result<MealPlan, String> {
         Err(error) => Err(error),
     }
 }
+
+// ── Workouts ───────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct WorkoutDayView {
+    pub day_index: i64,
+    pub title: String,
+    pub focus: String,
+    pub summary: String,
+    pub completed: bool,
+}
+
+#[derive(Debug, Default)]
+struct PlanDay {
+    title: String,
+    focus: String,
+    summary: String,
+}
+
+pub fn fetch_workout() -> Result<Vec<WorkoutDayView>, String> {
+    let plan = fetch_workout_plan()?;
+    let completed = fetch_workout_completions()?;
+    Ok(plan
+        .into_iter()
+        .enumerate()
+        .map(|(index, day)| WorkoutDayView {
+            day_index: index as i64,
+            title: day.title,
+            focus: day.focus,
+            summary: day.summary,
+            completed: completed.contains(&(index as i64)),
+        })
+        .collect())
+}
+
+fn fetch_workout_plan() -> Result<Vec<PlanDay>, String> {
+    match authorized_request("GET", "/v1/workout/today", None) {
+        Ok(response) => {
+            let value: serde_json::Value = response
+                .into_json()
+                .map_err(|error| format!("Could not parse workout: {error}"))?;
+            let plan = value
+                .get("data")
+                .and_then(|data| data.get("plan"))
+                .cloned()
+                .unwrap_or_default();
+            let days = if plan.is_array() {
+                plan.as_array().cloned().unwrap_or_default()
+            } else if plan.is_null() {
+                Vec::new()
+            } else {
+                vec![plan]
+            };
+            Ok(days
+                .iter()
+                .map(|day| {
+                    let exercises = day
+                        .get("exercises")
+                        .and_then(serde_json::Value::as_array)
+                        .cloned()
+                        .unwrap_or_default();
+                    let summary = exercises
+                        .iter()
+                        .map(|exercise| {
+                            let name = exercise
+                                .get("name")
+                                .and_then(serde_json::Value::as_str)
+                                .unwrap_or("Exercise");
+                            let sets = exercise
+                                .get("sets")
+                                .and_then(serde_json::Value::as_i64)
+                                .unwrap_or(0);
+                            let reps = exercise
+                                .get("reps")
+                                .and_then(serde_json::Value::as_str)
+                                .unwrap_or("");
+                            let rest = exercise
+                                .get("rest")
+                                .and_then(serde_json::Value::as_str)
+                                .unwrap_or("");
+                            if rest.is_empty() {
+                                format!("• {name} — {sets}×{reps}")
+                            } else {
+                                format!("• {name} — {sets}×{reps} · {rest}")
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    PlanDay {
+                        title: day
+                            .get("title")
+                            .and_then(serde_json::Value::as_str)
+                            .unwrap_or("Training day")
+                            .to_string(),
+                        focus: day
+                            .get("focus")
+                            .and_then(serde_json::Value::as_str)
+                            .unwrap_or("")
+                            .to_string(),
+                        summary,
+                    }
+                })
+                .collect())
+        }
+        Err(error) if error.contains("404") => Ok(Vec::new()),
+        Err(error) => Err(error),
+    }
+}
+
+fn fetch_workout_completions() -> Result<std::collections::HashSet<i64>, String> {
+    match authorized_request("GET", "/v1/workout/completions", None) {
+        Ok(response) => {
+            let value: serde_json::Value = response
+                .into_json()
+                .map_err(|error| format!("Could not parse completions: {error}"))?;
+            let items = value
+                .get("data")
+                .and_then(|data| data.get("completions"))
+                .and_then(serde_json::Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            Ok(items
+                .iter()
+                .filter_map(|item| item.get("day_index").and_then(serde_json::Value::as_i64))
+                .collect())
+        }
+        Err(error) if error.contains("404") => Ok(std::collections::HashSet::new()),
+        Err(error) => Err(error),
+    }
+}
+
+pub fn complete_workout(day_index: i64, title: &str) -> Result<(), String> {
+    let body = serde_json::json!({ "day_index": day_index, "title": title });
+    authorized_request("POST", "/v1/workout/complete", Some(body)).map(|_| ())
+}

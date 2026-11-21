@@ -7,6 +7,14 @@ export struct MealItem {
     protein: int,
 }
 
+export struct WorkoutDay {
+    day_index: int,
+    title: string,
+    focus: string,
+    summary: string,
+    completed: bool,
+}
+
 component StatCard inherits Rectangle {
     in property <string> title;
     in property <string> value;
@@ -237,6 +245,8 @@ export component AppWindow inherits Window {
     in-out property <int> target-protein: 0;
     in-out property <int> target-carbs: 0;
     in-out property <int> target-fat: 0;
+    in-out property <[WorkoutDay]> workout-days: [];
+    in-out property <string> workout-status: "Load today's workout.";
 
     callback refresh();
     callback sign-in();
@@ -246,6 +256,8 @@ export component AppWindow inherits Window {
     callback save-onboarding();
     callback skip-onboarding();
     callback load-nutrition();
+    callback load-workout();
+    callback complete-workout(int, string);
     callback add-water();
     callback add-steps();
     callback add-protein();
@@ -524,17 +536,106 @@ export component AppWindow inherits Window {
 
         if root.tab == 2 : VerticalLayout {
             spacing: 8px;
-            Text {
-                text: "Workouts";
-                color: #f8fafc;
-                font-size: 28px;
-                font-weight: 700;
+
+            HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    spacing: 2px;
+                    Text {
+                        text: "TRAIN";
+                        color: #38bdf8;
+                        font-size: 11px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: "Workouts";
+                        color: #f8fafc;
+                        font-size: 28px;
+                        font-weight: 700;
+                    }
+                }
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+                QuickButton {
+                    label: "Refresh";
+                    clicked => {
+                        root.load-workout();
+                    }
+                }
             }
+
             Text {
-                text: "The workout plan and completion flow will live here.";
+                text: root.workout-status;
                 color: #94a3b8;
-                font-size: 14px;
+                font-size: 12px;
                 wrap: word-wrap;
+            }
+
+            ScrollView {
+                height: 480px;
+
+                VerticalLayout {
+                    width: 100%;
+                    spacing: 8px;
+
+                    if root.workout-days.length == 0 : Text {
+                        text: "No workout plan yet. The daily planner will fill this after it runs.";
+                        color: #64748b;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+
+                    for day in root.workout-days : Rectangle {
+                        border-radius: 14px;
+                        background: #0d1622;
+                        border-width: 1px;
+                        border-color: #1e293b;
+
+                        VerticalLayout {
+                            padding: 12px;
+                            spacing: 6px;
+
+                            HorizontalLayout {
+                                Text {
+                                    text: day.title;
+                                    color: #f8fafc;
+                                    font-size: 15px;
+                                    font-weight: 600;
+                                }
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                }
+                                if day.completed : Text {
+                                    text: "DONE";
+                                    color: #34d399;
+                                    font-size: 10px;
+                                    font-weight: 700;
+                                }
+                            }
+                            Text {
+                                text: day.focus;
+                                color: #7dd3fc;
+                                font-size: 11px;
+                                wrap: word-wrap;
+                            }
+                            Text {
+                                text: day.summary;
+                                color: #94a3b8;
+                                font-size: 11px;
+                                wrap: word-wrap;
+                            }
+                            QuickButton {
+                                label: day.completed ? "Completed ✓" : "Mark day complete";
+                                clicked => {
+                                    if !day.completed {
+                                        root.complete-workout(day.day_index, day.title);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
