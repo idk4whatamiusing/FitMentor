@@ -2,6 +2,33 @@
 
 use serde::Deserialize;
 use std::env;
+use std::sync::{Mutex, OnceLock};
+
+const DEFAULT_API_URL: &str =
+    "https://vfvwjpw567ghnqwknc2m74thx40jmpiw.lambda-url.ap-south-1.on.aws";
+
+static TOKEN: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+
+fn token_cell() -> &'static Mutex<Option<String>> {
+    TOKEN.get_or_init(|| Mutex::new(None))
+}
+
+pub fn set_token(token: Option<String>) {
+    if let Ok(mut slot) = token_cell().lock() {
+        *slot = token;
+    }
+}
+
+fn token() -> Option<String> {
+    token_cell().lock().ok().and_then(|slot| slot.clone())
+}
+
+fn base_url() -> String {
+    env::var("FITMENTOR_API_URL")
+        .unwrap_or_else(|_| DEFAULT_API_URL.to_string())
+        .trim_end_matches('/')
+        .to_string()
+}
 
 #[derive(Debug, Default, Clone)]
 pub struct TodayLog {
@@ -9,6 +36,12 @@ pub struct TodayLog {
     pub sleep: i64,
     pub steps: i64,
     pub protein_g: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct User {
+    pub name: String,
+    pub email: String,
 }
 
 #[derive(Deserialize)]
@@ -29,21 +62,39 @@ struct Log {
     protein_g: Option<i64>,
 }
 
-pub fn fetch_today() -> Result<TodayLog, String> {
-    let base = env::var("FITMENTOR_API_URL")
-        .map_err(|_| "Set FITMENTOR_API_URL to load live data".to_string())?;
-    let key = env::var("FITMENTOR_API_KEY")
-        .map_err(|_| "Set FITMENTOR_API_KEY to load live data".to_string())?;
-    let user_id = env::var("FITMENTOR_USER_ID")
-        .map_err(|_| "Set FITMENTOR_USER_ID to load live data".to_string())?;
+#[derive(Deserialize)]
+struct MeEnvelope {
+    user: MeUser,
+}
 
-    let url = format!("{}/v1/logs/today", base.trim_end_matches('/'));
-    let response = ureq::get(&url)
+#[derive(Deserialize)]
+struct MeUser {
+    name: Option<String>,
+    email: Option<String>,
+}
+
+fn authorized_get(path: &str) -> Result<ureq::Response, String> {
+    let url = format!("{}{}", base_url(), path);
+    if let Some(token) = token() {
+        return ureq::get(&url)
+            .set("authorization", &format!("Bearer {token}"))
+            .call()
+            .map_err(|error| format!("API request failed: {error}"));
+    }
+
+    let key = env::var("FITMENTOR_API_KEY")
+        .map_err(|_| "Sign in with a mobile token to load your data".to_string())?;
+    let user_id = env::var("FITMENTOR_USER_ID")
+        .map_err(|_| "Sign in with a mobile token to load your data".to_string())?;
+    ureq::get(&url)
         .set("x-api-key", &key)
         .set("x-user-id", &user_id)
         .call()
-        .map_err(|error| format!("API request failed: {error}"))?;
+        .map_err(|error| format!("API request failed: {error}"))
+}
 
+pub fn fetch_today() -> Result<TodayLog, String> {
+    let response = authorized_get("/v1/logs/today")?;
     let envelope: Envelope = response
         .into_json()
         .map_err(|error| format!("Could not parse API response: {error}"))?;
@@ -54,5 +105,24 @@ pub fn fetch_today() -> Result<TodayLog, String> {
         sleep: log.sleep.unwrap_or(0),
         steps: log.steps.unwrap_or(0),
         protein_g: log.protein_g.unwrap_or(0),
+    })
+}
+
+pub fn fetch_me(token: &str) -> Result<User, String> {
+    let url = format!("{}/v1/auth/me", base_url());
+    let response = ureq::get(&url)
+        .set("authorization", &format!("Bearer {token}"))
+        .call()
+        .map_err(|_| "Token was not accepted".to_string())?;
+    let envelope: MeEnvelope = response
+        .into_json()
+        .map_err(|error| format!("Could not parse account: {error}"))?;
+    Ok(User {
+        name: envelope
+            .user
+            .name
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| "Friend".to_string()),
+        email: envelope.user.email.unwrap_or_default(),
     })
 }

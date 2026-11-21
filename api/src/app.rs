@@ -11,7 +11,9 @@ use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
 use crate::config::Config;
-use crate::handlers::{coach, community, logs, payments, planner, plans, quota, user, workout};
+use crate::handlers::{
+    auth_api, coach, community, logs, payments, planner, plans, quota, user, workout,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -45,6 +47,9 @@ async fn health() -> Json<Value> {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/v1/health", get(health))
+        // mobile auth
+        .route("/v1/auth/google", post(auth_api::google))
+        .route("/v1/auth/me", get(auth_api::me))
         // user
         .route("/v1/user/me", get(user::get_me))
         .route("/v1/user/exists", get(user::exists))

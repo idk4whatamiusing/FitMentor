@@ -77,6 +77,22 @@ variable "app_url" {
   default = "https://fitmentor-ey9.pages.dev"
 }
 
+variable "jwt_secret" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "jwt_ttl_days" {
+  type    = number
+  default = 30
+}
+
+variable "google_client_ids" {
+  type    = string
+  default = ""
+}
+
 variable "ai_worker_url" {
   type    = string
   default = "https://fitmentor-ey9.pages.dev/api/ai/complete"
@@ -113,6 +129,10 @@ locals {
     POLAR_PRO_PRICE_ID       = var.polar_pro_price_id
     POLAR_API_BASE           = var.polar_api_base
     APP_URL                  = var.app_url
+    JWT_SECRET               = var.jwt_secret
+    JWT_TTL_DAYS             = tostring(var.jwt_ttl_days)
+    GOOGLE_CLIENT_IDS        = var.google_client_ids
+    GOOGLE_TOKENINFO_URL     = "https://oauth2.googleapis.com/tokeninfo"
   }
 }
 

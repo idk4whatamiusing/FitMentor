@@ -25,6 +25,45 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             .into(),
     );
 
+    if let Ok(token) = env::var("FITMENTOR_JWT") {
+        api::set_token(Some(token));
+        ui.set_signed_in(true);
+        ui.set_status_text("Signed in".into());
+    }
+
+    let handle = ui.as_weak();
+    ui.on_sign_in(move || {
+        let Some(ui) = handle.upgrade() else {
+            return;
+        };
+        let token = ui.get_auth_token().trim().to_string();
+        if token.is_empty() {
+            ui.set_auth_error("Paste a mobile token first.".into());
+            return;
+        }
+        ui.set_auth_error("".into());
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::fetch_me(&token);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match result {
+                        Ok(user) => {
+                            api::set_token(Some(token));
+                            ui.set_signed_in(true);
+                            ui.set_user_name(user.name.into());
+                            ui.set_status_text("Signed in".into());
+                            ui.invoke_refresh();
+                        }
+                        Err(error) => ui.set_auth_error(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
     let handle = ui.as_weak();
     ui.on_refresh(move || {
         if let Some(ui) = handle.upgrade() {

@@ -15,6 +15,10 @@ path = "src/bin/api.rs"
 name = "planner"
 path = "src/bin/planner.rs"
 
+[[bin]]
+name = "mint-token"
+path = "src/bin/mint_token.rs"
+
 [dependencies]
 axum = "0.8"
 lambda_http = "1.3"

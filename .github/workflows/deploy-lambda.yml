@@ -63,6 +63,8 @@ jobs:
           TF_VAR_api_shared_secret: ${{ secrets.API_SHARED_SECRET }}
           TF_VAR_polar_access_token: ${{ secrets.POLAR_ACCESS_TOKEN }}
           TF_VAR_polar_webhook_secret: ${{ secrets.POLAR_WEBHOOK_SECRET }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          TF_VAR_google_client_ids: ${{ secrets.GOOGLE_CLIENT_IDS }}
         run: |
           terraform init -input=false
           terraform apply -auto-approve -input=false

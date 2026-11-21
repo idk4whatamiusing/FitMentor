@@ -95,9 +95,13 @@ export component AppWindow inherits Window {
     in-out property <int> protein: 0;
     in-out property <string> user-name: "Friend";
     in-out property <bool> loading: false;
-    in-out property <string> status-text: "Set FITMENTOR_API_URL, FITMENTOR_API_KEY, and FITMENTOR_USER_ID to sync.";
+    in-out property <string> status-text: "Connect your account to sync today's log.";
+    in-out property <bool> signed-in: false;
+    in-out property <string> auth-token: "";
+    in-out property <string> auth-error: "";
 
     callback refresh();
+    callback sign-in();
     callback add-water();
     callback add-steps();
     callback add-protein();
@@ -372,4 +376,73 @@ export component AppWindow inherits Window {
             }
         }
     }
+    if !root.signed-in : Rectangle {
+        background: #070b10;
+
+        VerticalLayout {
+            padding: 24px;
+            spacing: 12px;
+
+            Rectangle {
+                vertical-stretch: 1;
+            }
+
+            Text {
+                text: "FITMENTOR";
+                color: #38bdf8;
+                font-size: 11px;
+                font-weight: 700;
+            }
+            Text {
+                text: "Connect your account";
+                color: #f8fafc;
+                font-size: 28px;
+                font-weight: 700;
+            }
+            Text {
+                text: "Paste a mobile token to sync your day. Google Sign-In will replace this field once the native bridge is wired.";
+                color: #94a3b8;
+                font-size: 13px;
+                wrap: word-wrap;
+            }
+
+            Rectangle {
+                height: 52px;
+                border-radius: 14px;
+                background: #0d1622;
+                border-width: 1px;
+                border-color: #1e3a5f;
+
+                TextInput {
+                    x: 12px;
+                    y: 0;
+                    width: parent.width - 24px;
+                    height: 100%;
+                    text <=> root.auth-token;
+                    single-line: true;
+                    color: #f8fafc;
+                    font-size: 13px;
+                }
+            }
+
+            QuickButton {
+                label: "Continue";
+                clicked => {
+                    root.sign-in();
+                }
+            }
+
+            Text {
+                text: root.auth-error;
+                color: #f87171;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+            }
+        }
+    }
+
 }

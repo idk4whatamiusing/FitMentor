@@ -15,6 +15,10 @@ pub struct Config {
     pub polar_pro_price_id: String,
     pub polar_api_base: String,
     pub app_url: String,
+    pub jwt_secret: String,
+    pub jwt_ttl_days: i64,
+    pub google_client_ids: Vec<String>,
+    pub google_tokeninfo_url: String,
 }
 
 impl Config {
@@ -35,6 +39,21 @@ impl Config {
                 .unwrap_or_else(|_| "https://api.polar.sh".to_string()),
             app_url: env::var("APP_URL")
                 .unwrap_or_else(|_| "https://fitmentor-ey9.pages.dev".to_string()),
+            jwt_secret: env::var("JWT_SECRET").unwrap_or_default(),
+            jwt_ttl_days: env::var("JWT_TTL_DAYS")
+                .ok()
+                .and_then(|value| value.parse().ok())
+                .unwrap_or(30),
+            google_client_ids: env::var("GOOGLE_CLIENT_IDS")
+                .or_else(|_| env::var("GOOGLE_CLIENT_ID"))
+                .unwrap_or_default()
+                .split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(ToOwned::to_owned)
+                .collect(),
+            google_tokeninfo_url: env::var("GOOGLE_TOKENINFO_URL")
+                .unwrap_or_else(|_| "https://oauth2.googleapis.com/tokeninfo".to_string()),
         })
     }
 }
