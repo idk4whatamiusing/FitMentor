@@ -773,12 +773,15 @@ type CommunityPostView = {
 };
 
 function toCommunityView(p: any): CommunityPostView {
+  const raw = String(p.created_at ?? "");
+  const normalized = raw.replace(" ", "T").replace(/\+00$/, "+00:00");
+  const parsed = new Date(normalized).getTime();
   return {
     id: p.id,
     author: p.author_name || "User",
     userId: p.user_id,
     text: p.body?.text ?? "",
-    timestamp: new Date(String(p.created_at ?? "").replace(" ", "T")).getTime(),
+    timestamp: Number.isNaN(parsed) ? Date.now() : parsed,
     likedByMe: !!p.liked_by_me,
     likes: p.like_count ?? 0,
     replyCount: p.reply_count ?? 0,

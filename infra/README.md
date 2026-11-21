@@ -94,9 +94,15 @@ namespace.
   the Lambda secret.
 - D1 data was migrated and row counts verified (2 users, 1 daily log, 1 workout
   completion, 1 chat session, 23 rows in each daily-plan table).
-- Remaining cleanup: delete the old Worker + D1 database when the rollback
-  window closes, rotate the CockroachDB `ai` password, and enable MFA on the
-  AWS root account.
+- Polar payments are wired: `POST /v1/subscriptions/checkout`,
+  `GET /v1/user/subscription`, and `POST /v1/webhooks/polar`. The Lambda
+  webhook endpoint is registered in Polar; the old endpoints were deleted.
+- Polar still needs organization onboarding (`checkout_payments` is currently
+  false) before live payments can complete.
+- Community is live: feed, posts, likes, replies, reshares, notifications,
+  search, reports, and blocks. Media uploads are not enabled yet (text-only).
+- Remaining cleanup: rotate the CockroachDB `ai` password, enable MFA on the
+  AWS root/admin account, and decide on the Slint Android migration.
 
 ## Notes
 
