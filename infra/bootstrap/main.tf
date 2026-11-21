@@ -17,10 +17,10 @@ variable "aws_region" {
   default = "ap-south-1"
 }
 
-variable "github_repo" {
+variable "github_subject" {
   type        = string
-  description = "owner/repo allowed to assume the deploy role"
-  default     = "idk4whatamiusing/FitMentor"
+  description = "OIDC subject allowed to assume the deploy role (immutable format for repos created after 2026-07-15)"
+  default     = "repo:idk4whatamiusing@306649769/FitMentor@1305349114:ref:refs/heads/main"
 }
 
 variable "state_bucket" {
@@ -104,7 +104,7 @@ data "aws_iam_policy_document" "deploy_assume" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repo}:ref:refs/heads/main"]
+      values   = [var.github_subject]
     }
   }
 }
@@ -134,29 +134,8 @@ data "aws_iam_policy_document" "deploy" {
   }
 
   statement {
-    sid = "Lambda"
-    actions = [
-      "lambda:CreateFunction",
-      "lambda:DeleteFunction",
-      "lambda:GetFunction",
-      "lambda:GetFunctionConfiguration",
-      "lambda:UpdateFunctionCode",
-      "lambda:UpdateFunctionConfiguration",
-      "lambda:ListVersionsByFunction",
-      "lambda:PublishVersion",
-      "lambda:GetPolicy",
-      "lambda:AddPermission",
-      "lambda:RemovePermission",
-      "lambda:GetFunctionUrlConfig",
-      "lambda:CreateFunctionUrlConfig",
-      "lambda:UpdateFunctionUrlConfig",
-      "lambda:DeleteFunctionUrlConfig",
-      "lambda:TagResource",
-      "lambda:UntagResource",
-      "lambda:PutFunctionConcurrency",
-      "lambda:DeleteFunctionConcurrency",
-      "lambda:ListTags",
-    ]
+    sid       = "Lambda"
+    actions   = ["lambda:*"]
     resources = ["arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:*"]
   }
 
@@ -178,6 +157,12 @@ data "aws_iam_policy_document" "deploy" {
       "iam:UntagRole",
     ]
     resources = ["arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/fitmentor-*"]
+  }
+
+  statement {
+    sid       = "LogsDescribe"
+    actions   = ["logs:DescribeLogGroups", "logs:DescribeLogStreams"]
+    resources = ["*"]
   }
 
   statement {
