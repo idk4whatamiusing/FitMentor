@@ -54,3 +54,24 @@ The APK is written to `target/release/apk/`. The GitHub workflow is
 - Port Onboarding, Nutrition, Workouts, Coach, Progress, Tools, and Profile.
 - Persist quick-log changes to the API.
 - Wire Polar checkout to open in the system browser and refresh the tier.
+
+## Google device sign-in
+
+1. Google Cloud Console -> APIs & Services -> Credentials -> Create OAuth
+   client ID -> application type **TVs and Limited Input devices**.
+2. Set the same client ID in two places:
+   - `FITMENTOR_GOOGLE_CLIENT_ID` for the Slint build (GitHub secret or local env).
+   - `GOOGLE_CLIENT_IDS` for the API/Terraform (GitHub secret).
+3. Tap **Sign in with Google** in the app, open the displayed URL on any device,
+   and enter the code.
+4. The app exchanges the resulting Google ID token with `/v1/auth/google` and
+   stores the FitMentor JWT in memory.
+
+Without a client ID the app falls back to the paste-a-token flow. Tokens can be
+minted locally with:
+
+```bash
+cd api
+set -a && . ../.env && set +a
+cargo run --bin mint-token -- google:... you@example.com
+```

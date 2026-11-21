@@ -126,3 +126,100 @@ pub fn fetch_me(token: &str) -> Result<User, String> {
         email: envelope.user.email.unwrap_or_default(),
     })
 }
+
+// ── Google device sign-in ───────────────────────────────────────────
+
+const DEVICE_CODE_URL: &str = "https://oauth2.googleapis.com/device/code";
+const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
+
+#[derive(Debug, Deserialize)]
+pub struct DeviceAuth {
+    pub device_code: String,
+    pub user_code: String,
+    #[serde(alias = "verification_uri")]
+    pub verification_url: String,
+    pub expires_in: i64,
+    pub interval: i64,
+}
+
+pub fn google_client_id() -> String {
+    let runtime = env::var("FITMENTOR_GOOGLE_CLIENT_ID").unwrap_or_default();
+    if !runtime.trim().is_empty() {
+        return runtime.trim().to_string();
+    }
+    option_env!("FITMENTOR_GOOGLE_CLIENT_ID")
+        .unwrap_or("")
+        .trim()
+        .to_string()
+}
+
+pub fn device_start(client_id: &str) -> Result<DeviceAuth, String> {
+    let response = ureq::post(DEVICE_CODE_URL)
+        .send_form(&[("client_id", client_id), ("scope", "openid email profile")])
+        .map_err(|error| format!("Could not start Google sign-in: {error}"))?;
+    response
+        .into_json()
+        .map_err(|error| format!("Could not parse Google device code: {error}"))
+}
+
+pub fn device_poll(client_id: &str, device_code: &str) -> Result<Option<String>, String> {
+    match ureq::post(TOKEN_URL).send_form(&[
+        ("client_id", client_id),
+        ("device_code", device_code),
+        ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+    ]) {
+        Ok(response) => {
+            let value: serde_json::Value = response
+                .into_json()
+                .map_err(|error| format!("Could not parse Google token: {error}"))?;
+            Ok(value
+                .get("id_token")
+                .and_then(serde_json::Value::as_str)
+                .map(ToOwned::to_owned))
+        }
+        Err(ureq::Error::Status(_, response)) => {
+            let value: serde_json::Value = response.into_json().unwrap_or_default();
+            let error = value
+                .get("error")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("oauth_error");
+            if error == "authorization_pending" || error == "slow_down" {
+                Ok(None)
+            } else {
+                Err(format!("Google sign-in failed: {error}"))
+            }
+        }
+        Err(error) => Err(format!("Google sign-in failed: {error}")),
+    }
+}
+
+pub fn exchange_google(id_token: &str) -> Result<(String, User), String> {
+    let url = format!("{}/v1/auth/google", base_url());
+    let response = ureq::post(&url)
+        .send_json(serde_json::json!({ "id_token": id_token }))
+        .map_err(|error| format!("FitMentor sign-in failed: {error}"))?;
+    let value: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse FitMentor token: {error}"))?;
+    let token = value
+        .get("token")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "FitMentor did not return a token".to_string())?
+        .to_string();
+    let user = value.get("user").cloned().unwrap_or_default();
+    Ok((
+        token,
+        User {
+            name: user
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("Friend")
+                .to_string(),
+            email: user
+                .get("email")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("")
+                .to_string(),
+        },
+    ))
+}

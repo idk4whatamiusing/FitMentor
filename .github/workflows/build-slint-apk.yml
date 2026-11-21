@@ -48,6 +48,8 @@ jobs:
         run: cargo install cargo-apk2 --locked
 
       - name: Build APK (debug-signed)
+        env:
+          FITMENTOR_GOOGLE_CLIENT_ID: ${{ secrets.FITMENTOR_GOOGLE_CLIENT_ID }}
         run: cargo apk2 build --target aarch64-linux-android --lib
 
       - name: Upload APK

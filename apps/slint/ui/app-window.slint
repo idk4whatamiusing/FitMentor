@@ -99,9 +99,14 @@ export component AppWindow inherits Window {
     in-out property <bool> signed-in: false;
     in-out property <string> auth-token: "";
     in-out property <string> auth-error: "";
+    in-out property <bool> google-busy: false;
+    in-out property <string> device-user-code: "";
+    in-out property <string> device-url: "";
+    in-out property <string> auth-status: "";
 
     callback refresh();
     callback sign-in();
+    callback google-sign-in();
     callback add-water();
     callback add-steps();
     callback add-protein();
@@ -400,10 +405,57 @@ export component AppWindow inherits Window {
                 font-weight: 700;
             }
             Text {
-                text: "Paste a mobile token to sync your day. Google Sign-In will replace this field once the native bridge is wired.";
+                text: "Sign in with Google on this device, or paste a mobile token if you already have one.";
                 color: #94a3b8;
                 font-size: 13px;
                 wrap: word-wrap;
+            }
+
+            QuickButton {
+                label: root.google-busy ? "Waiting for Google..." : "Sign in with Google";
+                clicked => {
+                    root.google-sign-in();
+                }
+            }
+
+            if root.device-user-code != "" : VerticalLayout {
+                spacing: 4px;
+                Text {
+                    text: "Open this link on any device:";
+                    color: #94a3b8;
+                    font-size: 12px;
+                }
+                Text {
+                    text: root.device-url;
+                    color: #7dd3fc;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
+                Text {
+                    text: root.device-user-code;
+                    color: #f8fafc;
+                    font-size: 30px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: "Then approve the code in your browser.";
+                    color: #94a3b8;
+                    font-size: 12px;
+                }
+            }
+
+            Text {
+                text: root.auth-status;
+                color: #7dd3fc;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+
+            Text {
+                text: "or paste a mobile token";
+                color: #64748b;
+                font-size: 11px;
             }
 
             Rectangle {

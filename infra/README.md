@@ -111,3 +111,11 @@ namespace.
 - No VPC/NAT: CockroachDB Serverless has a public TLS endpoint.
 - Planner runs daily at 00:30 UTC via EventBridge Scheduler; AI calls still go
   through the Pages Workers AI gateway.
+
+## Mobile auth
+
+- `JWT_SECRET` signs the mobile JWTs (30-day TTL, `JWT_TTL_DAYS`).
+- `GOOGLE_CLIENT_IDS` is a comma-separated allow-list of Google OAuth client
+  IDs accepted by `POST /v1/auth/google`.
+- The Slint APK build uses `FITMENTOR_GOOGLE_CLIENT_ID` for the device flow.
+  Use the same client ID (type: TVs and Limited Input devices) for both values.
