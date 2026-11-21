@@ -89,11 +89,14 @@ namespace.
   `https://vfvwjpw567ghnqwknc2m74thx40jmpiw.lambda-url.ap-south-1.on.aws/`
 - CockroachDB `fitmentor` database and `fitmentor_app` user are provisioned and
   the schema is applied.
-- The Pages project still needs its `API_URL` / `API_SHARED_SECRET` updated and
-  a redeploy (requires a valid Cloudflare session). Until then the UI keeps
-  calling the old Worker.
-- The old Worker still has its own daily cron. After cutover, delete it (or at
-  least remove the cron trigger) so only the Lambda planner writes plans.
+- Cloudflare Pages env is set (`API_URL`, `API_SHARED_SECRET`, `APP_URL`) and
+  the project was redeployed. The Workers AI gateway now authenticates against
+  the Lambda secret.
+- D1 data was migrated and row counts verified (2 users, 1 daily log, 1 workout
+  completion, 1 chat session, 23 rows in each daily-plan table).
+- Remaining cleanup: delete the old Worker + D1 database when the rollback
+  window closes, rotate the CockroachDB `ai` password, and enable MFA on the
+  AWS root account.
 
 ## Notes
 
