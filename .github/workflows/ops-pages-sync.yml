@@ -15,6 +15,14 @@ on:
         description: Redeploy Pages after updating env vars
         type: boolean
         default: true
+      delete_worker:
+        description: Delete the old Cloudflare Worker (fitmentor-api)
+        type: boolean
+        default: false
+      delete_d1:
+        description: Delete the old D1 database (fitmentor) - export first!
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -71,3 +79,11 @@ jobs:
         if: ${{ inputs.redeploy_pages }}
         working-directory: ui
         run: npx --yes wrangler@4.116.0 pages deploy dist --project-name "$PROJECT" --branch main
+
+      - name: Delete old Worker
+        if: ${{ inputs.delete_worker }}
+        run: npx --yes wrangler@4.116.0 delete fitmentor-api --force
+
+      - name: Delete old D1 database
+        if: ${{ inputs.delete_d1 }}
+        run: npx --yes wrangler@4.116.0 d1 delete fitmentor --skip-confirmation
