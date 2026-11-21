@@ -47,12 +47,12 @@ jobs:
       - name: Install cargo-apk2
         run: cargo install cargo-apk2 --locked
 
-      - name: Build APK
-        run: cargo apk2 build --target aarch64-linux-android --lib --release
+      - name: Build APK (debug-signed)
+        run: cargo apk2 build --target aarch64-linux-android --lib
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: FitMentor-Slint-APK
-          path: apps/slint/target/release/apk/*.apk
+          name: FitMentor-Slint-APK-debug
+          path: apps/slint/target/debug/apk/*.apk
           if-no-files-found: error
