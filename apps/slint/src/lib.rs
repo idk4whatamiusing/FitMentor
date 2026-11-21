@@ -680,33 +680,27 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                     return;
                 }
                 std::thread::sleep(Duration::from_secs(interval));
-                match api::device_poll(&client_id, &device.device_code) {
-                    Ok(Some(id_token)) => match api::exchange_google(&id_token) {
-                        Ok((token, user)) => {
-                            api::set_token(Some(token));
-                            let ui_handle = handle.clone();
-                            slint::invoke_from_event_loop(move || {
-                                if let Some(ui) = ui_handle.upgrade() {
-                                    ui.set_signed_in(true);
-                                    ui.set_user_name(user.name.into());
-                                    ui.set_status_text("Signed in with Google".into());
-                                    ui.set_google_busy(false);
-                                    ui.set_device_user_code("".into());
-                                    ui.set_device_url("".into());
-                                    ui.set_auth_status("".into());
-                                    ui.invoke_refresh();
-                                    ui.invoke_load_profile();
-                                }
-                            })
-                            .ok();
-                            return;
-                        }
-                        Err(error) => {
-                            finish_google_error(&handle, &error);
-                            return;
-                        }
-                    },
-                    Ok(None) => {}
+                match api::device_poll(&device.device_code) {
+                    Ok(api::DevicePoll::Pending) => {}
+                    Ok(api::DevicePoll::Authorized { token, name }) => {
+                        api::set_token(Some(token));
+                        let ui_handle = handle.clone();
+                        slint::invoke_from_event_loop(move || {
+                            if let Some(ui) = ui_handle.upgrade() {
+                                ui.set_signed_in(true);
+                                ui.set_user_name(name.into());
+                                ui.set_status_text("Signed in with Google".into());
+                                ui.set_google_busy(false);
+                                ui.set_device_user_code("".into());
+                                ui.set_device_url("".into());
+                                ui.set_auth_status("".into());
+                                ui.invoke_refresh();
+                                ui.invoke_load_profile();
+                            }
+                        })
+                        .ok();
+                        return;
+                    }
                     Err(error) => {
                         finish_google_error(&handle, &error);
                         return;

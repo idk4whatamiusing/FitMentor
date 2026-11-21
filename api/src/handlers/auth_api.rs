@@ -2,6 +2,7 @@
 
 use axum::body::Bytes;
 use axum::extract::State;
+use axum::http::HeaderMap;
 use axum::Json;
 use chrono::Utc;
 use serde::Deserialize;
@@ -19,6 +20,11 @@ struct GoogleLoginRequest {
 }
 
 #[derive(Deserialize)]
+struct DevicePollRequest {
+    device_code: String,
+}
+
+#[derive(Deserialize)]
 struct GoogleClaims {
     sub: String,
     email: Option<String>,
@@ -28,23 +34,20 @@ struct GoogleClaims {
     exp: Option<Value>,
 }
 
-/// POST /v1/auth/google
-pub async fn google(State(state): State<AppState>, body: Bytes) -> ApiResult {
-    let request: GoogleLoginRequest =
-        serde_json::from_slice(&body).map_err(|_| ApiError::BadRequest("invalid json".into()))?;
-    if request.id_token.is_empty() {
-        return Err(ApiError::BadRequest("missing id_token".into()));
-    }
-    if state.config.google_client_ids.is_empty() {
-        return Err(ApiError::BadRequest(
-            "Google auth is not configured. Set GOOGLE_CLIENT_IDS.".into(),
-        ));
-    }
+struct GoogleIdentity {
+    sub: String,
+    email: String,
+    name: String,
+}
 
+async fn verify_google_id_token(
+    state: &AppState,
+    id_token: &str,
+) -> Result<GoogleIdentity, ApiError> {
     let response = state
         .http
         .get(&state.config.google_tokeninfo_url)
-        .query(&[("id_token", request.id_token.as_str())])
+        .query(&[("id_token", id_token)])
         .send()
         .await
         .map_err(|error| ApiError::Internal(format!("Google tokeninfo failed: {error}")))?;
@@ -85,8 +88,18 @@ pub async fn google(State(state): State<AppState>, body: Bytes) -> ApiResult {
         .email
         .unwrap_or_else(|| format!("{}@google", claims.sub));
     let name = claims.name.unwrap_or_else(|| email.clone());
-    let cf_sub = format!("google:{}", claims.sub);
+    Ok(GoogleIdentity {
+        sub: claims.sub,
+        email,
+        name,
+    })
+}
 
+async fn issue_for_identity(
+    state: &AppState,
+    identity: &GoogleIdentity,
+) -> Result<(String, UserRow), ApiError> {
+    let cf_sub = format!("google:{}", identity.sub);
     let new_id = Uuid::new_v4().to_string();
     sqlx::query(
         "INSERT INTO users (id, cf_access_sub, email, name) VALUES ($1, $2, $3, $4)
@@ -96,8 +109,8 @@ pub async fn google(State(state): State<AppState>, body: Bytes) -> ApiResult {
     )
     .bind(&new_id)
     .bind(&cf_sub)
-    .bind(&email)
-    .bind(&name)
+    .bind(&identity.email)
+    .bind(&identity.name)
     .execute(&state.pool)
     .await?;
 
@@ -108,21 +121,104 @@ pub async fn google(State(state): State<AppState>, body: Bytes) -> ApiResult {
     .fetch_one(&state.pool)
     .await?;
 
-    let token = auth::issue_token(&state.config, &cf_sub, &email)?;
+    let token = auth::issue_token(&state.config, &cf_sub, &identity.email)?;
+    Ok((token, user))
+}
+
+/// POST /v1/auth/google
+pub async fn google(State(state): State<AppState>, body: Bytes) -> ApiResult {
+    let request: GoogleLoginRequest =
+        serde_json::from_slice(&body).map_err(|_| ApiError::BadRequest("invalid json".into()))?;
+    if request.id_token.is_empty() {
+        return Err(ApiError::BadRequest("missing id_token".into()));
+    }
+    if state.config.google_client_ids.is_empty() {
+        return Err(ApiError::BadRequest(
+            "Google auth is not configured. Set GOOGLE_CLIENT_IDS.".into(),
+        ));
+    }
+
+    let identity = verify_google_id_token(&state, &request.id_token).await?;
+    let (token, user) = issue_for_identity(&state, &identity).await?;
 
     Ok(Json(json!({
         "token": token,
         "user": {
             "id": user.id,
-            "sub": cf_sub,
-            "email": email,
-            "name": name,
+            "sub": format!("google:{}", identity.sub),
+            "email": identity.email,
+            "name": identity.name,
         }
     })))
 }
 
+/// POST /v1/auth/google/device
+///
+/// The device flow needs the OAuth client secret on the token poll, so the
+/// app sends the device code here instead of calling Google directly.
+pub async fn google_device(State(state): State<AppState>, body: Bytes) -> ApiResult {
+    let request: DevicePollRequest =
+        serde_json::from_slice(&body).map_err(|_| ApiError::BadRequest("invalid json".into()))?;
+    if request.device_code.is_empty() {
+        return Err(ApiError::BadRequest("missing device_code".into()));
+    }
+
+    let Some(client_id) = state.config.google_client_ids.first() else {
+        return Err(ApiError::BadRequest(
+            "Google auth is not configured. Set GOOGLE_CLIENT_IDS.".into(),
+        ));
+    };
+    if state.config.google_client_secret.is_empty() {
+        return Err(ApiError::BadRequest(
+            "Google auth is not configured. Set GOOGLE_CLIENT_SECRET.".into(),
+        ));
+    }
+
+    let response = state
+        .http
+        .post("https://oauth2.googleapis.com/token")
+        .form(&[
+            ("client_id", client_id.as_str()),
+            ("client_secret", state.config.google_client_secret.as_str()),
+            ("device_code", request.device_code.as_str()),
+            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+        ])
+        .send()
+        .await
+        .map_err(|error| ApiError::Internal(format!("Google device poll failed: {error}")))?;
+
+    let status = response.status();
+    let value: Value = response.json().await.unwrap_or_else(|_| json!({}));
+
+    if status.is_success() {
+        let id_token = value
+            .get("id_token")
+            .and_then(Value::as_str)
+            .ok_or(ApiError::Unauthorized)?;
+        let identity = verify_google_id_token(&state, id_token).await?;
+        let (token, user) = issue_for_identity(&state, &identity).await?;
+        return Ok(Json(json!({
+            "status": "ok",
+            "token": token,
+            "user": {
+                "id": user.id,
+                "sub": format!("google:{}", identity.sub),
+                "email": identity.email,
+                "name": identity.name,
+            }
+        })));
+    }
+
+    let error = value.get("error").and_then(Value::as_str).unwrap_or("");
+    if error == "authorization_pending" || error == "slow_down" {
+        return Ok(Json(json!({ "status": "pending" })));
+    }
+
+    Err(ApiError::Unauthorized)
+}
+
 /// POST /v1/auth/me — validates a mobile token and returns its user.
-pub async fn me(State(state): State<AppState>, headers: axum::http::HeaderMap) -> ApiResult {
+pub async fn me(State(state): State<AppState>, headers: HeaderMap) -> ApiResult {
     let auth_user = auth::require_user(&headers, &state.config)?;
     let user = sqlx::query_as::<_, UserRow>(
         "SELECT id, cf_access_sub, email, name, created_at FROM users WHERE cf_access_sub = $1",

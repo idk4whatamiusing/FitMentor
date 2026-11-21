@@ -18,6 +18,7 @@ pub struct Config {
     pub jwt_secret: String,
     pub jwt_ttl_days: i64,
     pub google_client_ids: Vec<String>,
+    pub google_client_secret: String,
     pub google_tokeninfo_url: String,
 }
 
@@ -52,6 +53,7 @@ impl Config {
                 .filter(|value| !value.is_empty())
                 .map(ToOwned::to_owned)
                 .collect(),
+            google_client_secret: env::var("GOOGLE_CLIENT_SECRET").unwrap_or_default(),
             google_tokeninfo_url: env::var("GOOGLE_TOKENINFO_URL")
                 .unwrap_or_else(|_| "https://oauth2.googleapis.com/tokeninfo".to_string()),
         })

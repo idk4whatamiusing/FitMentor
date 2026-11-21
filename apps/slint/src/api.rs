@@ -199,7 +199,6 @@ pub fn fetch_me(token: &str) -> Result<User, String> {
 // ── Google device sign-in ───────────────────────────────────────────
 
 const DEVICE_CODE_URL: &str = "https://oauth2.googleapis.com/device/code";
-const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 
 #[derive(Debug, Deserialize)]
 pub struct DeviceAuth {
@@ -231,66 +230,39 @@ pub fn device_start(client_id: &str) -> Result<DeviceAuth, String> {
         .map_err(|error| format!("Could not parse Google device code: {error}"))
 }
 
-pub fn device_poll(client_id: &str, device_code: &str) -> Result<Option<String>, String> {
-    match ureq::post(TOKEN_URL).send_form(&[
-        ("client_id", client_id),
-        ("device_code", device_code),
-        ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-    ]) {
-        Ok(response) => {
-            let value: serde_json::Value = response
-                .into_json()
-                .map_err(|error| format!("Could not parse Google token: {error}"))?;
-            Ok(value
-                .get("id_token")
-                .and_then(serde_json::Value::as_str)
-                .map(ToOwned::to_owned))
-        }
-        Err(ureq::Error::Status(_, response)) => {
-            let value: serde_json::Value = response.into_json().unwrap_or_default();
-            let error = value
-                .get("error")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("oauth_error");
-            if error == "authorization_pending" || error == "slow_down" {
-                Ok(None)
-            } else {
-                Err(format!("Google sign-in failed: {error}"))
-            }
-        }
-        Err(error) => Err(format!("Google sign-in failed: {error}")),
-    }
+#[derive(Debug, Clone)]
+pub enum DevicePoll {
+    Pending,
+    Authorized { token: String, name: String },
 }
 
-pub fn exchange_google(id_token: &str) -> Result<(String, User), String> {
-    let url = format!("{}/v1/auth/google", base_url());
-    let response = ureq::post(&url)
-        .send_json(serde_json::json!({ "id_token": id_token }))
-        .map_err(|error| format!("FitMentor sign-in failed: {error}"))?;
+pub fn device_poll(device_code: &str) -> Result<DevicePoll, String> {
+    let body = serde_json::json!({ "device_code": device_code });
+    let response = ureq::post(&format!("{}/v1/auth/google/device", base_url()))
+        .send_json(body)
+        .map_err(|error| format!("Google sign-in failed: {error}"))?;
     let value: serde_json::Value = response
         .into_json()
-        .map_err(|error| format!("Could not parse FitMentor token: {error}"))?;
+        .map_err(|error| format!("Could not parse Google sign-in: {error}"))?;
+    let status = value
+        .get("status")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+    if status == "pending" {
+        return Ok(DevicePoll::Pending);
+    }
     let token = value
         .get("token")
         .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| "FitMentor did not return a token".to_string())?
+        .ok_or_else(|| "Google sign-in did not return a token".to_string())?
         .to_string();
-    let user = value.get("user").cloned().unwrap_or_default();
-    Ok((
-        token,
-        User {
-            name: user
-                .get("name")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("Friend")
-                .to_string(),
-            email: user
-                .get("email")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("")
-                .to_string(),
-        },
-    ))
+    let name = value
+        .get("user")
+        .and_then(|user| user.get("name"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("Friend")
+        .to_string();
+    Ok(DevicePoll::Authorized { token, name })
 }
 
 // ── Profile / subscription ─────────────────────────────────────────

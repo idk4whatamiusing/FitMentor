@@ -93,6 +93,12 @@ variable "google_client_ids" {
   default = ""
 }
 
+variable "google_client_secret" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
 variable "ai_worker_url" {
   type    = string
   default = "https://fitmentor-ey9.pages.dev/api/ai/complete"
@@ -132,6 +138,7 @@ locals {
     JWT_SECRET               = var.jwt_secret
     JWT_TTL_DAYS             = tostring(var.jwt_ttl_days)
     GOOGLE_CLIENT_IDS        = var.google_client_ids
+    GOOGLE_CLIENT_SECRET     = var.google_client_secret
     GOOGLE_TOKENINFO_URL     = "https://oauth2.googleapis.com/tokeninfo"
   }
 }

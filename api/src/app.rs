@@ -49,6 +49,7 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/health", get(health))
         // mobile auth
         .route("/v1/auth/google", post(auth_api::google))
+        .route("/v1/auth/google/device", post(auth_api::google_device))
         .route("/v1/auth/me", get(auth_api::me))
         // user
         .route("/v1/user/me", get(user::get_me))

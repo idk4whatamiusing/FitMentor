@@ -65,6 +65,7 @@ jobs:
           TF_VAR_polar_webhook_secret: ${{ secrets.POLAR_WEBHOOK_SECRET }}
           TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
           TF_VAR_google_client_ids: ${{ secrets.GOOGLE_CLIENT_IDS }}
+          TF_VAR_google_client_secret: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           terraform init -input=false
           terraform apply -auto-approve -input=false

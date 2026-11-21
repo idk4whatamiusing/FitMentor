@@ -64,8 +64,8 @@ The APK is written to `target/release/apk/`. The GitHub workflow is
    - `GOOGLE_CLIENT_IDS` for the API/Terraform (GitHub secret).
 3. Tap **Sign in with Google** in the app, open the displayed URL on any device,
    and enter the code.
-4. The app exchanges the resulting Google ID token with `/v1/auth/google` and
-   stores the FitMentor JWT in memory.
+4. The app polls `/v1/auth/google/device`; the Lambda performs the Google
+   token exchange with the client secret and returns the FitMentor JWT.
 
 Without a client ID the app falls back to the paste-a-token flow. Tokens can be
 minted locally with:
