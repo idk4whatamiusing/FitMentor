@@ -11,7 +11,7 @@ use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
 use crate::config::Config;
-use crate::handlers::{coach, logs, planner, plans, quota, user, workout};
+use crate::handlers::{coach, logs, payments, planner, plans, quota, user, workout};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -54,6 +54,10 @@ pub fn router(state: AppState) -> Router {
             put(user::update_protein_target),
         )
         .route("/v1/user/sync", post(user::sync))
+        // payments
+        .route("/v1/subscriptions/checkout", post(payments::checkout))
+        .route("/v1/user/subscription", get(payments::get_subscription))
+        .route("/v1/webhooks/polar", post(payments::webhook))
         // logs
         .route("/v1/logs/today", get(logs::get_today))
         .route("/v1/logs/today", put(logs::upsert_today))

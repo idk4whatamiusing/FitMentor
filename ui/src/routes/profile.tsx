@@ -80,26 +80,38 @@ function ProfilePage() {
     // Check if returning from Polar checkout
     const params = new URLSearchParams(window.location.search);
     if (params.get("checkout") === "success") {
-      // Fetch subscription from API
-      getSub()
-        .then((json: any) => {
-          const srv = json?.data?.subscription;
-          if (srv && srv.tier !== "free") {
-            const now = new Date();
-            const expiry = new Date(srv.currentPeriodEnd || now);
-            saveSubscription({
-              tier: srv.tier as PlanTier,
-              startDate: now.toISOString(),
-              expiryDate: expiry.toISOString(),
-              paymentMethod: "polar",
-            });
-            setSub(loadSubscription());
-            toast.success(`${getPlanName(srv.tier)} plan activated!`);
-          }
-        })
-        .catch(() => {});
-      // Clean up URL
       window.history.replaceState({}, "", "/profile");
+      let attempts = 6;
+      const poll = () => {
+        getSub()
+          .then((json: any) => {
+            const srv = json?.data?.subscription;
+            if (srv && srv.tier !== "free") {
+              const now = new Date();
+              const expiry = new Date(srv.currentPeriodEnd || now);
+              saveSubscription({
+                tier: srv.tier as PlanTier,
+                startDate: now.toISOString(),
+                expiryDate: expiry.toISOString(),
+                paymentMethod: "polar",
+              });
+              setSub(loadSubscription());
+              toast.success(`${getPlanName(srv.tier)} plan activated!`);
+            } else if (attempts > 0) {
+              attempts -= 1;
+              setTimeout(poll, 2000);
+            } else {
+              toast.message("Payment received — refresh in a moment if your plan hasn't updated.");
+            }
+          })
+          .catch(() => {
+            if (attempts > 0) {
+              attempts -= 1;
+              setTimeout(poll, 2000);
+            }
+          });
+      };
+      poll();
     }
 
     return () => window.removeEventListener("fitmentor:subscription", handler);

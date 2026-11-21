@@ -2,6 +2,7 @@
 
 pub mod coach;
 pub mod logs;
+pub mod payments;
 pub mod planner;
 pub mod plans;
 pub mod quota;

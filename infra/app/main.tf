@@ -35,6 +35,48 @@ variable "api_shared_secret" {
   sensitive = true
 }
 
+variable "polar_access_token" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "polar_webhook_secret" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "polar_premium_product_id" {
+  type    = string
+  default = "ebe9f020-45c6-48e8-bece-c010ac11d893"
+}
+
+variable "polar_premium_price_id" {
+  type    = string
+  default = "ff85613e-c183-42ae-a726-d5726a8146a8"
+}
+
+variable "polar_pro_product_id" {
+  type    = string
+  default = "343b9340-f3eb-435b-ac90-155a8fa72c18"
+}
+
+variable "polar_pro_price_id" {
+  type    = string
+  default = "1a9aec0d-86f2-4dfe-bd4d-af600d344ddf"
+}
+
+variable "polar_api_base" {
+  type    = string
+  default = "https://api.polar.sh"
+}
+
+variable "app_url" {
+  type    = string
+  default = "https://fitmentor-ey9.pages.dev"
+}
+
 variable "ai_worker_url" {
   type    = string
   default = "https://fitmentor-ey9.pages.dev/api/ai/complete"
@@ -59,10 +101,18 @@ variable "log_retention_days" {
 
 locals {
   environment = {
-    RUST_LOG          = "info"
-    DATABASE_URL      = var.database_url
-    API_SHARED_SECRET = var.api_shared_secret
-    AI_WORKER_URL     = var.ai_worker_url
+    RUST_LOG                 = "info"
+    DATABASE_URL             = var.database_url
+    API_SHARED_SECRET        = var.api_shared_secret
+    AI_WORKER_URL            = var.ai_worker_url
+    POLAR_ACCESS_TOKEN       = var.polar_access_token
+    POLAR_WEBHOOK_SECRET     = var.polar_webhook_secret
+    POLAR_PREMIUM_PRODUCT_ID = var.polar_premium_product_id
+    POLAR_PREMIUM_PRICE_ID   = var.polar_premium_price_id
+    POLAR_PRO_PRODUCT_ID     = var.polar_pro_product_id
+    POLAR_PRO_PRICE_ID       = var.polar_pro_price_id
+    POLAR_API_BASE           = var.polar_api_base
+    APP_URL                  = var.app_url
   }
 }
 
