@@ -16,7 +16,12 @@ fn today() -> String {
     Utc::now().format("%Y-%m-%d").to_string()
 }
 
-async fn call_ai(state: &AppState, system: &str, prompt: &str, max_tokens: i64) -> Option<String> {
+pub async fn call_ai(
+    state: &AppState,
+    system: &str,
+    prompt: &str,
+    max_tokens: i64,
+) -> Option<String> {
     let url = state.config.ai_worker_url.trim();
     if url.is_empty() {
         return None;

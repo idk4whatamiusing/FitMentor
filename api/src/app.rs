@@ -75,6 +75,7 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/coach/sessions/{id}", delete(coach::delete))
         .route("/v1/coach/sessions/{id}", patch(coach::rename))
         .route("/v1/coach/log", post(coach::log))
+        .route("/v1/coach/chat", post(coach::chat))
         // community
         .route("/v1/community/graphql", post(community::graphql))
         // plans / advice

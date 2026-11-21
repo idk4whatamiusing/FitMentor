@@ -3,7 +3,7 @@
 //! The UI is a native Slint window. On Android it runs through
 //! `android-activity`; on desktop `main.rs` runs the same window.
 
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, VecModel};
 use std::env;
 use std::time::{Duration, Instant};
 
@@ -369,6 +369,119 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     });
 
     let handle = ui.as_weak();
+    ui.on_load_chat(move || {
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::fetch_coach_session();
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match result {
+                        Ok(session) => {
+                            ui.set_chat_session_id(session.id.into());
+                            let items: Vec<ChatMessage> = session
+                                .messages
+                                .iter()
+                                .map(|message| ChatMessage {
+                                    role: message.role.clone().into(),
+                                    content: message.content.clone().into(),
+                                })
+                                .collect();
+                            let empty = items.is_empty();
+                            ui.set_chat_messages(ModelRc::new(VecModel::from(items)));
+                            ui.set_chat_status(if empty {
+                                "Ask about training, food, or recovery.".into()
+                            } else {
+                                "Chat loaded".into()
+                            });
+                        }
+                        Err(error) => ui.set_chat_status(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
+    ui.on_send_chat(move || {
+        let Some(ui) = handle.upgrade() else {
+            return;
+        };
+        if ui.get_chat_busy() {
+            return;
+        }
+        let message = ui.get_chat_input().to_string().trim().to_string();
+        let session_id = ui.get_chat_session_id().to_string();
+        if message.is_empty() {
+            return;
+        }
+        if session_id.is_empty() {
+            ui.set_chat_status("No chat session yet. Tap New chat.".into());
+            return;
+        }
+
+        let mut items: Vec<ChatMessage> = ui.get_chat_messages().iter().collect();
+        items.push(ChatMessage {
+            role: "user".into(),
+            content: message.clone().into(),
+        });
+        ui.set_chat_messages(ModelRc::new(VecModel::from(items)));
+        ui.set_chat_input("".into());
+        ui.set_chat_busy(true);
+        ui.set_chat_status("Coach is thinking...".into());
+
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::send_coach_message(&session_id, &message);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    ui.set_chat_busy(false);
+                    match result {
+                        Ok(reply) => {
+                            let mut items: Vec<ChatMessage> =
+                                ui.get_chat_messages().iter().collect();
+                            items.push(ChatMessage {
+                                role: "assistant".into(),
+                                content: reply.into(),
+                            });
+                            ui.set_chat_messages(ModelRc::new(VecModel::from(items)));
+                            ui.set_chat_status("".into());
+                        }
+                        Err(error) => ui.set_chat_status(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
+    ui.on_new_chat(move || {
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::create_coach_session();
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match result {
+                        Ok(id) => {
+                            ui.set_chat_session_id(id.into());
+                            ui.set_chat_messages(ModelRc::new(VecModel::from(
+                                Vec::<ChatMessage>::new(),
+                            )));
+                            ui.set_chat_status("New chat ready".into());
+                        }
+                        Err(error) => ui.set_chat_status(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
     ui.on_set_tab(move |tab| {
         if let Some(ui) = handle.upgrade() {
             ui.set_tab(tab);
@@ -377,6 +490,9 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             }
             if tab == 2 {
                 ui.invoke_load_workout();
+            }
+            if tab == 3 {
+                ui.invoke_load_chat();
             }
             if tab == 4 {
                 ui.invoke_load_profile();

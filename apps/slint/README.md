@@ -97,3 +97,10 @@ carbs, fat, and each meal's items/macros; **Refresh** reloads both.
 The Train tab loads `GET /v1/workout/today`, shows each day's focus and
 exercise summary, marks completed days from `/v1/workout/completions`, and
 posts completions to `/v1/workout/complete`.
+
+## Coach
+
+The Coach tab loads the latest chat session (or creates one), shows message
+history, and posts new messages to `POST /v1/coach/chat`. That endpoint checks
+the AI quota, builds the profile-aware system prompt, calls Workers AI through
+the Pages gateway, and stores both turns in `chat_sessions`.

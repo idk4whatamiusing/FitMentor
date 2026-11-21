@@ -22,6 +22,28 @@ fn main() -> Result<(), slint::PlatformError> {
         return Ok(());
     }
 
+    if std::env::args().any(|arg| arg == "--check-chat") {
+        if let Some(token) = std::env::var("FITMENTOR_JWT")
+            .ok()
+            .or_else(fitmentor_slint::api::load_token)
+        {
+            fitmentor_slint::api::set_token(Some(token));
+        }
+        match fitmentor_slint::api::fetch_coach_session() {
+            Ok(session) => {
+                println!("session: {}", session.id);
+                for message in session.messages.iter().rev().take(6).rev() {
+                    println!("{}: {}", message.role, message.content);
+                }
+            }
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
+        return Ok(());
+    }
+
     if std::env::args().any(|arg| arg == "--check-workout") {
         if let Some(token) = std::env::var("FITMENTOR_JWT")
             .ok()

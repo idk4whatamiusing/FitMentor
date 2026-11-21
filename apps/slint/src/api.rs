@@ -762,3 +762,95 @@ pub fn complete_workout(day_index: i64, title: &str) -> Result<(), String> {
     let body = serde_json::json!({ "day_index": day_index, "title": title });
     authorized_request("POST", "/v1/workout/complete", Some(body)).map(|_| ())
 }
+
+// ── Coach chat ─────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct CoachMessage {
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct CoachSession {
+    pub id: String,
+    pub messages: Vec<CoachMessage>,
+}
+
+pub fn fetch_coach_session() -> Result<CoachSession, String> {
+    let response = authorized_get("/v1/coach/sessions")?;
+    let list: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse chat sessions: {error}"))?;
+    let sessions = list.as_array().cloned().unwrap_or_default();
+    let existing_id = sessions
+        .first()
+        .and_then(|session| session.get("id"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("")
+        .to_string();
+    let id = if existing_id.is_empty() {
+        create_coach_session()?
+    } else {
+        existing_id
+    };
+    fetch_coach_messages(&id)
+}
+
+pub fn create_coach_session() -> Result<String, String> {
+    let body = serde_json::json!({ "title": "New Chat" });
+    let response = authorized_request("POST", "/v1/coach/sessions", Some(body))?;
+    let value: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse new chat: {error}"))?;
+    value
+        .get("id")
+        .and_then(serde_json::Value::as_str)
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| "New chat did not return an id".to_string())
+}
+
+pub fn fetch_coach_messages(session_id: &str) -> Result<CoachSession, String> {
+    let response = authorized_get(&format!("/v1/coach/sessions/{session_id}"))?;
+    let value: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse chat: {error}"))?;
+    let messages = value
+        .get("messages")
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .map(|message| CoachMessage {
+                    role: message
+                        .get("role")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or("user")
+                        .to_string(),
+                    content: message
+                        .get("content")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok(CoachSession {
+        id: session_id.to_string(),
+        messages,
+    })
+}
+
+pub fn send_coach_message(session_id: &str, message: &str) -> Result<String, String> {
+    let body = serde_json::json!({ "session_id": session_id, "message": message });
+    let response = authorized_request("POST", "/v1/coach/chat", Some(body))?;
+    let value: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse coach reply: {error}"))?;
+    value
+        .get("reply")
+        .and_then(serde_json::Value::as_str)
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| "Coach did not return a reply".to_string())
+}
