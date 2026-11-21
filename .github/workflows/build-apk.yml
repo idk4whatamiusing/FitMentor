@@ -39,10 +39,11 @@ jobs:
           ls node_modules/.bin/ 2>&1 || true
           echo "---"
           test -f node_modules/.bin/cap && echo "cap: YES" || echo "cap: NO"
-          test -f scripts/setup-capacitor.mjs && echo "script: YES" || echo "script: NO"
+          test -f ui/scripts/setup-capacitor.mjs && echo "script: YES" || echo "script: NO"
           npm ls @capacitor/cli 2>&1 || true
 
       - name: Setup Capacitor & add Android platform
+        working-directory: ui
         run: node scripts/setup-capacitor.mjs
 
       - name: Upload debug log
@@ -54,11 +55,11 @@ jobs:
 
       - name: Build APK
         run: |
-          cd android
+          cd ui/android
           ./gradlew assembleDebug --no-daemon --console=plain
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: FitMentor-APK
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: ui/android/app/build/outputs/apk/debug/*.apk
