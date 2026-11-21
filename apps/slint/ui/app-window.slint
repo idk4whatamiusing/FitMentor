@@ -270,12 +270,19 @@ export component AppWindow inherits Window {
     in-out property <string> community-input: "";
     in-out property <string> community-status: "Load the community feed.";
     in-out property <bool> community-busy: false;
+    in-out property <string> community-open-id: "";
+    in-out property <string> community-open-author: "";
+    in-out property <string> community-open-text: "";
+    in-out property <[CommunityPost]> community-replies: [];
+    in-out property <string> community-reply-input: "";
+    in-out property <string> community-reply-status: "";
 
     callback refresh();
     callback sign-in();
     callback google-sign-in();
     callback load-profile();
     callback sign-out();
+    callback edit-profile();
     callback save-onboarding();
     callback skip-onboarding();
     callback load-nutrition();
@@ -287,6 +294,9 @@ export component AppWindow inherits Window {
     callback load-community();
     callback post-community();
     callback like-community(string);
+    callback open-community-post(string);
+    callback close-community-post();
+    callback send-community-reply();
     callback checkout(string);
     callback add-water();
     callback add-steps();
@@ -866,7 +876,13 @@ export component AppWindow inherits Window {
             HorizontalLayout {
                 spacing: 8px;
                 QuickButton {
-                    label: "Refresh profile";
+                    label: "Edit profile";
+                    clicked => {
+                        root.edit-profile();
+                    }
+                }
+                QuickButton {
+                    label: "Refresh";
                     clicked => {
                         root.load-profile();
                     }
@@ -996,11 +1012,11 @@ export component AppWindow inherits Window {
                                         root.like-community(post.id);
                                     }
                                 }
-                                Text {
-                                    text: "\{post.reply_count} replies";
-                                    color: #94a3b8;
-                                    font-size: 10px;
-                                    vertical-alignment: center;
+                                QuickButton {
+                                    label: "\{post.reply_count} replies";
+                                    clicked => {
+                                        root.open-community-post(post.id);
+                                    }
                                 }
                             }
                         }
@@ -1424,6 +1440,131 @@ export component AppWindow inherits Window {
                 Rectangle {
                     height: 24px;
                 }
+            }
+        }
+    }
+
+    if root.community-open-id != "" : Rectangle {
+        background: #070b10;
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 8px;
+
+            HorizontalLayout {
+                Text {
+                    text: "Replies";
+                    color: #f8fafc;
+                    font-size: 24px;
+                    font-weight: 700;
+                }
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+                QuickButton {
+                    label: "Close";
+                    clicked => {
+                        root.close-community-post();
+                    }
+                }
+            }
+
+            ScrollView {
+                height: 560px;
+
+                VerticalLayout {
+                    width: 100%;
+                    spacing: 8px;
+
+                    Text {
+                        text: root.community-open-author;
+                        color: #7dd3fc;
+                        font-size: 11px;
+                        font-weight: 600;
+                    }
+                    Text {
+                        text: root.community-open-text;
+                        color: #e2e8f0;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+
+                    Rectangle {
+                        height: 1px;
+                        background: #1e293b;
+                    }
+
+                    if root.community-replies.length == 0 : Text {
+                        text: "No replies yet.";
+                        color: #64748b;
+                        font-size: 12px;
+                    }
+
+                    for reply in root.community-replies : Rectangle {
+                        border-radius: 12px;
+                        background: #0d1622;
+                        border-width: 1px;
+                        border-color: #1e293b;
+
+                        VerticalLayout {
+                            padding: 10px;
+                            spacing: 2px;
+                            Text {
+                                text: reply.author;
+                                color: #7dd3fc;
+                                font-size: 10px;
+                                font-weight: 600;
+                            }
+                            Text {
+                                text: reply.text;
+                                color: #e2e8f0;
+                                font-size: 12px;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                    height: 46px;
+                    border-radius: 12px;
+                    background: #0d1622;
+                    border-width: 1px;
+                    border-color: #1e3a5f;
+
+                    TextInput {
+                        x: 12px;
+                        y: 0;
+                        width: parent.width - 24px;
+                        height: 100%;
+                        text <=> root.community-reply-input;
+                        single-line: true;
+                        color: #f8fafc;
+                        font-size: 13px;
+                        accepted => {
+                            root.send-community-reply();
+                        }
+                    }
+                }
+
+                QuickButton {
+                    label: "Reply";
+                    clicked => {
+                        root.send-community-reply();
+                    }
+                }
+            }
+
+            Text {
+                text: root.community-reply-status;
+                color: #f87171;
+                font-size: 11px;
+                wrap: word-wrap;
             }
         }
     }

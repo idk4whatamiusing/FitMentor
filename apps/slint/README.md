@@ -104,3 +104,9 @@ The Coach tab loads the latest chat session (or creates one), shows message
 history, and posts new messages to `POST /v1/coach/chat`. That endpoint checks
 the AI quota, builds the profile-aware system prompt, calls Workers AI through
 the Pages gateway, and stores both turns in `chat_sessions`.
+
+## Profile editing and community replies
+
+- The You tab has **Edit profile**, which reopens the onboarding form pre-filled.
+- Community posts can be opened to view replies and post a reply; reply counts
+  refresh on the feed.

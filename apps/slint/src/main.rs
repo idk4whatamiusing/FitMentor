@@ -40,6 +40,14 @@ fn main() -> Result<(), slint::PlatformError> {
                     Ok((liked, count)) => println!("like: liked={liked} count={count}"),
                     Err(error) => eprintln!("like: {error}"),
                 }
+                match fitmentor_slint::api::reply_community_post(&post.id, "Slint reply test") {
+                    Ok(reply) => println!("reply: {}", reply.id),
+                    Err(error) => eprintln!("reply: {error}"),
+                }
+                match fitmentor_slint::api::fetch_community_post(&post.id) {
+                    Ok((_, replies)) => println!("replies: {}", replies.len()),
+                    Err(error) => eprintln!("post: {error}"),
+                }
             }
             Err(error) => eprintln!("create: {error}"),
         }

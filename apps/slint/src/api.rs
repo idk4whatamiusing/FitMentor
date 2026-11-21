@@ -946,3 +946,36 @@ pub fn toggle_community_like(post_id: &str) -> Result<(bool, i64), String> {
             .unwrap_or(0),
     ))
 }
+
+pub fn fetch_community_post(
+    post_id: &str,
+) -> Result<(CommunityPostView, Vec<CommunityPostView>), String> {
+    let value = community_graphql(serde_json::json!({
+        "query": "query post($id: String)",
+        "variables": { "id": post_id }
+    }))?;
+    let data = value
+        .get("data")
+        .ok_or_else(|| "Post not found".to_string())?;
+    let post = data
+        .get("post")
+        .ok_or_else(|| "Post not found".to_string())?;
+    let replies = data
+        .get("replies")
+        .and_then(serde_json::Value::as_array)
+        .map(|items| items.iter().map(parse_community_post).collect())
+        .unwrap_or_default();
+    Ok((parse_community_post(post), replies))
+}
+
+pub fn reply_community_post(post_id: &str, text: &str) -> Result<CommunityPostView, String> {
+    let value = community_graphql(serde_json::json!({
+        "query": "mutation replyToPost($postId: String, $text: String, $media: JSON)",
+        "variables": { "postId": post_id, "text": text, "media": [] }
+    }))?;
+    let reply = value
+        .get("data")
+        .and_then(|data| data.get("replyToPost"))
+        .ok_or_else(|| "Could not reply".to_string())?;
+    Ok(parse_community_post(reply))
+}

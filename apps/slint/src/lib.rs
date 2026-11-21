@@ -192,6 +192,9 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             ui.set_profile_tier("Free".into());
             ui.set_needs_onboarding(false);
             ui.set_form_error("".into());
+            ui.set_community_open_id("".into());
+            ui.set_community_replies(ModelRc::new(VecModel::from(Vec::<CommunityPost>::new())));
+            ui.set_community_reply_status("".into());
             ui.set_status_text("Connect your account to sync today's log.".into());
             ui.set_tab(0);
         }
@@ -602,6 +605,112 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                             }
                         }
                         Err(error) => ui.set_status_text(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
+    ui.on_edit_profile(move || {
+        if let Some(ui) = handle.upgrade() {
+            ui.set_needs_onboarding(true);
+            ui.set_form_error("".into());
+        }
+    });
+
+    let handle = ui.as_weak();
+    ui.on_open_community_post(move |post_id| {
+        let post_id = post_id.to_string();
+        let Some(ui) = handle.upgrade() else {
+            return;
+        };
+        if let Some(post) = ui
+            .get_community_posts()
+            .iter()
+            .find(|post| post.id.as_str() == post_id.as_str())
+        {
+            ui.set_community_open_id(post.id.clone());
+            ui.set_community_open_author(post.author.clone());
+            ui.set_community_open_text(post.text.clone());
+        } else {
+            ui.set_community_open_id(post_id.clone().into());
+        }
+        ui.set_community_reply_status("Loading replies...".into());
+
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::fetch_community_post(&post_id);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match result {
+                        Ok((post, replies)) => {
+                            ui.set_community_open_id(post.id.into());
+                            ui.set_community_open_author(post.author.into());
+                            ui.set_community_open_text(post.text.into());
+                            let items: Vec<CommunityPost> = replies
+                                .iter()
+                                .map(|reply| CommunityPost {
+                                    id: reply.id.clone().into(),
+                                    author: reply.author.clone().into(),
+                                    text: reply.text.clone().into(),
+                                    likes: reply.likes as i32,
+                                    liked_by_me: reply.liked_by_me,
+                                    reply_count: reply.reply_count as i32,
+                                })
+                                .collect();
+                            ui.set_community_replies(ModelRc::new(VecModel::from(items)));
+                            ui.set_community_reply_status("".into());
+                        }
+                        Err(error) => ui.set_community_reply_status(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
+    ui.on_close_community_post(move || {
+        if let Some(ui) = handle.upgrade() {
+            ui.set_community_open_id("".into());
+            ui.set_community_replies(ModelRc::new(VecModel::from(Vec::<CommunityPost>::new())));
+            ui.set_community_reply_input("".into());
+            ui.set_community_reply_status("".into());
+        }
+    });
+
+    let handle = ui.as_weak();
+    ui.on_send_community_reply(move || {
+        let Some(ui) = handle.upgrade() else {
+            return;
+        };
+        let post_id = ui.get_community_open_id().to_string();
+        let text = ui
+            .get_community_reply_input()
+            .to_string()
+            .trim()
+            .to_string();
+        if post_id.is_empty() || text.is_empty() {
+            return;
+        }
+        ui.set_community_reply_status("Replying...".into());
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::reply_community_post(&post_id, &text);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match result {
+                        Ok(_) => {
+                            ui.set_community_reply_input("".into());
+                            ui.set_community_reply_status("".into());
+                            ui.invoke_load_community();
+                            ui.invoke_open_community_post(post_id.into());
+                        }
+                        Err(error) => ui.set_community_reply_status(error.into()),
                     }
                 }
             })
