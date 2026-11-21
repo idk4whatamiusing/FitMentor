@@ -854,3 +854,123 @@ pub fn send_coach_message(session_id: &str, message: &str) -> Result<String, Str
         .map(ToOwned::to_owned)
         .ok_or_else(|| "Coach did not return a reply".to_string())
 }
+
+// ── Payments ───────────────────────────────────────────────────────
+
+pub fn create_checkout(tier: &str) -> Result<String, String> {
+    let body = serde_json::json!({ "tier": tier });
+    let response = authorized_request("POST", "/v1/subscriptions/checkout", Some(body))?;
+    let value: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse checkout: {error}"))?;
+    value
+        .get("checkout_url")
+        .and_then(serde_json::Value::as_str)
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| "Checkout did not return a URL".to_string())
+}
+
+// ── Community ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct CommunityPostView {
+    pub id: String,
+    pub author: String,
+    pub text: String,
+    pub likes: i64,
+    pub liked_by_me: bool,
+    pub reply_count: i64,
+}
+
+fn parse_community_post(post: &serde_json::Value) -> CommunityPostView {
+    let body = post.get("body").cloned().unwrap_or_default();
+    CommunityPostView {
+        id: post
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        author: post
+            .get("author_name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("User")
+            .to_string(),
+        text: body
+            .get("text")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        likes: post
+            .get("like_count")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        liked_by_me: post
+            .get("liked_by_me")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        reply_count: post
+            .get("reply_count")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+    }
+}
+
+fn community_graphql(body: serde_json::Value) -> Result<serde_json::Value, String> {
+    let response = authorized_request("POST", "/v1/community/graphql", Some(body))?;
+    let value: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse community response: {error}"))?;
+    if let Some(errors) = value.get("errors").and_then(serde_json::Value::as_array) {
+        let message = errors
+            .first()
+            .and_then(|error| error.get("message"))
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("Community error");
+        return Err(message.to_string());
+    }
+    Ok(value)
+}
+
+pub fn fetch_community_feed(limit: i64) -> Result<Vec<CommunityPostView>, String> {
+    let value = community_graphql(serde_json::json!({
+        "query": "query feed($cursor: String, $limit: Int)",
+        "variables": { "limit": limit }
+    }))?;
+    Ok(value
+        .get("data")
+        .and_then(|data| data.get("feed"))
+        .and_then(serde_json::Value::as_array)
+        .map(|items| items.iter().map(parse_community_post).collect())
+        .unwrap_or_default())
+}
+
+pub fn create_community_post(text: &str) -> Result<CommunityPostView, String> {
+    let value = community_graphql(serde_json::json!({
+        "query": "mutation createPost($text: String, $media: JSON)",
+        "variables": { "text": text, "media": [] }
+    }))?;
+    let post = value
+        .get("data")
+        .and_then(|data| data.get("createPost"))
+        .ok_or_else(|| "Could not create post".to_string())?;
+    Ok(parse_community_post(post))
+}
+
+pub fn toggle_community_like(post_id: &str) -> Result<(bool, i64), String> {
+    let value = community_graphql(serde_json::json!({
+        "query": "mutation toggleLike($postId: String)",
+        "variables": { "postId": post_id }
+    }))?;
+    let like = value
+        .get("data")
+        .and_then(|data| data.get("toggleLike"))
+        .ok_or_else(|| "Could not like post".to_string())?;
+    Ok((
+        like.get("liked")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        like.get("count")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+    ))
+}

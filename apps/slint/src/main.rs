@@ -22,6 +22,47 @@ fn main() -> Result<(), slint::PlatformError> {
         return Ok(());
     }
 
+    if std::env::args().any(|arg| arg == "--check-community") {
+        if let Some(token) = std::env::var("FITMENTOR_JWT")
+            .ok()
+            .or_else(fitmentor_slint::api::load_token)
+        {
+            fitmentor_slint::api::set_token(Some(token));
+        }
+        match fitmentor_slint::api::fetch_community_feed(5) {
+            Ok(posts) => println!("feed: {} posts", posts.len()),
+            Err(error) => eprintln!("feed: {error}"),
+        }
+        match fitmentor_slint::api::create_community_post("Slint community smoke test") {
+            Ok(post) => {
+                println!("created: {} {}", post.id, post.text);
+                match fitmentor_slint::api::toggle_community_like(&post.id) {
+                    Ok((liked, count)) => println!("like: liked={liked} count={count}"),
+                    Err(error) => eprintln!("like: {error}"),
+                }
+            }
+            Err(error) => eprintln!("create: {error}"),
+        }
+        return Ok(());
+    }
+
+    if std::env::args().any(|arg| arg == "--check-checkout") {
+        if let Some(token) = std::env::var("FITMENTOR_JWT")
+            .ok()
+            .or_else(fitmentor_slint::api::load_token)
+        {
+            fitmentor_slint::api::set_token(Some(token));
+        }
+        match fitmentor_slint::api::create_checkout("pro") {
+            Ok(url) => println!("checkout: {url}"),
+            Err(error) => {
+                eprintln!("{error}");
+                std::process::exit(1);
+            }
+        }
+        return Ok(());
+    }
+
     if std::env::args().any(|arg| arg == "--check-chat") {
         if let Some(token) = std::env::var("FITMENTOR_JWT")
             .ok()

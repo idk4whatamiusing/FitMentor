@@ -20,6 +20,15 @@ export struct ChatMessage {
     content: string,
 }
 
+export struct CommunityPost {
+    id: string,
+    author: string,
+    text: string,
+    likes: int,
+    liked_by_me: bool,
+    reply_count: int,
+}
+
 component StatCard inherits Rectangle {
     in property <string> title;
     in property <string> value;
@@ -257,6 +266,10 @@ export component AppWindow inherits Window {
     in-out property <string> chat-status: "Ask about training, food, or recovery.";
     in-out property <string> chat-session-id: "";
     in-out property <bool> chat-busy: false;
+    in-out property <[CommunityPost]> community-posts: [];
+    in-out property <string> community-input: "";
+    in-out property <string> community-status: "Load the community feed.";
+    in-out property <bool> community-busy: false;
 
     callback refresh();
     callback sign-in();
@@ -271,6 +284,10 @@ export component AppWindow inherits Window {
     callback load-chat();
     callback send-chat();
     callback new-chat();
+    callback load-community();
+    callback post-community();
+    callback like-community(string);
+    callback checkout(string);
     callback add-water();
     callback add-steps();
     callback add-protein();
@@ -800,6 +817,22 @@ export component AppWindow inherits Window {
                         font-size: 12px;
                         wrap: word-wrap;
                     }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        QuickButton {
+                            label: "Basic ₹99";
+                            clicked => {
+                                root.checkout("pro");
+                            }
+                        }
+                        QuickButton {
+                            label: "Elite ₹299";
+                            clicked => {
+                                root.checkout("premium");
+                            }
+                        }
+                    }
                 }
             }
 
@@ -842,6 +875,135 @@ export component AppWindow inherits Window {
                     label: "Sign out";
                     clicked => {
                         root.sign-out();
+                    }
+                }
+            }
+        }
+
+        if root.tab == 5 : VerticalLayout {
+            spacing: 8px;
+
+            HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    spacing: 2px;
+                    Text {
+                        text: "SOCIAL";
+                        color: #38bdf8;
+                        font-size: 11px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: "Community";
+                        color: #f8fafc;
+                        font-size: 28px;
+                        font-weight: 700;
+                    }
+                }
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+                QuickButton {
+                    label: "Refresh";
+                    clicked => {
+                        root.load-community();
+                    }
+                }
+            }
+
+            Text {
+                text: root.community-status;
+                color: #94a3b8;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                    height: 46px;
+                    border-radius: 12px;
+                    background: #0d1622;
+                    border-width: 1px;
+                    border-color: #1e3a5f;
+
+                    TextInput {
+                        x: 12px;
+                        y: 0;
+                        width: parent.width - 24px;
+                        height: 100%;
+                        text <=> root.community-input;
+                        single-line: true;
+                        color: #f8fafc;
+                        font-size: 13px;
+                        accepted => {
+                            root.post-community();
+                        }
+                    }
+                }
+
+                QuickButton {
+                    label: root.community-busy ? "..." : "Post";
+                    clicked => {
+                        root.post-community();
+                    }
+                }
+            }
+
+            ScrollView {
+                height: 400px;
+
+                VerticalLayout {
+                    width: 100%;
+                    spacing: 8px;
+
+                    if root.community-posts.length == 0 : Text {
+                        text: "No posts yet. Share the first one.";
+                        color: #64748b;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+
+                    for post in root.community-posts : Rectangle {
+                        border-radius: 14px;
+                        background: #0d1622;
+                        border-width: 1px;
+                        border-color: #1e293b;
+
+                        VerticalLayout {
+                            padding: 12px;
+                            spacing: 6px;
+
+                            Text {
+                                text: post.author;
+                                color: #7dd3fc;
+                                font-size: 11px;
+                                font-weight: 600;
+                            }
+                            Text {
+                                text: post.text;
+                                color: #e2e8f0;
+                                font-size: 12px;
+                                wrap: word-wrap;
+                            }
+                            HorizontalLayout {
+                                spacing: 12px;
+                                QuickButton {
+                                    label: post.liked_by_me ? "♥ \{post.likes}" : "♡ \{post.likes}";
+                                    clicked => {
+                                        root.like-community(post.id);
+                                    }
+                                }
+                                Text {
+                                    text: "\{post.reply_count} replies";
+                                    color: #94a3b8;
+                                    font-size: 10px;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -895,6 +1057,13 @@ export component AppWindow inherits Window {
                     active: root.tab == 4;
                     clicked => {
                         root.set-tab(4);
+                    }
+                }
+                NavItem {
+                    label: "Feed";
+                    active: root.tab == 5;
+                    clicked => {
+                        root.set-tab(5);
                     }
                 }
             }

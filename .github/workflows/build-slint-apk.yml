@@ -47,12 +47,35 @@ jobs:
       - name: Install cargo-apk2
         run: cargo install cargo-apk2 --locked
 
-      - name: Build APK (debug-signed)
+      - name: Decode release keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/fitmentor-release.p12"
+
+      - name: Build APK (release-signed)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        env:
+          CARGO_APK_RELEASE_KEYSTORE: ${{ runner.temp }}/fitmentor-release.p12
+          CARGO_APK_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          FITMENTOR_GOOGLE_CLIENT_ID: ${{ secrets.FITMENTOR_GOOGLE_CLIENT_ID }}
+        run: cargo apk2 build --target aarch64-linux-android --lib --release
+
+      - name: Build APK (debug-signed fallback)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 == '' }}
         env:
           FITMENTOR_GOOGLE_CLIENT_ID: ${{ secrets.FITMENTOR_GOOGLE_CLIENT_ID }}
         run: cargo apk2 build --target aarch64-linux-android --lib
 
-      - name: Upload APK
+      - name: Upload release APK
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: FitMentor-Slint-APK
+          path: apps/slint/target/release/apk/*.apk
+          if-no-files-found: error
+
+      - name: Upload debug APK
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 == '' }}
         uses: actions/upload-artifact@v4
         with:
           name: FitMentor-Slint-APK-debug

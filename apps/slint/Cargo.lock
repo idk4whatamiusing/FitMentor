@@ -1243,6 +1243,7 @@ dependencies = [
  "slint",
  "slint-build",
  "ureq",
+ "webbrowser",
 ]
 
 [[package]]

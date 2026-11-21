@@ -482,6 +482,134 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     });
 
     let handle = ui.as_weak();
+    ui.on_load_community(move || {
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::fetch_community_feed(30);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match result {
+                        Ok(posts) => {
+                            let items: Vec<CommunityPost> = posts
+                                .iter()
+                                .map(|post| CommunityPost {
+                                    id: post.id.clone().into(),
+                                    author: post.author.clone().into(),
+                                    text: post.text.clone().into(),
+                                    likes: post.likes as i32,
+                                    liked_by_me: post.liked_by_me,
+                                    reply_count: post.reply_count as i32,
+                                })
+                                .collect();
+                            let empty = items.is_empty();
+                            ui.set_community_posts(ModelRc::new(VecModel::from(items)));
+                            ui.set_community_status(if empty {
+                                "No posts yet. Share the first one.".into()
+                            } else {
+                                "Community feed".into()
+                            });
+                        }
+                        Err(error) => ui.set_community_status(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
+    ui.on_post_community(move || {
+        let Some(ui) = handle.upgrade() else {
+            return;
+        };
+        if ui.get_community_busy() {
+            return;
+        }
+        let text = ui.get_community_input().to_string().trim().to_string();
+        if text.is_empty() {
+            return;
+        }
+        ui.set_community_busy(true);
+        ui.set_community_status("Posting...".into());
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::create_community_post(&text);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    ui.set_community_busy(false);
+                    match result {
+                        Ok(_) => {
+                            ui.set_community_input("".into());
+                            ui.set_community_status("Posted".into());
+                            ui.invoke_load_community();
+                        }
+                        Err(error) => ui.set_community_status(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
+    ui.on_like_community(move |post_id| {
+        let post_id = post_id.to_string();
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::toggle_community_like(&post_id);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    if let Ok((liked, count)) = result {
+                        let mut items: Vec<CommunityPost> =
+                            ui.get_community_posts().iter().collect();
+                        for item in &mut items {
+                            if item.id == post_id {
+                                item.liked_by_me = liked;
+                                item.likes = count as i32;
+                            }
+                        }
+                        ui.set_community_posts(ModelRc::new(VecModel::from(items)));
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
+    ui.on_checkout(move |tier| {
+        let tier = tier.to_string();
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::create_checkout(&tier);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match result {
+                        Ok(url) => {
+                            if let Err(error) = webbrowser::open(&url) {
+                                ui.set_status_text(
+                                    format!("Could not open checkout: {error}").into(),
+                                );
+                            } else {
+                                ui.set_status_text(
+                                    "Complete payment in your browser, then refresh profile."
+                                        .into(),
+                                );
+                            }
+                        }
+                        Err(error) => ui.set_status_text(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
     ui.on_set_tab(move |tab| {
         if let Some(ui) = handle.upgrade() {
             ui.set_tab(tab);
@@ -496,6 +624,9 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             }
             if tab == 4 {
                 ui.invoke_load_profile();
+            }
+            if tab == 5 {
+                ui.invoke_load_community();
             }
         }
     });
