@@ -1,6 +1,7 @@
 //! HTTP handlers. Routing lives in `crate::app`.
 
 pub mod coach;
+pub mod community;
 pub mod logs;
 pub mod payments;
 pub mod planner;

@@ -4,7 +4,7 @@ import { resolveSessionFromToken } from "@/utils/session";
 import { getEnv } from "@/utils/env";
 
 const SESSION_COOKIE = "fitmentor_session";
-const wsUrl = () => getEnv("WS_URL") || "https://40-192-40-60.sslip.io";
+const apiUrl = () => getEnv("API_URL");
 
 function getClientIp(): string {
   try {
@@ -40,7 +40,7 @@ export const proxyCommunityGraphQL = createServerFn({ method: "POST" })
     const session = await resolveSession();
     if (!session) return { errors: [{ message: "Unauthorized" }] };
 
-    const res = await fetch(`${wsUrl()}/v1/community/graphql`, {
+    const res = await fetch(`${apiUrl()}/v1/community/graphql`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

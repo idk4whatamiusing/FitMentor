@@ -11,7 +11,7 @@ use sqlx::PgPool;
 use tower_http::trace::TraceLayer;
 
 use crate::config::Config;
-use crate::handlers::{coach, logs, payments, planner, plans, quota, user, workout};
+use crate::handlers::{coach, community, logs, payments, planner, plans, quota, user, workout};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -70,6 +70,8 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/coach/sessions/{id}", delete(coach::delete))
         .route("/v1/coach/sessions/{id}", patch(coach::rename))
         .route("/v1/coach/log", post(coach::log))
+        // community
+        .route("/v1/community/graphql", post(community::graphql))
         // plans / advice
         .route("/v1/meal/today", get(meal_get))
         .route("/v1/meal/today", put(meal_upsert))

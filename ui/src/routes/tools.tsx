@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { MobileShell } from "@/components/MobileShell";
 import { loadProfile, useProfile, calcTargets, type Profile } from "@/utils/profile";
+import { useAuth } from "@/utils/auth";
 import { loadLogs, saveLog, todayKey, last7, type DailyLog } from "@/utils/habits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,16 @@ import {
   Sparkles,
   Loader,
   Dumbbell,
+  Bell,
+  Search,
+  Heart,
+  MessageCircle,
+  Repeat2,
+  MoreHorizontal,
+  Send,
+  Trash2,
+  Flag,
+  Ban,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -747,14 +758,490 @@ function FormAnalyzer() {
   );
 }
 
+type CommunityPostView = {
+  id: string;
+  author: string;
+  userId: string;
+  text: string;
+  timestamp: number;
+  likedByMe: boolean;
+  likes: number;
+  replyCount: number;
+  reshareCount: number;
+  reshareId: string | null;
+  parentId: string | null;
+};
+
+function toCommunityView(p: any): CommunityPostView {
+  return {
+    id: p.id,
+    author: p.author_name || "User",
+    userId: p.user_id,
+    text: p.body?.text ?? "",
+    timestamp: new Date(String(p.created_at ?? "").replace(" ", "T")).getTime(),
+    likedByMe: !!p.liked_by_me,
+    likes: p.like_count ?? 0,
+    replyCount: p.reply_count ?? 0,
+    reshareCount: p.reshare_count ?? 0,
+    reshareId: p.reshare_id ?? null,
+    parentId: p.parent_id ?? null,
+  };
+}
+
 function CommunityFeed() {
+  const { user } = useAuth();
+  const userId = user?.sub ?? "";
+  const [posts, setPosts] = useState<CommunityPostView[]>([]);
+  const [newPost, setNewPost] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<CommunityPostView[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [resharing, setResharing] = useState<string | null>(null);
+
+  const loadFeed = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { community } = await import("@/utils/community");
+      const data = await community.feed(undefined, 30);
+      setPosts(data.feed.map(toCommunityView));
+    } catch {
+      // Silently keep the previous feed on transient errors.
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFeed();
+  }, [loadFeed]);
+
+  const loadNotifications = async () => {
+    try {
+      const { community } = await import("@/utils/community");
+      const [notifData, countData] = await Promise.all([
+        community.notifications(20),
+        community.unreadNotificationCount(),
+      ]);
+      setNotifications(notifData.notifications);
+      setUnreadCount(countData.unreadNotificationCount);
+    } catch {
+      // ignore
+    }
+  };
+
+  const addPost = async () => {
+    if (!newPost.trim()) return;
+    setPosting(true);
+    try {
+      const { community } = await import("@/utils/community");
+      const result = await community.createPost(newPost.trim(), []);
+      setPosts((prev) => [toCommunityView(result.createPost), ...prev]);
+      setNewPost("");
+      toast.success("Posted!");
+    } catch {
+      toast.error("Failed to post");
+    }
+    setPosting(false);
+  };
+
+  const toggleLike = async (postId: string) => {
+    try {
+      const { community } = await import("@/utils/community");
+      const result = await community.toggleLike(postId);
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                likedByMe: result.toggleLike.liked,
+                likes: result.toggleLike.count,
+              }
+            : p,
+        ),
+      );
+    } catch {
+      // ignore
+    }
+  };
+
+  const addReply = async (postId: string) => {
+    if (!replyText.trim()) return;
+    try {
+      const { community } = await import("@/utils/community");
+      await community.replyToPost(postId, replyText.trim(), []);
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, replyCount: p.replyCount + 1 } : p,
+        ),
+      );
+      setReplyText("");
+      setReplyTo(null);
+      toast.success("Replied!");
+    } catch {
+      toast.error("Failed to reply");
+    }
+  };
+
+  const reshare = async (postId: string) => {
+    setResharing(postId);
+    try {
+      const { community } = await import("@/utils/community");
+      const result = await community.resharePost(postId);
+      setPosts((prev) => [toCommunityView(result.resharePost), ...prev]);
+      toast.success("Reshared!");
+    } catch {
+      toast.error("Failed to reshare");
+    }
+    setResharing(null);
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const { community } = await import("@/utils/community");
+      const data = await community.search(searchQuery.trim());
+      setSearchResults(data.search.map(toCommunityView));
+    } catch {
+      setSearchResults([]);
+    }
+  };
+
+  const deletePost = async (postId: string) => {
+    try {
+      const { community } = await import("@/utils/community");
+      await community.deletePost(postId);
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      toast.success("Deleted");
+    } catch {
+      toast.error("Failed to delete");
+    }
+    setMenuOpen(null);
+  };
+
+  const reportPost = async (postId: string) => {
+    try {
+      const { community } = await import("@/utils/community");
+      await community.reportPost(postId, "Reported by user");
+      toast.success("Reported");
+    } catch {
+      toast.error("Failed to report");
+    }
+    setMenuOpen(null);
+  };
+
+  const blockUser = async (blockedId: string) => {
+    try {
+      const { community } = await import("@/utils/community");
+      await community.blockUser(blockedId);
+      setPosts((prev) => prev.filter((p) => p.userId !== blockedId));
+      toast.success("User blocked");
+    } catch {
+      toast.error("Failed to block");
+    }
+    setMenuOpen(null);
+  };
+
+  const markAllRead = async () => {
+    try {
+      const { community } = await import("@/utils/community");
+      await community.markAllNotificationsRead();
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setUnreadCount(0);
+    } catch {
+      // ignore
+    }
+  };
+
+  const displayPosts = isSearching ? searchResults : posts;
+
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <Users className="mb-4 h-16 w-16 text-muted-foreground" />
-      <h2 className="text-xl font-semibold">Community</h2>
-      <p className="mt-2 max-w-xs text-sm text-muted-foreground">
-        The community feature is coming soon. Stay tuned!
-      </p>
+    <div className="space-y-5 pt-4">
+      <div className="rounded-2xl border border-border/60 bg-card p-5">
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-lg font-bold">
+            <Users className="h-5 w-5 text-primary" /> Community
+          </h2>
+          <button
+            onClick={() => {
+              setShowNotifications(!showNotifications);
+              if (!showNotifications) loadNotifications();
+            }}
+            className="relative rounded-full p-1.5 hover:bg-muted"
+          >
+            <Bell className="h-4 w-4" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {showNotifications && (
+          <div className="mt-3 rounded-xl border border-border/60 bg-background p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-semibold text-muted-foreground">
+                Notifications
+              </p>
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllRead}
+                  className="text-[10px] text-primary hover:underline"
+                >
+                  Mark all read
+                </button>
+              )}
+            </div>
+            {notifications.length === 0 && (
+              <p className="py-2 text-center text-xs text-muted-foreground">
+                No notifications yet
+              </p>
+            )}
+            {notifications.slice(0, 10).map((n: any) => (
+              <div
+                key={n.id}
+                className={cn(
+                  "flex items-start gap-2 rounded-lg px-2 py-1.5 text-xs",
+                  !n.read && "bg-primary/5",
+                )}
+              >
+                <span className="text-muted-foreground">
+                  {n.type === "like"
+                    ? "❤️"
+                    : n.type === "reply"
+                      ? "💬"
+                      : "🔁"}
+                </span>
+                <span>
+                  <span className="font-semibold">
+                    {String(n.actor_id ?? "").split(":").pop()}
+                  </span>{" "}
+                  {n.type === "like"
+                    ? "liked your post"
+                    : n.type === "reply"
+                      ? "replied to your post"
+                      : "reshared your post"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-3 flex gap-2">
+          <input
+            type="text"
+            placeholder="Search community..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSearch();
+              if (e.key === "Escape") {
+                setSearchQuery("");
+                setSearchResults([]);
+                setIsSearching(false);
+              }
+            }}
+            className="flex-1 rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none"
+          />
+          <Button size="icon" variant="outline" onClick={handleSearch}>
+            <Search className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="mt-3">
+          <textarea
+            placeholder="Share something with the community..."
+            value={newPost}
+            onChange={(e) => setNewPost(e.target.value)}
+            className="w-full resize-none rounded-xl border border-border/60 bg-background p-3 text-sm outline-none"
+            rows={2}
+          />
+          <div className="mt-2 flex justify-end">
+            <Button
+              size="sm"
+              onClick={addPost}
+              disabled={posting || !newPost.trim()}
+            >
+              {posting ? (
+                <Loader className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {isSearching && (
+          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+            <span>Search results for "{searchQuery}"</span>
+            <button
+              onClick={() => {
+                setSearchQuery("");
+                setSearchResults([]);
+                setIsSearching(false);
+              }}
+              className="text-primary hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
+        <div className="mt-5 space-y-3">
+          {loading && (
+            <div className="py-8 text-center">
+              <Loader className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+          {!loading && displayPosts.length === 0 && (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {isSearching
+                ? "No results found"
+                : "No posts yet. Be the first to share!"}
+            </p>
+          )}
+          {displayPosts.map((post) => (
+            <div
+              key={post.id}
+              className="rounded-xl border border-border/60 bg-background p-3.5"
+            >
+              {post.reshareId && (
+                <div className="mb-2 flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <Repeat2 className="h-3 w-3" />
+                  <span>Reshared</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
+                    {(post.author[0] ?? "U").toUpperCase()}
+                  </div>
+                  <div>
+                    <span className="text-sm font-semibold">{post.author}</span>
+                    <span className="ml-2 text-[10px] text-muted-foreground">
+                      {new Date(post.timestamp).toLocaleDateString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </span>
+                  </div>
+                </div>
+                <div className="relative">
+                  <button
+                    onClick={() =>
+                      setMenuOpen(menuOpen === post.id ? null : post.id)
+                    }
+                    className="rounded p-1 hover:bg-muted"
+                  >
+                    <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  {menuOpen === post.id && (
+                    <div className="absolute right-0 top-8 z-20 w-40 rounded-xl border border-border/60 bg-card p-1 shadow-lg">
+                      {post.userId === userId ? (
+                        <button
+                          onClick={() => deletePost(post.id)}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-red-500 hover:bg-muted"
+                        >
+                          <Trash2 className="h-3 w-3" /> Delete
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => reportPost(post.id)}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs hover:bg-muted"
+                          >
+                            <Flag className="h-3 w-3" /> Report
+                          </button>
+                          <button
+                            onClick={() => blockUser(post.userId)}
+                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs hover:bg-muted"
+                          >
+                            <Ban className="h-3 w-3" /> Block user
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <p className="mt-2 text-sm whitespace-pre-wrap">{post.text}</p>
+              <div className="mt-3 flex items-center gap-4">
+                <button
+                  onClick={() => toggleLike(post.id)}
+                  className={cn(
+                    "flex items-center gap-1 text-xs transition-colors",
+                    post.likedByMe
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <Heart
+                    className={cn(
+                      "h-3.5 w-3.5",
+                      post.likedByMe && "fill-primary",
+                    )}
+                  />
+                  {post.likes}
+                </button>
+                <button
+                  onClick={() =>
+                    setReplyTo(replyTo === post.id ? null : post.id)
+                  }
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" />
+                  {post.replyCount}
+                </button>
+                <button
+                  onClick={() => reshare(post.id)}
+                  disabled={resharing === post.id}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  {resharing === post.id ? (
+                    <Loader className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Repeat2 className="h-3.5 w-3.5" />
+                  )}
+                  {post.reshareCount}
+                </button>
+              </div>
+              {replyTo === post.id && (
+                <div className="mt-2 flex gap-2">
+                  <Input
+                    placeholder="Write a reply..."
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    className="flex-1 text-xs"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") addReply(post.id);
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => addReply(post.id)}
+                    disabled={!replyText.trim()}
+                  >
+                    Reply
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
