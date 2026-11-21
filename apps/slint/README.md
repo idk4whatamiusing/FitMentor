@@ -85,3 +85,9 @@ token when you tap **Sign out** in the You tab.
 
 The You tab loads `/v1/user/me` and `/v1/user/subscription` to show the
 profile and current plan.
+
+## Nutrition
+
+The Food tab calculates daily targets (Mifflin-St Jeor + activity) and loads
+today's AI meal plan from `GET /v1/meal/today`. It shows calories, protein,
+carbs, fat, and each meal's items/macros; **Refresh** reloads both.

@@ -1,5 +1,12 @@
 import { ScrollView } from "std-widgets.slint";
 
+export struct MealItem {
+    name: string,
+    items: string,
+    kcal: int,
+    protein: int,
+}
+
 component StatCard inherits Rectangle {
     in property <string> title;
     in property <string> value;
@@ -152,6 +159,36 @@ component ChoiceChip inherits Rectangle {
     }
 }
 
+
+component MacroPill inherits Rectangle {
+    in property <string> label;
+    in property <int> value;
+    in property <color> accent: #7dd3fc;
+
+    horizontal-stretch: 1;
+    height: 58px;
+    border-radius: 12px;
+    background: #0d1622;
+    border-width: 1px;
+    border-color: #1e293b;
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 1px;
+        Text {
+            text: "\{root.value}";
+            color: root.accent;
+            font-size: 18px;
+            font-weight: 700;
+        }
+        Text {
+            text: root.label;
+            color: #94a3b8;
+            font-size: 9px;
+        }
+    }
+}
+
 export component AppWindow inherits Window {
     in-out property <int> tab: 0;
     in-out property <int> water: 0;
@@ -193,6 +230,13 @@ export component AppWindow inherits Window {
     in-out property <string> form-days: "4";
     in-out property <string> form-budget: "150";
     in-out property <string> form-error: "";
+    in-out property <[MealItem]> nutrition-meals: [];
+    in-out property <string> nutrition-title: "";
+    in-out property <string> nutrition-status: "Load today's meal plan.";
+    in-out property <int> target-calories: 0;
+    in-out property <int> target-protein: 0;
+    in-out property <int> target-carbs: 0;
+    in-out property <int> target-fat: 0;
 
     callback refresh();
     callback sign-in();
@@ -201,6 +245,7 @@ export component AppWindow inherits Window {
     callback sign-out();
     callback save-onboarding();
     callback skip-onboarding();
+    callback load-nutrition();
     callback add-water();
     callback add-steps();
     callback add-protein();
@@ -360,17 +405,120 @@ export component AppWindow inherits Window {
 
         if root.tab == 1 : VerticalLayout {
             spacing: 8px;
-            Text {
-                text: "Nutrition";
-                color: #f8fafc;
-                font-size: 28px;
-                font-weight: 700;
+
+            HorizontalLayout {
+                spacing: 8px;
+                VerticalLayout {
+                    spacing: 2px;
+                    Text {
+                        text: "FUEL";
+                        color: #38bdf8;
+                        font-size: 11px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: "Nutrition";
+                        color: #f8fafc;
+                        font-size: 28px;
+                        font-weight: 700;
+                    }
+                }
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+                QuickButton {
+                    label: "Refresh";
+                    clicked => {
+                        root.load-nutrition();
+                    }
+                }
             }
+
             Text {
-                text: "Today's meal plan will live here.";
+                text: root.nutrition-status;
                 color: #94a3b8;
-                font-size: 14px;
+                font-size: 12px;
                 wrap: word-wrap;
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                MacroPill {
+                    label: "kcal";
+                    value: root.target-calories;
+                    accent: #fbbf24;
+                }
+                MacroPill {
+                    label: "protein";
+                    value: root.target-protein;
+                    accent: #34d399;
+                }
+                MacroPill {
+                    label: "carbs";
+                    value: root.target-carbs;
+                    accent: #38bdf8;
+                }
+                MacroPill {
+                    label: "fat";
+                    value: root.target-fat;
+                    accent: #a78bfa;
+                }
+            }
+
+            ScrollView {
+                height: 430px;
+
+                VerticalLayout {
+                    width: 100%;
+                    spacing: 8px;
+
+                    if root.nutrition-meals.length == 0 : Text {
+                        text: "No meal plan yet. The daily planner will fill this after it runs.";
+                        color: #64748b;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+
+                    for meal in root.nutrition-meals : Rectangle {
+                        border-radius: 14px;
+                        background: #0d1622;
+                        border-width: 1px;
+                        border-color: #1e293b;
+
+                        VerticalLayout {
+                            padding: 12px;
+                            spacing: 3px;
+
+                            HorizontalLayout {
+                                Text {
+                                    text: meal.name;
+                                    color: #f8fafc;
+                                    font-size: 14px;
+                                    font-weight: 600;
+                                }
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                }
+                                Text {
+                                    text: "\{meal.kcal} kcal";
+                                    color: #fbbf24;
+                                    font-size: 11px;
+                                }
+                            }
+                            Text {
+                                text: meal.items;
+                                color: #94a3b8;
+                                font-size: 12px;
+                                wrap: word-wrap;
+                            }
+                            Text {
+                                text: "\{meal.protein} g protein";
+                                color: #34d399;
+                                font-size: 10px;
+                            }
+                        }
+                    }
+                }
             }
         }
 

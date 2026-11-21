@@ -22,6 +22,27 @@ fn main() -> Result<(), slint::PlatformError> {
         return Ok(());
     }
 
+    if std::env::args().any(|arg| arg == "--check-nutrition") {
+        if let Some(token) = std::env::var("FITMENTOR_JWT")
+            .ok()
+            .or_else(fitmentor_slint::api::load_token)
+        {
+            fitmentor_slint::api::set_token(Some(token));
+        }
+        match fitmentor_slint::api::fetch_profile() {
+            Ok(profile) => println!(
+                "targets: {:?}",
+                fitmentor_slint::api::calc_targets(&profile)
+            ),
+            Err(error) => eprintln!("profile: {error}"),
+        }
+        match fitmentor_slint::api::fetch_meal_plan() {
+            Ok(plan) => println!("meal plan: {plan:?}"),
+            Err(error) => eprintln!("meal plan: {error}"),
+        }
+        return Ok(());
+    }
+
     if std::env::args().any(|arg| arg == "--check-profile") {
         if let Some(token) = std::env::var("FITMENTOR_JWT")
             .ok()

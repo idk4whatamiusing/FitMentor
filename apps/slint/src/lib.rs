@@ -3,7 +3,7 @@
 //! The UI is a native Slint window. On Android it runs through
 //! `android-activity`; on desktop `main.rs` runs the same window.
 
-use slint::ComponentHandle;
+use slint::{ComponentHandle, ModelRc, VecModel};
 use std::env;
 use std::time::{Duration, Instant};
 
@@ -266,9 +266,57 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     });
 
     let handle = ui.as_weak();
+    ui.on_load_nutrition(move || {
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let profile = api::fetch_profile();
+            let plan = api::fetch_meal_plan();
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match (profile, plan) {
+                        (Ok(profile), Ok(plan)) => {
+                            let targets = api::calc_targets(&profile);
+                            ui.set_target_calories(targets.calories as i32);
+                            ui.set_target_protein(targets.protein as i32);
+                            ui.set_target_carbs(targets.carbs as i32);
+                            ui.set_target_fat(targets.fat as i32);
+                            ui.set_nutrition_title(plan.title.clone().into());
+                            let items: Vec<MealItem> = plan
+                                .meals
+                                .iter()
+                                .map(|meal| MealItem {
+                                    name: meal.name.clone().into(),
+                                    items: meal.items.clone().into(),
+                                    kcal: meal.kcal as i32,
+                                    protein: meal.protein as i32,
+                                })
+                                .collect();
+                            let empty = items.is_empty();
+                            ui.set_nutrition_meals(ModelRc::new(VecModel::from(items)));
+                            ui.set_nutrition_status(if empty {
+                                "No meal plan yet — the daily planner will fill this after it runs."
+                                    .into()
+                            } else {
+                                "Today's meal plan".into()
+                            });
+                        }
+                        (Err(error), _) => ui.set_nutrition_status(error.into()),
+                        (_, Err(error)) => ui.set_nutrition_status(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
     ui.on_set_tab(move |tab| {
         if let Some(ui) = handle.upgrade() {
             ui.set_tab(tab);
+            if tab == 1 {
+                ui.invoke_load_nutrition();
+            }
             if tab == 4 {
                 ui.invoke_load_profile();
             }

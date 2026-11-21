@@ -512,3 +512,118 @@ fn profile_from_value(value: serde_json::Value, tier: String) -> Profile {
         tier,
     }
 }
+
+// ── Nutrition ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+pub struct Meal {
+    pub name: String,
+    pub items: String,
+    pub kcal: i64,
+    pub protein: i64,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct MealPlan {
+    pub title: String,
+    pub meals: Vec<Meal>,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct Targets {
+    pub calories: i64,
+    pub protein: i64,
+    pub carbs: i64,
+    pub fat: i64,
+}
+
+pub fn calc_targets(profile: &Profile) -> Targets {
+    let base = 10 * profile.weight_kg + 625 * profile.height_cm / 100 - 5 * profile.age;
+    let bmr = if profile.gender == "male" {
+        base + 5
+    } else {
+        base - 161
+    };
+    let factor = 1.35 + profile.days_per_week.min(6) as f64 * 0.045;
+    let tdee = (bmr as f64 * factor).round() as i64;
+    let calories = match profile.goal.as_str() {
+        "fat_loss" => tdee - 400,
+        "muscle_gain" => tdee + 300,
+        "recomp" => tdee - 150,
+        _ => tdee,
+    };
+    let protein_per_kg = match profile.goal.as_str() {
+        "muscle_gain" | "strength" => 1.8,
+        "fat_loss" => 2.0,
+        _ => 1.6,
+    };
+    let protein = (profile.weight_kg as f64 * protein_per_kg).round() as i64;
+    let fat = (calories as f64 * 0.25 / 9.0).round() as i64;
+    let carbs = ((calories - protein * 4 - fat * 9) as f64 / 4.0).round() as i64;
+    Targets {
+        calories,
+        protein,
+        carbs: carbs.max(0),
+        fat,
+    }
+}
+
+pub fn fetch_meal_plan() -> Result<MealPlan, String> {
+    match authorized_request("GET", "/v1/meal/today", None) {
+        Ok(response) => {
+            let value: serde_json::Value = response
+                .into_json()
+                .map_err(|error| format!("Could not parse meal plan: {error}"))?;
+            let plan = value
+                .get("data")
+                .and_then(|data| data.get("plan"))
+                .cloned()
+                .unwrap_or_default();
+            let plan = if plan.is_array() {
+                plan.as_array()
+                    .and_then(|items| items.first())
+                    .cloned()
+                    .unwrap_or_default()
+            } else {
+                plan
+            };
+            let title = plan
+                .get("title")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("Today's plan")
+                .to_string();
+            let meals = plan
+                .get("meals")
+                .and_then(serde_json::Value::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .map(|meal| Meal {
+                            name: meal
+                                .get("name")
+                                .and_then(serde_json::Value::as_str)
+                                .unwrap_or("Meal")
+                                .to_string(),
+                            items: meal
+                                .get("items")
+                                .and_then(serde_json::Value::as_str)
+                                .unwrap_or("")
+                                .to_string(),
+                            kcal: meal
+                                .get("kcal")
+                                .and_then(serde_json::Value::as_i64)
+                                .unwrap_or(0),
+                            protein: meal
+                                .get("protein")
+                                .and_then(serde_json::Value::as_i64)
+                                .unwrap_or(0),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            Ok(MealPlan { title, meals })
+        }
+        Err(error) if error.contains("404") => Ok(MealPlan::default()),
+        Err(error) => Err(error),
+    }
+}
