@@ -1,0 +1,375 @@
+component StatCard inherits Rectangle {
+    in property <string> title;
+    in property <string> value;
+    in property <color> accent: #38bdf8;
+
+    horizontal-stretch: 1;
+    height: 86px;
+    border-radius: 16px;
+    background: #0d1622;
+    border-width: 1px;
+    border-color: #1e293b;
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 4px;
+
+        Text {
+            text: root.title;
+            color: #94a3b8;
+            font-size: 11px;
+        }
+        Text {
+            text: root.value;
+            color: root.accent;
+            font-size: 18px;
+            font-weight: 700;
+        }
+    }
+}
+
+component QuickButton inherits Rectangle {
+    in property <string> label;
+    callback clicked();
+
+    horizontal-stretch: 1;
+    height: 44px;
+    border-radius: 12px;
+    background: #0f2233;
+    border-width: 1px;
+    border-color: #1e3a5f;
+
+    Text {
+        text: root.label;
+        color: #bae6fd;
+        font-size: 12px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        width: 100%;
+        height: 100%;
+    }
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+component NavItem inherits Rectangle {
+    in property <string> label;
+    in property <bool> active: false;
+    callback clicked();
+
+    horizontal-stretch: 1;
+    border-radius: 14px;
+    background: root.active ? #11243a : transparent;
+
+    Text {
+        text: root.label;
+        color: root.active ? #7dd3fc : #64748b;
+        font-size: 10px;
+        font-weight: root.active ? 700 : 400;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        width: 100%;
+        height: 100%;
+    }
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    in-out property <int> tab: 0;
+    in-out property <int> water: 0;
+    in-out property <int> sleep: 0;
+    in-out property <int> steps: 0;
+    in-out property <int> protein: 0;
+    in-out property <string> user-name: "Friend";
+    in-out property <bool> loading: false;
+    in-out property <string> status-text: "Set FITMENTOR_API_URL, FITMENTOR_API_KEY, and FITMENTOR_USER_ID to sync.";
+
+    callback refresh();
+    callback add-water();
+    callback add-steps();
+    callback add-protein();
+    callback set-tab(int);
+
+    width: 390px;
+    height: 844px;
+    background: #070b10;
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 14px;
+
+        HorizontalLayout {
+            spacing: 12px;
+
+            VerticalLayout {
+                spacing: 2px;
+                Text {
+                    text: "FITMENTOR";
+                    color: #38bdf8;
+                    font-size: 11px;
+                    font-weight: 700;
+                }
+                Text {
+                    text: "Good morning, \{root.user-name}";
+                    color: #f8fafc;
+                    font-size: 24px;
+                    font-weight: 700;
+                }
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+
+            Rectangle {
+                width: 44px;
+                height: 44px;
+                border-radius: 14px;
+                background: #0f2233;
+                border-width: 1px;
+                border-color: #1e3a5f;
+
+                Text {
+                    text: "\{root.water}";
+                    color: #7dd3fc;
+                    font-size: 16px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        if root.tab == 0 : VerticalLayout {
+            spacing: 12px;
+
+            VerticalLayout {
+                spacing: 10px;
+                HorizontalLayout {
+                    spacing: 10px;
+                    StatCard {
+                        title: "Water";
+                        value: "\{root.water} glasses";
+                        accent: #38bdf8;
+                    }
+                    StatCard {
+                        title: "Sleep";
+                        value: "\{root.sleep} hours";
+                        accent: #a78bfa;
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 10px;
+                    StatCard {
+                        title: "Steps";
+                        value: "\{root.steps}";
+                        accent: #34d399;
+                    }
+                    StatCard {
+                        title: "Protein";
+                        value: "\{root.protein} g";
+                        accent: #fbbf24;
+                    }
+                }
+            }
+
+            Rectangle {
+                border-radius: 18px;
+                background: #0d1622;
+                border-width: 1px;
+                border-color: #1e293b;
+
+                VerticalLayout {
+                    padding: 14px;
+                    spacing: 10px;
+
+                    Text {
+                        text: "Quick log";
+                        color: #f8fafc;
+                        font-size: 15px;
+                        font-weight: 600;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+
+                        QuickButton {
+                            label: "+250 ml";
+                            clicked => {
+                                root.add-water();
+                            }
+                        }
+                        QuickButton {
+                            label: "+1000 steps";
+                            clicked => {
+                                root.add-steps();
+                            }
+                        }
+                        QuickButton {
+                            label: "+10g protein";
+                            clicked => {
+                                root.add-protein();
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                border-radius: 18px;
+                background: #0d1622;
+                border-width: 1px;
+                border-color: #1e293b;
+
+                VerticalLayout {
+                    padding: 14px;
+                    spacing: 10px;
+
+                    Text {
+                        text: root.status-text;
+                        color: #94a3b8;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                    }
+
+                    QuickButton {
+                        label: root.loading ? "Syncing..." : "Refresh from API";
+                        clicked => {
+                            root.refresh();
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.tab == 1 : VerticalLayout {
+            spacing: 8px;
+            Text {
+                text: "Nutrition";
+                color: #f8fafc;
+                font-size: 28px;
+                font-weight: 700;
+            }
+            Text {
+                text: "Today's meal plan will live here.";
+                color: #94a3b8;
+                font-size: 14px;
+                wrap: word-wrap;
+            }
+        }
+
+        if root.tab == 2 : VerticalLayout {
+            spacing: 8px;
+            Text {
+                text: "Workouts";
+                color: #f8fafc;
+                font-size: 28px;
+                font-weight: 700;
+            }
+            Text {
+                text: "The workout plan and completion flow will live here.";
+                color: #94a3b8;
+                font-size: 14px;
+                wrap: word-wrap;
+            }
+        }
+
+        if root.tab == 3 : VerticalLayout {
+            spacing: 8px;
+            Text {
+                text: "Coach";
+                color: #f8fafc;
+                font-size: 28px;
+                font-weight: 700;
+            }
+            Text {
+                text: "Chat with FitMentor AI is next.";
+                color: #94a3b8;
+                font-size: 14px;
+                wrap: word-wrap;
+            }
+        }
+
+        if root.tab == 4 : VerticalLayout {
+            spacing: 8px;
+            Text {
+                text: "Profile";
+                color: #f8fafc;
+                font-size: 28px;
+                font-weight: 700;
+            }
+            Text {
+                text: "Plan, targets, and payment status will live here.";
+                color: #94a3b8;
+                font-size: 14px;
+                wrap: word-wrap;
+            }
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+        }
+
+        Rectangle {
+            height: 64px;
+            border-radius: 20px;
+            background: #0b1420;
+            border-width: 1px;
+            border-color: #1e293b;
+
+            HorizontalLayout {
+                padding: 6px;
+                spacing: 2px;
+
+                NavItem {
+                    label: "Today";
+                    active: root.tab == 0;
+                    clicked => {
+                        root.set-tab(0);
+                    }
+                }
+                NavItem {
+                    label: "Food";
+                    active: root.tab == 1;
+                    clicked => {
+                        root.set-tab(1);
+                    }
+                }
+                NavItem {
+                    label: "Train";
+                    active: root.tab == 2;
+                    clicked => {
+                        root.set-tab(2);
+                    }
+                }
+                NavItem {
+                    label: "Coach";
+                    active: root.tab == 3;
+                    clicked => {
+                        root.set-tab(3);
+                    }
+                }
+                NavItem {
+                    label: "You";
+                    active: root.tab == 4;
+                    clicked => {
+                        root.set-tab(4);
+                    }
+                }
+            }
+        }
+    }
+}
