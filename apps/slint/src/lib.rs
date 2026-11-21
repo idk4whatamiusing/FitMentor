@@ -141,6 +141,23 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                             "premium" => "Elite",
                             _ => "Free",
                         };
+                        let needs_onboarding = profile.name == "Friend";
+                        ui.set_needs_onboarding(needs_onboarding);
+                        ui.set_form_name(if needs_onboarding {
+                            "".into()
+                        } else {
+                            profile.name.clone().into()
+                        });
+                        ui.set_form_age(profile.age.to_string().into());
+                        ui.set_form_gender(profile.gender.clone().into());
+                        ui.set_form_height(profile.height_cm.to_string().into());
+                        ui.set_form_weight(profile.weight_kg.to_string().into());
+                        ui.set_form_goal(profile.goal.clone().into());
+                        ui.set_form_place(profile.place.clone().into());
+                        ui.set_form_experience(profile.experience.clone().into());
+                        ui.set_form_diet(profile.diet.clone().into());
+                        ui.set_form_days(profile.days_per_week.to_string().into());
+                        ui.set_form_budget(profile.budget_per_day.to_string().into());
                         let name = profile.name;
                         ui.set_user_name(name.clone().into());
                         ui.set_profile_name(name.into());
@@ -173,8 +190,78 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             ui.set_profile_name("Friend".into());
             ui.set_profile_email("".into());
             ui.set_profile_tier("Free".into());
+            ui.set_needs_onboarding(false);
+            ui.set_form_error("".into());
             ui.set_status_text("Connect your account to sync today's log.".into());
             ui.set_tab(0);
+        }
+    });
+
+    let handle = ui.as_weak();
+    ui.on_save_onboarding(move || {
+        let Some(ui) = handle.upgrade() else {
+            return;
+        };
+        let input = api::ProfileInput {
+            name: ui.get_form_name().trim().to_string(),
+            age: ui.get_form_age().parse().unwrap_or(22),
+            gender: ui.get_form_gender().to_string(),
+            height_cm: ui.get_form_height().parse().unwrap_or(170),
+            weight_kg: ui.get_form_weight().parse().unwrap_or(65),
+            goal: ui.get_form_goal().to_string(),
+            place: ui.get_form_place().to_string(),
+            experience: ui.get_form_experience().to_string(),
+            diet: ui.get_form_diet().to_string(),
+            days_per_week: ui.get_form_days().parse().unwrap_or(4),
+            budget_per_day: ui.get_form_budget().parse().unwrap_or(150),
+        };
+        if input.name.is_empty() {
+            ui.set_form_error("Enter your name".into());
+            return;
+        }
+        ui.set_form_error("".into());
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::save_profile(&input);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match result {
+                        Ok(profile) => {
+                            let tier = match profile.tier.as_str() {
+                                "pro" => "Basic",
+                                "premium" => "Elite",
+                                _ => "Free",
+                            };
+                            ui.set_needs_onboarding(false);
+                            ui.set_form_error("".into());
+                            ui.set_user_name(profile.name.clone().into());
+                            ui.set_profile_name(profile.name.into());
+                            ui.set_profile_email(profile.email.into());
+                            ui.set_profile_age(profile.age as i32);
+                            ui.set_profile_height(profile.height_cm as i32);
+                            ui.set_profile_weight(profile.weight_kg as i32);
+                            ui.set_profile_goal(profile.goal.into());
+                            ui.set_profile_diet(profile.diet.into());
+                            ui.set_profile_days(profile.days_per_week as i32);
+                            ui.set_profile_budget(profile.budget_per_day as i32);
+                            ui.set_profile_tier(tier.into());
+                            ui.set_status_text("Profile saved".into());
+                            ui.invoke_refresh();
+                        }
+                        Err(error) => ui.set_form_error(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
+    ui.on_skip_onboarding(move || {
+        if let Some(ui) = handle.upgrade() {
+            ui.set_needs_onboarding(false);
+            ui.set_form_error("".into());
         }
     });
 

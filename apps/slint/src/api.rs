@@ -128,24 +128,38 @@ struct MeUser {
     email: Option<String>,
 }
 
-fn authorized_get(path: &str) -> Result<ureq::Response, String> {
+fn authorized_request(
+    method: &str,
+    path: &str,
+    body: Option<serde_json::Value>,
+) -> Result<ureq::Response, String> {
     let url = format!("{}{}", base_url(), path);
-    if let Some(token) = token() {
-        return ureq::get(&url)
-            .set("authorization", &format!("Bearer {token}"))
-            .call()
-            .map_err(|error| format!("API request failed: {error}"));
-    }
+    let request = match method {
+        "GET" => ureq::get(&url),
+        "PUT" => ureq::put(&url),
+        "POST" => ureq::post(&url),
+        _ => return Err(format!("Unsupported method: {method}")),
+    };
 
-    let key = env::var("FITMENTOR_API_KEY")
-        .map_err(|_| "Sign in with a mobile token to load your data".to_string())?;
-    let user_id = env::var("FITMENTOR_USER_ID")
-        .map_err(|_| "Sign in with a mobile token to load your data".to_string())?;
-    ureq::get(&url)
-        .set("x-api-key", &key)
-        .set("x-user-id", &user_id)
-        .call()
-        .map_err(|error| format!("API request failed: {error}"))
+    let request = if let Some(token) = token() {
+        request.set("authorization", &format!("Bearer {token}"))
+    } else {
+        let key = env::var("FITMENTOR_API_KEY")
+            .map_err(|_| "Sign in with a mobile token to load your data".to_string())?;
+        let user_id = env::var("FITMENTOR_USER_ID")
+            .map_err(|_| "Sign in with a mobile token to load your data".to_string())?;
+        request.set("x-api-key", &key).set("x-user-id", &user_id)
+    };
+
+    match body {
+        Some(body) => request.send_json(body),
+        None => request.call(),
+    }
+    .map_err(|error| format!("API request failed: {error}"))
+}
+
+fn authorized_get(path: &str) -> Result<ureq::Response, String> {
+    authorized_request("GET", path, None)
 }
 
 pub fn fetch_today() -> Result<TodayLog, String> {
@@ -286,6 +300,7 @@ pub struct Profile {
     pub name: String,
     pub email: String,
     pub age: i64,
+    pub gender: String,
     pub height_cm: i64,
     pub weight_kg: i64,
     pub goal: String,
@@ -335,6 +350,11 @@ pub fn fetch_profile() -> Result<Profile, String> {
             .get("age")
             .and_then(serde_json::Value::as_i64)
             .unwrap_or(0),
+        gender: profile
+            .get("gender")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("male")
+            .to_string(),
         height_cm: profile
             .get("heightCm")
             .and_then(serde_json::Value::as_i64)
@@ -373,4 +393,122 @@ pub fn fetch_profile() -> Result<Profile, String> {
             .unwrap_or(0),
         tier,
     })
+}
+
+#[derive(Debug, Clone)]
+pub struct ProfileInput {
+    pub name: String,
+    pub age: i64,
+    pub gender: String,
+    pub height_cm: i64,
+    pub weight_kg: i64,
+    pub goal: String,
+    pub place: String,
+    pub experience: String,
+    pub diet: String,
+    pub days_per_week: i64,
+    pub budget_per_day: i64,
+}
+
+pub fn save_profile(input: &ProfileInput) -> Result<Profile, String> {
+    let body = serde_json::json!({
+        "name": input.name,
+        "age": input.age,
+        "gender": input.gender,
+        "heightCm": input.height_cm,
+        "weightKg": input.weight_kg,
+        "goal": input.goal,
+        "place": input.place,
+        "experience": input.experience,
+        "diet": input.diet,
+        "daysPerWeek": input.days_per_week,
+        "budgetPerDay": input.budget_per_day,
+        "healthConditions": [],
+    });
+    let response = authorized_request("PUT", "/v1/user/profile", Some(body))?;
+    let value: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse saved profile: {error}"))?;
+    Ok(profile_from_value(value, fetch_tier()))
+}
+
+fn fetch_tier() -> String {
+    match authorized_get("/v1/user/subscription")
+        .ok()
+        .and_then(|response| response.into_json::<serde_json::Value>().ok())
+    {
+        Some(value) => value
+            .get("data")
+            .and_then(|data| data.get("subscription"))
+            .and_then(|subscription| subscription.get("tier"))
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("free")
+            .to_string(),
+        None => "free".to_string(),
+    }
+}
+
+fn profile_from_value(value: serde_json::Value, tier: String) -> Profile {
+    let data = value.get("data").cloned().unwrap_or_default();
+    let user = data.get("user").cloned().unwrap_or_default();
+    let profile = data.get("profile").cloned().unwrap_or_default();
+
+    Profile {
+        name: user
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("Friend")
+            .to_string(),
+        email: user
+            .get("email")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        age: profile
+            .get("age")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        gender: profile
+            .get("gender")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("male")
+            .to_string(),
+        height_cm: profile
+            .get("heightCm")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        weight_kg: profile
+            .get("weightKg")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        goal: profile
+            .get("goal")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        diet: profile
+            .get("diet")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        place: profile
+            .get("place")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        experience: profile
+            .get("experience")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("")
+            .to_string(),
+        days_per_week: profile
+            .get("daysPerWeek")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        budget_per_day: profile
+            .get("budgetPerDay")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        tier,
+    }
 }
