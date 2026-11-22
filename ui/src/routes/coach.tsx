@@ -48,43 +48,6 @@ const STARTERS = [
   "Is my workout plan good?",
 ];
 
-function buildSystemPrompt(p: Record<string, any> | undefined): string {
-  if (!p) return "User has not completed onboarding yet.";
-  const h = p.healthConditions?.length
-    ? `- Health conditions: ${p.healthConditions.join(", ")}`
-    : "";
-  return `User profile:
-- Name: ${p.name ?? "Friend"}
-- Age: ${p.age}, Gender: ${p.gender}
-- Height: ${p.heightCm} cm, Weight: ${p.weightKg} kg
-- Goal: ${p.goal}, Experience: ${p.experience}
-- Trains: ${p.place} (${p.daysPerWeek} days/week)
-- Diet: ${p.diet}, Food budget: ₹${p.budgetPerDay}/day
-${h}
-- Daily targets: ${p.calories} kcal, ${p.protein} g protein`;
-}
-
-function buildChatMessages(
-  messages: Msg[],
-  profile: Record<string, any> | undefined,
-): { role: string; content: string }[] {
-  const system = `You are FitMentor, a warm, no-nonsense AI fitness coach for Indian gym beginners and students.
-Rules:
-- Be concise. Use short paragraphs and bullet points. Never write essays.
-- Use simple words. No fitness jargon unless you explain it.
-- Suggest affordable Indian foods (dal, eggs, paneer, soya, milk, chicken, rice, roti).
-- Default currency: INR. Default units: kg, cm, ml.
-- Never recommend extreme diets or unsafe lifts. Suggest seeing a doctor for medical issues.
-- Don't push supplements. Whey is optional, not required.
-- Always end with one clear next step the user can do today.
-
-${buildSystemPrompt(profile)}`;
-  return [
-    { role: "system", content: system },
-    ...messages.map((m) => ({ role: m.role, content: m.content })),
-  ];
-}
-
 function Coach() {
   const ask = useServerFn(askCoach);
   const genTitle = useServerFn(generateChatTitle);

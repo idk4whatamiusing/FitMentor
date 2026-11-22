@@ -4,6 +4,19 @@ The native FitMentor client: Rust + Slint, one codebase for **desktop**
 (macOS/Linux/Windows) and **Android**. Both targets share the same UI, API
 client, auth flow, and persistence.
 
+## Design system
+
+The native UI and the web app share one editorial system: cream paper by
+default, ink in dark mode, and a single signal-orange accent. Tokens live in
+`ui/theme.slint`, shared components in `ui/components.slint`, photography in
+`ui/images/`, and the Onest/Michroma fonts in `ui/fonts/` (SIL OFL). Sources
+and licenses are listed in [`ASSETS.md`](../../ASSETS.md).
+
+The theme follows the system on first launch and is persisted next to the
+token. For previews, `FITMENTOR_THEME=light|dark` overrides it and
+`FITMENTOR_TAB=0..5` opens a specific tab (Today, Food, Train, Coach, You,
+Feed).
+
 ## Desktop
 
 ```bash

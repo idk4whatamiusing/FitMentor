@@ -39,7 +39,10 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     if let Ok(theme) = env::var("FITMENTOR_THEME") {
         ui.set_dark_mode(theme.eq_ignore_ascii_case("dark"));
     }
-    if env::var("FITMENTOR_ONBOARDING").map(|v| v == "1").unwrap_or(false) {
+    if env::var("FITMENTOR_ONBOARDING")
+        .map(|v| v == "1")
+        .unwrap_or(false)
+    {
         ui.set_signed_in(true);
         ui.set_needs_onboarding(true);
     }
