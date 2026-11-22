@@ -44,6 +44,10 @@ dist-ssr
 android/
 capacitor.config.*
 
+# Native app Android resources are source, not generated.
+!apps/native/android/
+!apps/native/android/**
+
 # Rust / Workers
 api/target/
 api/build/

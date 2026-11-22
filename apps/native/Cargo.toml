@@ -24,7 +24,12 @@ slint-build = "1.19.0"
 
 [package.metadata.android]
 package = "ai.fitmentor.app"
+resources = "android/res"
+apk_name = "FitMentor"
+
+[package.metadata.android.application]
 label = "FitMentor"
+icon = "@mipmap/ic_launcher"
 
 [[package.metadata.android.application.activity]]
 name = "android.app.NativeActivity"

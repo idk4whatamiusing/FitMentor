@@ -74,6 +74,29 @@ pub fn load_token() -> Option<String> {
         .filter(|token| !token.is_empty())
 }
 
+fn theme_path() -> Option<PathBuf> {
+    storage_dir().map(|dir| dir.join("theme"))
+}
+
+pub fn load_theme_dark() -> Option<bool> {
+    let path = theme_path()?;
+    match fs::read_to_string(path).ok()?.trim() {
+        "dark" => Some(true),
+        "light" => Some(false),
+        _ => None,
+    }
+}
+
+pub fn save_theme_dark(dark: bool) {
+    let Some(path) = theme_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let _ = fs::write(path, if dark { "dark" } else { "light" });
+}
+
 fn token() -> Option<String> {
     token_cell().lock().ok().and_then(|slot| slot.clone())
 }

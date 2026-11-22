@@ -33,6 +33,23 @@ fn finish_google_error(handle: &slint::Weak<AppWindow>, message: &str) {
 
 pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     let ui = AppWindow::new()?;
+    if let Some(dark) = api::load_theme_dark() {
+        ui.set_dark_mode(dark);
+    }
+    if let Ok(theme) = env::var("FITMENTOR_THEME") {
+        ui.set_dark_mode(theme.eq_ignore_ascii_case("dark"));
+    }
+    if env::var("FITMENTOR_ONBOARDING").map(|v| v == "1").unwrap_or(false) {
+        ui.set_signed_in(true);
+        ui.set_needs_onboarding(true);
+    }
+    if let Ok(tab) = env::var("FITMENTOR_TAB") {
+        if let Ok(tab) = tab.parse::<i32>() {
+            if (0..=5).contains(&tab) {
+                ui.set_tab(tab);
+            }
+        }
+    }
     ui.set_user_name(
         env::var("FITMENTOR_USER_NAME")
             .unwrap_or_else(|_| "Friend".into())
@@ -124,6 +141,15 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     ui.on_add_protein(move || {
         if let Some(ui) = handle.upgrade() {
             ui.set_protein(ui.get_protein() + 10);
+        }
+    });
+
+    let handle = ui.as_weak();
+    ui.on_toggle_theme(move || {
+        if let Some(ui) = handle.upgrade() {
+            let next = !ui.get_dark_mode();
+            ui.set_dark_mode(next);
+            api::save_theme_dark(next);
         }
     });
 

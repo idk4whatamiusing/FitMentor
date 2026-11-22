@@ -1,0 +1,27 @@
+// FitMentor native design tokens.
+//
+// Cream paper by default, ink in dark mode, one signal orange. Michroma is
+// reserved for the wordmark; Onest carries everything else.
+
+import "fonts/Onest.ttf";
+import "fonts/Michroma-Regular.ttf";
+
+import { Palette } from "std-widgets.slint";
+
+export global Theme {
+    in-out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
+
+    out property <color> bg: dark ? #0B0B0B : #F7F3ED;
+    out property <color> surface: dark ? #171717 : #FFFFFF;
+    out property <color> surface-2: dark ? #232323 : #F3E4D2;
+    out property <color> text: dark ? #F7F3ED : #0B0B0B;
+    out property <color> muted: dark ? #ADADAD : #6B6B6B;
+    out property <color> line: dark ? rgba(247, 243, 237, 0.14) : rgba(11, 11, 11, 0.12);
+    out property <color> accent: #FF6C04;
+    out property <color> accent-soft: dark ? rgba(255, 108, 4, 0.16) : rgba(255, 108, 4, 0.10);
+    out property <color> ink: #0B0B0B;
+    out property <color> cream: #F7F3ED;
+
+    out property <string> font-body: "Onest";
+    out property <string> font-wordmark: "Michroma";
+}
