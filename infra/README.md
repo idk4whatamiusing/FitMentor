@@ -116,8 +116,11 @@ namespace.
 
 - `JWT_SECRET` signs the mobile JWTs (30-day TTL, `JWT_TTL_DAYS`).
 - `GOOGLE_CLIENT_IDS` is a comma-separated allow-list of Google OAuth client
-  IDs accepted by `POST /v1/auth/google`.
-- `GOOGLE_CLIENT_SECRET` is used only by `POST /v1/auth/google/device` to
-  complete the device-code token exchange. It never ships in the APK.
-- The Slint APK build uses `FITMENTOR_GOOGLE_CLIENT_ID` for the device flow.
-  Use the same client ID (type: TVs and Limited Input devices) for both values.
+  IDs accepted by `POST /v1/auth/google`. It should include the web client ID.
+- `GOOGLE_WEB_CLIENT_ID` / `GOOGLE_WEB_CLIENT_SECRET` drive the Slint browser
+  redirect flow (`/v1/auth/google/start`, `/v1/auth/google/callback`,
+  `/v1/auth/google/poll`). The client must be a **Web application** OAuth client
+  with `GOOGLE_WEB_REDIRECT_URI` registered as an authorized redirect URI.
+- `GOOGLE_CLIENT_SECRET` is kept for the legacy device-code flow
+  (`POST /v1/auth/google/device`). Neither secret ships in the APK.
+

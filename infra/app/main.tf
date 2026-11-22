@@ -99,6 +99,22 @@ variable "google_client_secret" {
   default   = ""
 }
 
+variable "google_web_client_id" {
+  type    = string
+  default = ""
+}
+
+variable "google_web_client_secret" {
+  type      = string
+  sensitive = true
+  default   = ""
+}
+
+variable "google_web_redirect_uri" {
+  type    = string
+  default = "https://vfvwjpw567ghnqwknc2m74thx40jmpiw.lambda-url.ap-south-1.on.aws/v1/auth/google/callback"
+}
+
 variable "ai_worker_url" {
   type    = string
   default = "https://fitmentor-ey9.pages.dev/api/ai/complete"
@@ -139,6 +155,9 @@ locals {
     JWT_TTL_DAYS             = tostring(var.jwt_ttl_days)
     GOOGLE_CLIENT_IDS        = var.google_client_ids
     GOOGLE_CLIENT_SECRET     = var.google_client_secret
+    GOOGLE_WEB_CLIENT_ID     = var.google_web_client_id
+    GOOGLE_WEB_CLIENT_SECRET = var.google_web_client_secret
+    GOOGLE_WEB_REDIRECT_URI  = var.google_web_redirect_uri
     GOOGLE_TOKENINFO_URL     = "https://oauth2.googleapis.com/tokeninfo"
   }
 }

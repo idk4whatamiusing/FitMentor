@@ -59,13 +59,11 @@ jobs:
         env:
           CARGO_APK_RELEASE_KEYSTORE: ${{ runner.temp }}/fitmentor-release.p12
           CARGO_APK_RELEASE_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          FITMENTOR_GOOGLE_CLIENT_ID: ${{ secrets.FITMENTOR_GOOGLE_CLIENT_ID }}
         run: cargo apk2 build --target aarch64-linux-android --lib --release
 
       - name: Build APK (debug-signed fallback)
         if: env.HAS_RELEASE_KEYSTORE == 'false'
         env:
-          FITMENTOR_GOOGLE_CLIENT_ID: ${{ secrets.FITMENTOR_GOOGLE_CLIENT_ID }}
         run: cargo apk2 build --target aarch64-linux-android --lib
 
       - name: Upload release APK

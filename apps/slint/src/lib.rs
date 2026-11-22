@@ -750,48 +750,44 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
         }
         ui.set_google_busy(true);
         ui.set_auth_error("".into());
-        ui.set_auth_status("Starting Google sign-in...".into());
+        ui.set_auth_status("Opening Google...".into());
         let handle = handle.clone();
         std::thread::spawn(move || {
-            let client_id = api::google_client_id();
-            if client_id.is_empty() {
-                finish_google_error(
-                    &handle,
-                    "Google Sign-In is not configured. Set FITMENTOR_GOOGLE_CLIENT_ID.",
-                );
-                return;
-            }
-            let device = match api::device_start(&client_id) {
-                Ok(device) => device,
+            let started = match api::start_google_login() {
+                Ok(started) => started,
                 Err(error) => {
                     finish_google_error(&handle, &error);
                     return;
                 }
             };
+            if let Err(error) = webbrowser::open(&started.auth_url) {
+                finish_google_error(
+                    &handle,
+                    &format!("Could not open your browser to sign in: {error}"),
+                );
+                return;
+            }
 
             let ui_handle = handle.clone();
-            let code = device.user_code.clone();
-            let url = device.verification_url.clone();
             slint::invoke_from_event_loop(move || {
                 if let Some(ui) = ui_handle.upgrade() {
-                    ui.set_device_user_code(code.into());
-                    ui.set_device_url(url.into());
-                    ui.set_auth_status("Approve the code in your browser...".into());
+                    ui.set_auth_status(
+                        "Finish signing in with Google in your browser, then come back...".into(),
+                    );
                 }
             })
             .ok();
 
-            let interval = device.interval.max(5) as u64;
-            let deadline = Instant::now() + Duration::from_secs(device.expires_in.max(60) as u64);
+            let deadline = Instant::now() + Duration::from_secs(600);
             loop {
                 if Instant::now() > deadline {
                     finish_google_error(&handle, "Google sign-in timed out.");
                     return;
                 }
-                std::thread::sleep(Duration::from_secs(interval));
-                match api::device_poll(&device.device_code) {
-                    Ok(api::DevicePoll::Pending) => {}
-                    Ok(api::DevicePoll::Authorized { token, name }) => {
+                std::thread::sleep(Duration::from_secs(2));
+                match api::poll_google_login(&started.state) {
+                    Ok(api::GooglePoll::Pending) => {}
+                    Ok(api::GooglePoll::Ok { token, name }) => {
                         api::set_token(Some(token));
                         let ui_handle = handle.clone();
                         slint::invoke_from_event_loop(move || {
@@ -800,14 +796,23 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                                 ui.set_user_name(name.into());
                                 ui.set_status_text("Signed in with Google".into());
                                 ui.set_google_busy(false);
-                                ui.set_device_user_code("".into());
-                                ui.set_device_url("".into());
                                 ui.set_auth_status("".into());
                                 ui.invoke_refresh();
                                 ui.invoke_load_profile();
                             }
                         })
                         .ok();
+                        return;
+                    }
+                    Ok(api::GooglePoll::Error(message)) => {
+                        finish_google_error(&handle, &message);
+                        return;
+                    }
+                    Ok(api::GooglePoll::Expired) => {
+                        finish_google_error(
+                            &handle,
+                            "This Google sign-in expired. Please try again.",
+                        );
                         return;
                     }
                     Err(error) => {

@@ -50,6 +50,9 @@ pub fn router(state: AppState) -> Router {
         // mobile auth
         .route("/v1/auth/google", post(auth_api::google))
         .route("/v1/auth/google/device", post(auth_api::google_device))
+        .route("/v1/auth/google/start", post(auth_api::google_start))
+        .route("/v1/auth/google/callback", get(auth_api::google_callback))
+        .route("/v1/auth/google/poll", post(auth_api::google_poll))
         .route("/v1/auth/me", get(auth_api::me))
         // user
         .route("/v1/user/me", get(user::get_me))

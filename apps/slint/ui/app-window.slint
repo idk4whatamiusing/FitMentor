@@ -224,8 +224,6 @@ export component AppWindow inherits Window {
     in-out property <string> auth-token: "";
     in-out property <string> auth-error: "";
     in-out property <bool> google-busy: false;
-    in-out property <string> device-user-code: "";
-    in-out property <string> device-url: "";
     in-out property <string> auth-status: "";
     in-out property <string> profile-name: "Friend";
     in-out property <string> profile-email: "";
@@ -1109,43 +1107,16 @@ export component AppWindow inherits Window {
                 font-weight: 700;
             }
             Text {
-                text: "Sign in with Google on this device, or paste a mobile token if you already have one.";
+                text: "Sign in with Google in your browser. You'll come back here when you're done.";
                 color: #94a3b8;
                 font-size: 13px;
                 wrap: word-wrap;
             }
 
             QuickButton {
-                label: root.google-busy ? "Waiting for Google..." : "Sign in with Google";
+                label: root.google-busy ? "Waiting for Google..." : "Continue with Google";
                 clicked => {
                     root.google-sign-in();
-                }
-            }
-
-            if root.device-user-code != "" : VerticalLayout {
-                spacing: 4px;
-                Text {
-                    text: "Open this link on any device:";
-                    color: #94a3b8;
-                    font-size: 12px;
-                }
-                Text {
-                    text: root.device-url;
-                    color: #7dd3fc;
-                    font-size: 13px;
-                    wrap: word-wrap;
-                }
-                Text {
-                    text: root.device-user-code;
-                    color: #f8fafc;
-                    font-size: 30px;
-                    font-weight: 700;
-                    horizontal-alignment: center;
-                }
-                Text {
-                    text: "Then approve the code in your browser.";
-                    color: #94a3b8;
-                    font-size: 12px;
                 }
             }
 

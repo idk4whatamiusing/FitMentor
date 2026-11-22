@@ -196,78 +196,81 @@ pub fn fetch_me(token: &str) -> Result<User, String> {
     })
 }
 
-// ── Google device sign-in ───────────────────────────────────────────
+// ── Google browser sign-in ─────────────────────────────────────────
 
-const DEVICE_CODE_URL: &str = "https://oauth2.googleapis.com/device/code";
-
-#[derive(Debug, Deserialize)]
-pub struct DeviceAuth {
-    pub device_code: String,
-    pub user_code: String,
-    #[serde(alias = "verification_uri")]
-    pub verification_url: String,
-    pub expires_in: i64,
-    pub interval: i64,
-}
-
-const DEFAULT_GOOGLE_CLIENT_ID: &str =
-    "102580553542-gr1sndbs9ki33jq9m3u2902gthecket2.apps.googleusercontent.com";
-
-pub fn google_client_id() -> String {
-    let runtime = env::var("FITMENTOR_GOOGLE_CLIENT_ID").unwrap_or_default();
-    if !runtime.trim().is_empty() {
-        return runtime.trim().to_string();
-    }
-    let baked = option_env!("FITMENTOR_GOOGLE_CLIENT_ID").unwrap_or("");
-    if !baked.trim().is_empty() {
-        baked.trim().to_string()
-    } else {
-        DEFAULT_GOOGLE_CLIENT_ID.to_string()
-    }
-}
-
-pub fn device_start(client_id: &str) -> Result<DeviceAuth, String> {
-    let response = ureq::post(DEVICE_CODE_URL)
-        .send_form(&[("client_id", client_id), ("scope", "openid email profile")])
-        .map_err(|error| format!("Could not start Google sign-in: {error}"))?;
-    response
-        .into_json()
-        .map_err(|error| format!("Could not parse Google device code: {error}"))
+#[derive(Debug, Clone)]
+pub struct GoogleStart {
+    pub state: String,
+    pub auth_url: String,
 }
 
 #[derive(Debug, Clone)]
-pub enum DevicePoll {
+pub enum GooglePoll {
     Pending,
-    Authorized { token: String, name: String },
+    Ok { token: String, name: String },
+    Error(String),
+    Expired,
 }
 
-pub fn device_poll(device_code: &str) -> Result<DevicePoll, String> {
-    let body = serde_json::json!({ "device_code": device_code });
-    let response = ureq::post(&format!("{}/v1/auth/google/device", base_url()))
-        .send_json(body)
-        .map_err(|error| format!("Google sign-in failed: {error}"))?;
+pub fn start_google_login() -> Result<GoogleStart, String> {
+    let state = uuid::Uuid::new_v4().simple().to_string();
+    let response = ureq::post(&format!("{}/v1/auth/google/start", base_url()))
+        .send_json(serde_json::json!({ "state": state }))
+        .map_err(|error| format!("Could not start Google sign-in: {error}"))?;
     let value: serde_json::Value = response
         .into_json()
         .map_err(|error| format!("Could not parse Google sign-in: {error}"))?;
-    let status = value
+    let state = value
+        .get("state")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "Google sign-in did not return a state".to_string())?;
+    let auth_url = value
+        .get("auth_url")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "Google sign-in did not return a URL".to_string())?;
+    Ok(GoogleStart {
+        state: state.to_string(),
+        auth_url: auth_url.to_string(),
+    })
+}
+
+pub fn poll_google_login(state: &str) -> Result<GooglePoll, String> {
+    let response = ureq::post(&format!("{}/v1/auth/google/poll", base_url()))
+        .send_json(serde_json::json!({ "state": state }))
+        .map_err(|error| format!("Could not check Google sign-in: {error}"))?;
+    let value: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse Google sign-in: {error}"))?;
+    match value
         .get("status")
         .and_then(serde_json::Value::as_str)
-        .unwrap_or("");
-    if status == "pending" {
-        return Ok(DevicePoll::Pending);
+        .unwrap_or("")
+    {
+        "pending" => Ok(GooglePoll::Pending),
+        "ok" => {
+            let token = value
+                .get("token")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "Google sign-in did not return a token".to_string())?
+                .to_string();
+            let name = value
+                .get("user")
+                .and_then(|user| user.get("name"))
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("Friend")
+                .to_string();
+            Ok(GooglePoll::Ok { token, name })
+        }
+        "error" => Ok(GooglePoll::Error(
+            value
+                .get("message")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("Sign-in failed")
+                .to_string(),
+        )),
+        "expired" => Ok(GooglePoll::Expired),
+        other => Err(format!("Unexpected sign-in status: {other}")),
     }
-    let token = value
-        .get("token")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| "Google sign-in did not return a token".to_string())?
-        .to_string();
-    let name = value
-        .get("user")
-        .and_then(|user| user.get("name"))
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("Friend")
-        .to_string();
-    Ok(DevicePoll::Authorized { token, name })
 }
 
 // ── Profile / subscription ─────────────────────────────────────────

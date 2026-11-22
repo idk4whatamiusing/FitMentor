@@ -55,20 +55,28 @@ The APK is written to `target/release/apk/`. The GitHub workflow is
 - Persist quick-log changes to the API.
 - Wire Polar checkout to open in the system browser and refresh the tier.
 
-## Google device sign-in
+## Sign in with Google
 
-1. Google Cloud Console -> APIs & Services -> Credentials -> Create OAuth
-   client ID -> application type **TVs and Limited Input devices**.
-2. Set the same client ID in two places:
-   - `FITMENTOR_GOOGLE_CLIENT_ID` for the Slint build (GitHub secret or local env).
-   - `GOOGLE_CLIENT_IDS` for the API/Terraform (GitHub secret).
-3. Tap **Sign in with Google** in the app, open the displayed URL on any device,
-   and enter the code.
-4. The app polls `/v1/auth/google/device`; the Lambda performs the Google
-   token exchange with the client secret and returns the FitMentor JWT.
+The app uses the browser redirect flow, the same consent screen as the web app:
 
-Without a client ID the app falls back to the paste-a-token flow. Tokens can be
-minted locally with:
+1. Tap **Continue with Google**. The app calls `POST /v1/auth/google/start` and
+   opens the returned URL in the system browser.
+2. Sign in with Google. The browser returns to the Lambda callback
+   (`/v1/auth/google/callback`), which exchanges the code and stores the
+   FitMentor JWT against the login state.
+3. The app polls `POST /v1/auth/google/poll` every two seconds and signs in
+   when the callback completes.
+
+No Google client ID or secret ships in the APK. The Lambda holds
+`GOOGLE_WEB_CLIENT_ID` and `GOOGLE_WEB_CLIENT_SECRET`; the redirect URI is
+`GOOGLE_WEB_REDIRECT_URI` and must be registered on that OAuth client
+(**Web application** type) in Google Cloud Console.
+
+The legacy device-code endpoint (`POST /v1/auth/google/device`) remains on the
+API for TVs/limited-input clients, but the app no longer uses it.
+
+Without a configured web client the app falls back to the paste-a-token flow.
+Tokens can be minted locally with:
 
 ```bash
 cd api

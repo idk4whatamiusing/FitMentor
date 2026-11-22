@@ -19,6 +19,9 @@ pub struct Config {
     pub jwt_ttl_days: i64,
     pub google_client_ids: Vec<String>,
     pub google_client_secret: String,
+    pub google_web_client_id: String,
+    pub google_web_client_secret: String,
+    pub google_web_redirect_uri: String,
     pub google_tokeninfo_url: String,
 }
 
@@ -26,6 +29,21 @@ impl Config {
     pub fn from_env() -> Result<Self, String> {
         let database_url =
             env::var("DATABASE_URL").map_err(|_| "DATABASE_URL is not set".to_string())?;
+
+        let google_web_client_id = env::var("GOOGLE_WEB_CLIENT_ID").unwrap_or_default();
+        let mut google_client_ids: Vec<String> = env::var("GOOGLE_CLIENT_IDS")
+            .or_else(|_| env::var("GOOGLE_CLIENT_ID"))
+            .unwrap_or_default()
+            .split(',')
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+            .collect();
+        let web_id = google_web_client_id.trim();
+        if !web_id.is_empty() && !google_client_ids.iter().any(|id| id == web_id) {
+            google_client_ids.push(web_id.to_string());
+        }
+
         Ok(Self {
             database_url,
             api_shared_secret: env::var("API_SHARED_SECRET").unwrap_or_default(),
@@ -45,15 +63,14 @@ impl Config {
                 .ok()
                 .and_then(|value| value.parse().ok())
                 .unwrap_or(30),
-            google_client_ids: env::var("GOOGLE_CLIENT_IDS")
-                .or_else(|_| env::var("GOOGLE_CLIENT_ID"))
-                .unwrap_or_default()
-                .split(',')
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .map(ToOwned::to_owned)
-                .collect(),
+            google_client_ids,
             google_client_secret: env::var("GOOGLE_CLIENT_SECRET").unwrap_or_default(),
+            google_web_client_id: google_web_client_id.trim().to_string(),
+            google_web_client_secret: env::var("GOOGLE_WEB_CLIENT_SECRET").unwrap_or_default(),
+            google_web_redirect_uri: env::var("GOOGLE_WEB_REDIRECT_URI").unwrap_or_else(|_| {
+                "https://vfvwjpw567ghnqwknc2m74thx40jmpiw.lambda-url.ap-south-1.on.aws/v1/auth/google/callback"
+                    .to_string()
+            }),
             google_tokeninfo_url: env::var("GOOGLE_TOKENINFO_URL")
                 .unwrap_or_else(|_| "https://oauth2.googleapis.com/tokeninfo".to_string()),
         })
