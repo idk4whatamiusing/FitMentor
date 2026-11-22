@@ -1,46 +1,53 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useCallback } from "react";
 import { MobileShell } from "@/components/MobileShell";
-import { loadProfile, useProfile, calcTargets, type Profile } from "@/utils/profile";
+import { loadProfile, useProfile, calcTargets } from "@/utils/profile";
 import { useAuth } from "@/utils/auth";
 import { loadLogs, saveLog, todayKey, last7, type DailyLog } from "@/utils/habits";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/utils/cn";
 import { proxyToolAdvice } from "@/services/api-proxy";
 import {
-  Scale,
-  Moon,
-  Footprints,
-  HeartPulse,
-  Pill,
+  Ban,
+  Bell,
   CalendarDays,
-  Users,
-  TrendingUp,
-  TrendingDown,
+  Flag,
+  Footprints,
+  Heart,
+  HeartPulse,
+  Loader,
+  MessageCircle,
+  Moon,
+  MoreHorizontal,
+  Pill,
+  Repeat2,
+  Scale,
+  Search,
+  Send,
   Shapes,
   Sparkles,
-  Loader,
-  Dumbbell,
-  Bell,
-  Search,
-  Heart,
-  MessageCircle,
-  Repeat2,
-  MoreHorizontal,
-  Send,
   Trash2,
-  Flag,
-  Ban,
+  TrendingDown,
+  TrendingUp,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader, Pill as EditorialPill, ProgressBar, SectionLabel } from "@/components/editorial";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/tools")({
-  head: () => ({ meta: [{ title: "AI Tools — FitMentor" }] }),
+  head: () => ({ meta: [{ title: "Tools — FitMentor" }] }),
   component: ToolsPage,
 });
 
-type ToolTab = "bmi" | "sleep" | "steps" | "injury" | "supplements" | "calories" | "community" | "form";
+type ToolTab =
+  | "bmi"
+  | "sleep"
+  | "steps"
+  | "injury"
+  | "supplements"
+  | "calories"
+  | "community"
+  | "form";
 
 const TOOLS: { id: ToolTab; label: string; icon: typeof Scale }[] = [
   { id: "bmi", label: "BMI", icon: Scale },
@@ -49,8 +56,8 @@ const TOOLS: { id: ToolTab; label: string; icon: typeof Scale }[] = [
   { id: "injury", label: "Injury", icon: HeartPulse },
   { id: "supplements", label: "Supplements", icon: Pill },
   { id: "calories", label: "Calories", icon: CalendarDays },
-  { id: "community", label: "Community", icon: Users },
   { id: "form", label: "Form", icon: Shapes },
+  { id: "community", label: "Community", icon: Users },
 ];
 
 function ToolsPage() {
@@ -58,15 +65,20 @@ function ToolsPage() {
   useProfile();
 
   return (
-    <MobileShell>
-      <div className="px-4 pt-14 pb-4">
-        <h1 className="text-2xl font-bold">AI Tools</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Smart tools to level up your fitness journey
-        </p>
-      </div>
-      <div className="sticky top-0 z-10 bg-background/90 backdrop-blur-xl">
-        <div className="flex gap-1 overflow-x-auto px-4 pb-2 scrollbar-none">
+    <MobileShell wide>
+      <div className="px-5 pt-8 lg:px-8 lg:pt-12">
+        <PageHeader
+          label="Tools"
+          title={
+            <>
+              Check the <span className="text-orange">numbers.</span>
+            </>
+          }
+          description="Fast calculators, recovery checks, and the community — all in one place."
+          action={<EditorialPill>{TOOLS.length} tools</EditorialPill>}
+        />
+
+        <div className="mt-8 flex gap-2 overflow-x-auto pb-2 lg:hidden">
           {TOOLS.map((t) => {
             const Icon = t.icon;
             return (
@@ -74,10 +86,10 @@ function ToolsPage() {
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 className={cn(
-                  "flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
+                  "flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition-colors",
                   tab === t.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:text-foreground",
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-border text-muted-foreground hover:text-foreground",
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -86,18 +98,105 @@ function ToolsPage() {
             );
           })}
         </div>
-      </div>
-      <div className="px-4 pb-8">
-        {tab === "bmi" && <BMIAnalyzer />}
-        {tab === "sleep" && <SleepTracker />}
-        {tab === "steps" && <StepsTracker />}
-        {tab === "injury" && <InjuryAssessment />}
-        {tab === "supplements" && <SupplementGuide />}
-        {tab === "calories" && <CalorieTimeline />}
-        {tab === "community" && <CommunityFeed />}
-        {tab === "form" && <FormAnalyzer />}
+
+        <div className="mt-6 grid gap-6 pb-6 lg:grid-cols-[0.3fr_0.7fr]">
+          <aside className="hidden lg:block">
+            <div className="sticky top-24 space-y-1 rounded-[1.75rem] border border-border bg-card p-3">
+              {TOOLS.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition-colors",
+                      tab === t.id
+                        ? "bg-foreground text-background"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                    )}
+                  >
+                    <Icon className={cn("h-4 w-4", tab === t.id ? "text-orange" : "")} />
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+
+          <div className="min-w-0">
+            {tab === "bmi" && <BMIAnalyzer />}
+            {tab === "sleep" && <SleepTracker />}
+            {tab === "steps" && <StepsTracker />}
+            {tab === "injury" && <InjuryAssessment />}
+            {tab === "supplements" && <SupplementGuide />}
+            {tab === "calories" && <CalorieTimeline />}
+            {tab === "community" && <CommunityFeed />}
+            {tab === "form" && <FormAnalyzer />}
+          </div>
+        </div>
       </div>
     </MobileShell>
+  );
+}
+
+function ToolShell({
+  eyebrow,
+  title,
+  description,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-[2rem] border border-border bg-card p-6 lg:p-8">
+      <SectionLabel index={eyebrow}>{title}</SectionLabel>
+      <h2 className="mt-3 text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">{title}</h2>
+      {description ? (
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">{description}</p>
+      ) : null}
+      <div className="mt-7">{children}</div>
+    </section>
+  );
+}
+
+function AdviceBox({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <div className="mt-4 whitespace-pre-wrap rounded-2xl border border-border bg-background p-5 text-sm leading-relaxed">
+      {text}
+    </div>
+  );
+}
+
+function AIButton({
+  loading,
+  onClick,
+  children,
+}: {
+  loading: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Button variant="outline" className="mt-4" onClick={onClick} disabled={loading}>
+      {loading ? <Loader className="animate-spin" /> : <Sparkles className="text-orange" />}
+      {loading ? "Thinking…" : children}
+    </Button>
+  );
+}
+
+function BigNumber({ label, value, unit }: { label: string; value: string; unit?: string }) {
+  return (
+    <div className="border-t border-border pt-4">
+      <p className="label-micro text-muted-foreground">{label}</p>
+      <p className="mt-2 text-4xl font-medium tabular-nums tracking-tight">
+        {value}
+        {unit ? <span className="ml-1 text-xs font-normal text-muted-foreground">{unit}</span> : null}
+      </p>
+    </div>
   );
 }
 
@@ -120,21 +219,15 @@ function BMIAnalyzer() {
   const showResult = weight && height && Number(weight) > 0 && Number(height) > 0;
   const category =
     bmi < 18.5 ? "Underweight" : bmi < 25 ? "Normal" : bmi < 30 ? "Overweight" : "Obese";
-  const color =
-    bmi < 18.5
-      ? "text-blue-400"
-      : bmi < 25
-        ? "text-green-400"
-        : bmi < 30
-          ? "text-orange-400"
-          : "text-red-400";
 
   const getAiRecommendations = async () => {
     setLoading(true);
     try {
       const data = await proxyToolAdvice({ data: { path: "/v1/tools/bmi-advice" } });
       const tips = data.tips;
-      setAiTips(tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.");
+      setAiTips(
+        tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.",
+      );
     } catch {
       setAiTips("Failed to get AI recommendations. Try again.");
     }
@@ -142,89 +235,71 @@ function BMIAnalyzer() {
   };
 
   return (
-    <div className="space-y-5 pt-4">
-      <div className="rounded-2xl border border-border/60 bg-card p-5">
-        <h2 className="flex items-center gap-2 text-lg font-bold">
-          <Scale className="h-5 w-5 text-primary" /> BMI Calculator
-        </h2>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div>
-            <p className="text-xs text-muted-foreground">Weight (kg)</p>
+    <ToolShell
+      eyebrow="01"
+      title="BMI analyzer"
+      description="Body mass index is a rough screen, not a verdict. Use it with the mirror and the bar."
+    >
+      <div className="grid gap-6 sm:grid-cols-2">
+        <label className="block">
+          <span className="label-micro text-muted-foreground">Weight</span>
+          <span className="mt-2 flex items-end gap-2 border-b-2 border-border pb-2 focus-within:border-orange">
             <input
               id="bmi-weight"
               type="number"
               value={weight}
               onChange={(e) => setWeight(e.target.value)}
-              placeholder="e.g. 70"
-              className="mt-1 w-full rounded-xl border border-border/60 bg-background p-3 text-lg font-bold outline-none"
+              placeholder="70"
+              className="w-full bg-transparent text-3xl font-medium tabular-nums outline-none"
             />
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Height (cm)</p>
+            <span className="pb-1 text-xs text-muted-foreground">kg</span>
+          </span>
+        </label>
+        <label className="block">
+          <span className="label-micro text-muted-foreground">Height</span>
+          <span className="mt-2 flex items-end gap-2 border-b-2 border-border pb-2 focus-within:border-orange">
             <input
               id="bmi-height"
               type="number"
               value={height}
               onChange={(e) => setHeight(e.target.value)}
-              placeholder="e.g. 175"
-              className="mt-1 w-full rounded-xl border border-border/60 bg-background p-3 text-lg font-bold outline-none"
+              placeholder="175"
+              className="w-full bg-transparent text-3xl font-medium tabular-nums outline-none"
             />
-          </div>
-        </div>
-        {showResult && (
-          <div className="mt-4 rounded-xl bg-background p-4 text-center">
-            <p className="text-xs text-muted-foreground">Your BMI</p>
-            <p className={cn("text-4xl font-black", color)}>{bmi.toFixed(1)}</p>
-            <p className={cn("mt-1 text-sm font-semibold", color)}>{category}</p>
-          </div>
-        )}
-        {showResult && (
-        <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-          {bmi < 18.5 && (
-            <p>
-              • You're in the underweight range. Consider a calorie surplus with strength training.
-            </p>
-          )}
-          {bmi >= 18.5 && bmi < 25 && (
-            <p>
-              • You're in the healthy range. Great work! Focus on body recomposition or maintenance.
-            </p>
-          )}
-          {bmi >= 25 && bmi < 30 && (
-            <p>
-              • You're in the overweight range. A moderate calorie deficit + regular training can
-              help.
-            </p>
-          )}
-          {bmi >= 30 && (
-            <p>
-              • You're in the obese range. Consult a doctor before starting any intense program.
-            </p>
-          )}
-          <p>
-            • BMI doesn't account for muscle mass. Athletes may show higher BMI while being healthy.
-          </p>
-        </div>
-        )}
-        {showResult && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="mt-3 w-full"
-            onClick={getAiRecommendations}
-            disabled={loading}
-          >
-            {loading ? <Loader className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            {loading ? "Thinking..." : "AI Recommendations"}
-          </Button>
-        )}
-        {aiTips && (
-          <div className="mt-3 rounded-xl bg-background p-4 text-sm whitespace-pre-wrap">
-            {aiTips}
-          </div>
-        )}
+            <span className="pb-1 text-xs text-muted-foreground">cm</span>
+          </span>
+        </label>
       </div>
-    </div>
+
+      {showResult ? (
+        <div className="mt-8 grid gap-6 sm:grid-cols-[0.5fr_0.5fr]">
+          <BigNumber label="Your BMI" value={bmi.toFixed(1)} />
+          <div className="border-t border-border pt-4">
+            <p className="label-micro text-muted-foreground">Category</p>
+            <p className="mt-2 text-2xl font-medium text-orange">{category}</p>
+          </div>
+          <div className="text-sm leading-relaxed text-muted-foreground sm:col-span-2">
+            {bmi < 18.5
+              ? "Underweight range. A calorie surplus with strength training is the usual path."
+              : bmi < 25
+                ? "Healthy range. Focus on recomposition or maintenance."
+                : bmi < 30
+                  ? "Overweight range. A moderate deficit plus regular training helps."
+                  : "Obese range. Talk to a doctor before starting an intense program."}
+            <span className="mt-2 block text-xs">
+              BMI doesn't account for muscle mass. Athletes can read high and still be healthy.
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      {showResult ? (
+        <AIButton loading={loading} onClick={getAiRecommendations}>
+          AI recommendations
+        </AIButton>
+      ) : null}
+      <AdviceBox text={aiTips} />
+    </ToolShell>
   );
 }
 
@@ -243,31 +318,23 @@ function SleepTracker() {
   const [loading, setLoading] = useState(false);
 
   const logSleep = () => {
-    const log = { ...today, sleep: sleepVal };
-    saveLog(log);
-    toast.success("Sleep logged!");
+    saveLog({ ...today, sleep: sleepVal });
+    toast.success("Sleep logged");
   };
 
   const avgSleep =
     logs.reduce((s, l) => s + (l.sleep || 0), 0) / logs.filter((l) => l.sleep).length || 0;
   const score = Math.min(100, Math.round((avgSleep / 8) * 100));
-  const status =
-    avgSleep < 6 ? "Poor" : avgSleep < 7.5 ? "Fair" : avgSleep < 9 ? "Good" : "Excellent";
-  const statusColor =
-    avgSleep < 6
-      ? "text-red-400"
-      : avgSleep < 7.5
-        ? "text-orange-400"
-        : avgSleep < 9
-          ? "text-green-400"
-          : "text-blue-400";
+  const status = avgSleep < 6 ? "Poor" : avgSleep < 7.5 ? "Fair" : avgSleep < 9 ? "Good" : "Excellent";
 
   const getSleepTips = async () => {
     setLoading(true);
     try {
       const data = await proxyToolAdvice({ data: { path: "/v1/tools/sleep-advice" } });
       const tips = data.tips;
-      setAiTips(tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.");
+      setAiTips(
+        tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.",
+      );
     } catch {
       setAiTips("Failed to get AI advice. Try again.");
     }
@@ -275,70 +342,71 @@ function SleepTracker() {
   };
 
   return (
-    <div className="space-y-5 pt-4">
-      <div className="rounded-2xl border border-border/60 bg-card p-5">
-        <h2 className="flex items-center gap-2 text-lg font-bold">
-          <Moon className="h-5 w-5 text-primary" /> Sleep Tracker
-        </h2>
-        <div className="mt-4 rounded-xl bg-background p-4 text-center">
-          <p className="text-xs text-muted-foreground">7-Day Recovery Score</p>
-          <p className={cn("text-4xl font-black", statusColor)}>{isNaN(score) ? 0 : score}%</p>
-          <p className={cn("mt-1 text-sm font-semibold", statusColor)}>{status}</p>
+    <ToolShell
+      eyebrow="02"
+      title="Sleep tracker"
+      description="Recovery is training. Seven nights tell you more than one good one."
+    >
+      <div className="grid gap-6 sm:grid-cols-3">
+        <BigNumber label="Recovery score" value={`${isNaN(score) ? 0 : score}%`} />
+        <BigNumber label="Average" value={avgSleep.toFixed(1)} unit="h" />
+        <div className="border-t border-border pt-4">
+          <p className="label-micro text-muted-foreground">Status</p>
+          <p className="mt-2 text-2xl font-medium text-orange">{status}</p>
         </div>
-        <div className="mt-4">
-          <p className="text-sm text-muted-foreground">
-            Log tonight's sleep: <strong>{sleepVal}h</strong>
-          </p>
-          <input
-            id="sleep-hours"
-            type="range"
-            min={0}
-            max={12}
-            value={sleepVal}
-            onChange={(e) => setSleepVal(Number(e.target.value))}
-            className="mt-2 w-full accent-[var(--primary)]"
-          />
-          <Button size="sm" className="mt-2 w-full" onClick={logSleep}>
-            Log Sleep
-          </Button>
-        </div>
-        <div className="mt-4">
-          <p className="mb-2 text-sm font-semibold">Last 7 days</p>
-          <div className="flex items-end gap-1.5">
-            {logs.map((l) => {
-              const h = l.sleep || 0;
-              const pct = Math.min(100, (h / 10) * 100);
-              return (
-                <div key={l.date} className="flex flex-1 flex-col items-center gap-1">
-                  <div
-                    className="w-full rounded-t-lg bg-primary/60 transition-all"
-                    style={{ height: `${pct}%`, minHeight: pct > 0 ? 16 : 4 }}
-                  />
-                  <span className="text-[10px] text-muted-foreground">
-                    {new Date(l.date).toLocaleDateString("en-IN", { weekday: "short" })}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="mt-4 w-full"
-          onClick={getSleepTips}
-          disabled={loading}
-        >
-          {loading ? <Loader className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {loading ? "Analyzing..." : "AI Sleep Tips"}
-        </Button>
-        {aiTips && (
-          <div className="mt-3 rounded-xl bg-background p-4 text-sm whitespace-pre-wrap">
-            {aiTips}
-          </div>
-        )}
       </div>
-    </div>
+
+      <div className="mt-8 rounded-2xl border border-border bg-background p-5">
+        <div className="flex items-baseline justify-between">
+          <p className="text-sm font-medium">Tonight's sleep</p>
+          <p className="text-2xl font-medium tabular-nums">
+            {sleepVal}
+            <span className="ml-1 text-xs text-muted-foreground">h</span>
+          </p>
+        </div>
+        <input
+          id="sleep-hours"
+          type="range"
+          min={0}
+          max={12}
+          value={sleepVal}
+          onChange={(e) => setSleepVal(Number(e.target.value))}
+          className="mt-4 w-full accent-orange"
+        />
+        <button
+          onClick={logSleep}
+          className="mt-4 inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2 text-xs font-semibold text-background"
+        >
+          Log sleep
+        </button>
+      </div>
+
+      <div className="mt-8">
+        <p className="label-micro text-muted-foreground">Last 7 days</p>
+        <div className="mt-4 flex h-32 items-end gap-2">
+          {logs.map((l) => {
+            const h = l.sleep || 0;
+            const pct = Math.min(100, (h / 10) * 100);
+            return (
+              <div key={l.date} className="flex flex-1 flex-col items-center gap-2">
+                <div
+                  className="w-full rounded-t-md bg-orange/80"
+                  style={{ height: `${pct}%`, minHeight: pct > 0 ? 8 : 2 }}
+                />
+                <span className="text-[10px] text-muted-foreground">
+                  {new Date(l.date).toLocaleDateString("en-IN", { weekday: "short" })}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <AIButton loading={loading} onClick={getSleepTips}>
+        AI sleep tips
+      </AIButton>
+      <AdviceBox text={aiTips} />
+    </ToolShell>
   );
 }
 
@@ -357,66 +425,61 @@ function StepsTracker() {
     const log = { ...today, steps: Math.min(50000, today.steps + amount) };
     saveLog(log);
     setStepsVal(log.steps);
-    if (log.steps >= 10000) toast.success("10k steps milestone! 🎉");
+    if (log.steps >= 10000) toast.success("10k steps milestone");
   };
 
   const goal = 10000;
   const pct = Math.min(100, (stepsVal / goal) * 100);
 
   return (
-    <div className="space-y-5 pt-4">
-      <div className="rounded-2xl border border-border/60 bg-card p-5">
-        <h2 className="flex items-center gap-2 text-lg font-bold">
-          <Footprints className="h-5 w-5 text-primary" /> Steps Tracker
-        </h2>
-        <div className="mt-4 rounded-xl bg-background p-4 text-center">
-          <p className="text-xs text-muted-foreground">Today's Steps</p>
-          <p className="text-4xl font-black">{stepsVal.toLocaleString()}</p>
-          <p className="text-sm text-muted-foreground">Goal: {goal.toLocaleString()}</p>
-          <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all"
-              style={{ width: `${pct}%` }}
-            />
+    <ToolShell
+      eyebrow="03"
+      title="Steps"
+      description="Walking is the cheapest conditioning you have. Ten thousand is a target, not a law."
+    >
+      <div className="grid gap-6 sm:grid-cols-2">
+        <BigNumber label="Today" value={stepsVal.toLocaleString()} unit="steps" />
+        <div className="border-t border-border pt-4">
+          <div className="flex items-baseline justify-between">
+            <p className="label-micro text-muted-foreground">Goal</p>
+            <p className="text-xs tabular-nums text-muted-foreground">10,000</p>
           </div>
+          <ProgressBar value={pct} className="mt-3" />
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={() => addSteps(500)}>
-            +500
-          </Button>
-          <Button variant="outline" onClick={() => addSteps(1000)}>
-            +1,000
-          </Button>
-          <Button variant="outline" onClick={() => addSteps(2000)}>
-            +2,000
-          </Button>
-          <Button variant="outline" onClick={() => addSteps(5000)}>
-            +5,000
-          </Button>
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          💡 Aim for 8,000–10,000 steps daily. Walking after meals helps digestion too.
-        </p>
       </div>
-    </div>
+      <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[500, 1000, 2000, 5000].map((n) => (
+          <button
+            key={n}
+            onClick={() => addSteps(n)}
+            className="rounded-full border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:border-foreground/30"
+          >
+            +{n.toLocaleString()}
+          </button>
+        ))}
+      </div>
+      <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
+        Walk after meals when you can. It helps digestion and stacks up faster than one long walk.
+      </p>
+    </ToolShell>
   );
 }
 
+const INJURY_AREAS = [
+  { id: "knee", label: "Knee" },
+  { id: "lower_back", label: "Lower back" },
+  { id: "shoulder", label: "Shoulder" },
+  { id: "wrist", label: "Wrist" },
+  { id: "ankle", label: "Ankle" },
+  { id: "elbow", label: "Elbow" },
+];
+
 function InjuryAssessment() {
-  const { profile } = useProfile();
+  useProfile();
   const [painArea, setPainArea] = useState("");
   const [description, setDescription] = useState("");
   const [advice, setAdvice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const areas = [
-    { id: "knee", label: "Knee", icon: "🦵" },
-    { id: "lower_back", label: "Lower Back", icon: "🔙" },
-    { id: "shoulder", label: "Shoulder", icon: "💪" },
-    { id: "wrist", label: "Wrist", icon: "✋" },
-    { id: "ankle", label: "Ankle", icon: "🦶" },
-    { id: "elbow", label: "Elbow", icon: "💪" },
-  ];
 
   const getAIAdvice = async () => {
     if (!painArea) return;
@@ -424,7 +487,9 @@ function InjuryAssessment() {
     try {
       const data = await proxyToolAdvice({ data: { path: "/v1/tools/injury-advice" } });
       const tips = data.tips;
-      setAdvice(tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.");
+      setAdvice(
+        tips && tips.length > 0 ? tips.join("\n") : "No advice available yet. Generate a plan first.",
+      );
     } catch {
       setAdvice("Failed to get AI advice. Try again.");
     }
@@ -432,64 +497,53 @@ function InjuryAssessment() {
   };
 
   return (
-    <div className="space-y-5 pt-4">
-      <div className="rounded-2xl border border-border/60 bg-card p-5">
-        <h2 className="flex items-center gap-2 text-lg font-bold">
-          <HeartPulse className="h-5 w-5 text-primary" /> AI Injury Assessment
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Select your pain area, describe how it feels, get personalized advice
-        </p>
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {areas.map((a) => (
-            <button
-              key={a.id}
-              onClick={() => { setPainArea(a.id); setAdvice(null); }}
-              className={cn(
-                "flex flex-col items-center gap-1 rounded-xl border p-3 text-center transition",
-                painArea === a.id
-                  ? "border-primary bg-primary/10"
-                  : "border-border/60 bg-background hover:border-primary/40",
-              )}
-            >
-              <span className="text-2xl">{a.icon}</span>
-              <span className="text-xs font-medium">{a.label}</span>
-            </button>
-          ))}
-        </div>
-        {painArea && (
-          <>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe your pain — when does it hurt? Any swelling? How long?"
-              className="mt-4 w-full rounded-xl border border-border/60 bg-background p-3 text-sm outline-none resize-none"
-              rows={3}
-            />
-            <Button
-              size="sm"
-              className="mt-2 w-full"
-              onClick={getAIAdvice}
-              disabled={loading}
-            >
-              {loading ? <Loader className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {loading ? "Analyzing..." : "Get AI Advice"}
-            </Button>
-          </>
-        )}
-        {advice && (
-          <div className="mt-4 rounded-xl bg-background p-4 text-sm whitespace-pre-wrap">
-            {advice}
-          </div>
-        )}
+    <ToolShell
+      eyebrow="04"
+      title="Injury check"
+      description="This is guidance, not a diagnosis. Sharp pain, swelling, or numbness means a doctor."
+    >
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {INJURY_AREAS.map((a) => (
+          <button
+            key={a.id}
+            onClick={() => {
+              setPainArea(a.id);
+              setAdvice(null);
+            }}
+            className={cn(
+              "rounded-2xl border p-4 text-left text-sm font-medium transition-colors",
+              painArea === a.id
+                ? "border-orange bg-orange/10"
+                : "border-border hover:border-foreground/25",
+            )}
+          >
+            {a.label}
+          </button>
+        ))}
       </div>
-    </div>
+
+      {painArea ? (
+        <>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="When does it hurt? Any swelling? How long has it been like this?"
+            className="mt-4 w-full resize-none rounded-2xl border border-border bg-background p-4 text-sm outline-none focus:border-orange"
+            rows={3}
+          />
+          <AIButton loading={loading} onClick={getAIAdvice}>
+            Get AI advice
+          </AIButton>
+        </>
+      ) : null}
+      <AdviceBox text={advice} />
+    </ToolShell>
   );
 }
 
 const SUPPLEMENTS = [
   {
-    name: "Whey Protein",
+    name: "Whey protein",
     when: "Post-workout / anytime",
     why: "Convenient protein source",
     inr: "₹1,500–2,500/kg",
@@ -497,17 +551,17 @@ const SUPPLEMENTS = [
   },
   {
     name: "Creatine",
-    when: "Daily (3–5g)",
-    why: "Strength & power output",
+    when: "Daily (3–5 g)",
+    why: "Strength and power output",
     inr: "₹600–1,200/500g",
     natural: "Red meat (small amounts)",
   },
   {
     name: "Vitamin D",
-    when: "Morning (with food)",
+    when: "Morning, with food",
     why: "Bone health, immunity",
     inr: "₹200–500/bottle",
-    natural: "Sunlight 15min, eggs",
+    natural: "Sunlight, eggs",
   },
   {
     name: "Omega-3",
@@ -521,14 +575,14 @@ const SUPPLEMENTS = [
     when: "After breakfast",
     why: "General health coverage",
     inr: "₹300–800/bottle",
-    natural: "Balanced diet",
+    natural: "A balanced diet",
   },
   {
     name: "Magnesium",
     when: "Before bed",
     why: "Sleep, muscle recovery",
     inr: "₹400–900/bottle",
-    natural: "Nuts, seeds, green veggies",
+    natural: "Nuts, seeds, greens",
   },
 ];
 
@@ -536,51 +590,52 @@ function SupplementGuide() {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
-    <div className="space-y-5 pt-4">
-      <div className="rounded-2xl border border-border/60 bg-card p-5">
-        <h2 className="flex items-center gap-2 text-lg font-bold">
-          <Pill className="h-5 w-5 text-primary" /> Supplement Guide
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Supplements are optional. Food comes first. Here's what actually helps.
-        </p>
-        <div className="mt-4 space-y-2">
-          {SUPPLEMENTS.map((s) => (
+    <ToolShell
+      eyebrow="05"
+      title="Supplements"
+      description="Optional, not required. Food first, always. Here's what actually has evidence."
+    >
+      <div className="divide-y divide-border border-y border-border">
+        {SUPPLEMENTS.map((s, i) => {
+          const open = expanded === s.name;
+          return (
             <div key={s.name}>
               <button
-                onClick={() => setExpanded(expanded === s.name ? null : s.name)}
-                className="flex w-full items-center justify-between rounded-xl border border-border/60 bg-background p-3.5 text-left transition hover:border-primary/40"
+                onClick={() => setExpanded(open ? null : s.name)}
+                className="flex w-full items-center gap-4 py-4 text-left"
               >
-                <div>
-                  <p className="font-semibold">{s.name}</p>
-                  <p className="text-xs text-muted-foreground">{s.inr}</p>
+                <span className="label-micro w-6 shrink-0 text-muted-foreground">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">{s.name}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{s.inr}</p>
                 </div>
-                <span className="text-muted-foreground">{expanded === s.name ? "−" : "+"}</span>
+                <span className="text-xl font-light text-muted-foreground">{open ? "−" : "+"}</span>
               </button>
-              {expanded === s.name && (
-                <div className="mt-1 rounded-xl border border-border/30 bg-muted/50 p-3.5 text-sm space-y-2">
+              {open ? (
+                <div className="space-y-2 pb-5 pl-10 text-sm leading-relaxed text-muted-foreground">
                   <p>
-                    <span className="font-medium">When:</span> {s.when}
-                  </p>
-                  <p>
-                    <span className="font-medium">Why:</span> {s.why}
+                    <span className="font-medium text-foreground">When:</span> {s.when}
                   </p>
                   <p>
-                    <span className="font-medium">Natural sources:</span> {s.natural}
+                    <span className="font-medium text-foreground">Why:</span> {s.why}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    💰 {s.inr} — Always check expiry before buying.
+                  <p>
+                    <span className="font-medium text-foreground">Natural sources:</span>{" "}
+                    {s.natural}
                   </p>
+                  <p className="text-xs">Check the expiry before buying. Skip anything unsealed.</p>
                 </div>
-              )}
+              ) : null}
             </div>
-          ))}
-        </div>
-        <p className="mt-4 rounded-xl bg-background p-3 text-xs text-muted-foreground">
-          💡 Most supplements are unnecessary if your diet is solid. Spend on good food first.
-        </p>
+          );
+        })}
       </div>
-    </div>
+      <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
+        Most supplements are unnecessary when the diet is solid. Spend on good food first.
+      </p>
+    </ToolShell>
   );
 }
 
@@ -590,32 +645,36 @@ function CalorieTimeline() {
   const [weeks, setWeeks] = useState(12);
   const [dailyDeficit, setDailyDeficit] = useState(400);
 
-  if (!targets) {
+  if (!targets || !profile) {
     return (
-      <div className="rounded-2xl border border-border/60 bg-card p-5 pt-4 text-center">
-        <p className="text-muted-foreground">Complete onboarding to see your calorie timeline.</p>
-      </div>
+      <ToolShell eyebrow="06" title="Calorie timeline">
+        <p className="text-sm text-muted-foreground">
+          Complete onboarding to see your calorie timeline.
+        </p>
+      </ToolShell>
     );
   }
 
   const weeklyDeficit = dailyDeficit * 7;
-  const weeklySurplus = weeklyDeficit;
   const kgPerWeekFat = weeklyDeficit / 7700;
-  const kgPerWeekMuscle = weeklySurplus / 5500;
+  const kgPerWeekMuscle = weeklyDeficit / 5500;
   const totalLoss = (kgPerWeekFat * weeks).toFixed(1);
   const totalGain = (kgPerWeekMuscle * weeks).toFixed(1);
-  const projectedWeightLoss = profile ? (profile.weightKg - Number(totalLoss)).toFixed(1) : "—";
-  const projectedWeightGain = profile ? (profile.weightKg + Number(totalGain)).toFixed(1) : "—";
+  const projectedWeightLoss = (profile.weightKg - Number(totalLoss)).toFixed(1);
+  const projectedWeightGain = (profile.weightKg + Number(totalGain)).toFixed(1);
 
   return (
-    <div className="space-y-5 pt-4">
-      <div className="rounded-2xl border border-border/60 bg-card p-5">
-        <h2 className="flex items-center gap-2 text-lg font-bold">
-          <CalendarDays className="h-5 w-5 text-primary" /> Calorie Timeline
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">Project your weight at 4/8/12 weeks</p>
-        <div className="mt-4 rounded-xl bg-background p-4">
-          <p className="mb-1 text-xs text-muted-foreground">Daily deficit / surplus</p>
+    <ToolShell
+      eyebrow="06"
+      title="Calorie timeline"
+      description="A projection, not a promise. Sleep, steps, and consistency move these lines."
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-2xl border border-border bg-background p-5">
+          <div className="flex items-baseline justify-between">
+            <p className="text-sm font-medium">Daily deficit / surplus</p>
+            <p className="text-lg font-medium tabular-nums text-orange">{dailyDeficit}</p>
+          </div>
           <input
             id="daily-deficit"
             type="range"
@@ -624,16 +683,18 @@ function CalorieTimeline() {
             step={50}
             value={dailyDeficit}
             onChange={(e) => setDailyDeficit(Number(e.target.value))}
-            className="w-full accent-[var(--primary)]"
+            className="mt-4 w-full accent-orange"
           />
-          <div className="flex justify-between text-xs text-muted-foreground">
+          <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
             <span>100</span>
-            <span className="font-bold text-foreground">{dailyDeficit} kcal</span>
-            <span>800</span>
+            <span>800 kcal</span>
           </div>
         </div>
-        <div className="mt-3 rounded-xl bg-background p-4">
-          <p className="mb-1 text-xs text-muted-foreground">Timeline (weeks)</p>
+        <div className="rounded-2xl border border-border bg-background p-5">
+          <div className="flex items-baseline justify-between">
+            <p className="text-sm font-medium">Timeline</p>
+            <p className="text-lg font-medium tabular-nums text-orange">{weeks} wk</p>
+          </div>
           <input
             id="timeline-weeks"
             type="range"
@@ -642,46 +703,56 @@ function CalorieTimeline() {
             step={4}
             value={weeks}
             onChange={(e) => setWeeks(Number(e.target.value))}
-            className="w-full accent-[var(--primary)]"
+            className="mt-4 w-full accent-orange"
           />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>4w</span>
-            <span className="font-bold text-foreground">{weeks} weeks</span>
-            <span>12w</span>
+          <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
+            <span>4 weeks</span>
+            <span>12 weeks</span>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-border/60 bg-background p-3.5">
-            <div className="flex items-center gap-1.5 text-sm text-red-400">
-              <TrendingDown className="h-4 w-4" /> Fat Loss
-            </div>
-            <p className="mt-1 text-lg font-bold">{totalLoss} kg</p>
-            <p className="text-xs text-muted-foreground">Projected: {projectedWeightLoss} kg</p>
-          </div>
-          <div className="rounded-xl border border-border/60 bg-background p-3.5">
-            <div className="flex items-center gap-1.5 text-sm text-green-400">
-              <TrendingUp className="h-4 w-4" /> Muscle Gain
-            </div>
-            <p className="mt-1 text-lg font-bold">{totalGain} kg</p>
-            <p className="text-xs text-muted-foreground">Projected: {projectedWeightGain} kg</p>
-          </div>
-        </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          💡 Based on 7,700 kcal ≈ 1 kg fat and 5,500 kcal ≈ 1 kg muscle. Actual results vary.
-        </p>
       </div>
-    </div>
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="relative overflow-hidden rounded-2xl bg-ink p-5 text-cream">
+          <TrendingDown className="h-4 w-4 text-orange" />
+          <p className="mt-4 text-3xl font-medium tabular-nums">{totalLoss} kg</p>
+          <p className="mt-1 text-xs text-cream/60">Fat loss projection</p>
+          <p className="mt-4 text-xs text-cream/45">Weight: {projectedWeightLoss} kg</p>
+        </div>
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5">
+          <TrendingUp className="h-4 w-4 text-orange" />
+          <p className="mt-4 text-3xl font-medium tabular-nums">{totalGain} kg</p>
+          <p className="mt-1 text-xs text-muted-foreground">Muscle gain projection</p>
+          <p className="mt-4 text-xs text-muted-foreground">Weight: {projectedWeightGain} kg</p>
+        </div>
+      </div>
+      <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
+        Based on 7,700 kcal ≈ 1 kg fat and 5,500 kcal ≈ 1 kg muscle. Actual results vary.
+      </p>
+    </ToolShell>
   );
 }
 
 const EXERCISE_LIST = [
-  "Squat", "Deadlift", "Bench Press", "Overhead Press", "Barbell Row",
-  "Pull-up", "Push-up", "Lunge", "Plank", "Hip Thrust",
-  "Bicep Curl", "Tricep Extension", "Lat Pulldown", "Leg Press", "Dumbbell Fly",
+  "Squat",
+  "Deadlift",
+  "Bench Press",
+  "Overhead Press",
+  "Barbell Row",
+  "Pull-up",
+  "Push-up",
+  "Lunge",
+  "Plank",
+  "Hip Thrust",
+  "Bicep Curl",
+  "Tricep Extension",
+  "Lat Pulldown",
+  "Leg Press",
+  "Dumbbell Fly",
 ];
 
 function FormAnalyzer() {
-  const { profile } = useProfile();
+  useProfile();
   const [exercise, setExercise] = useState("");
   const [description, setDescription] = useState("");
   const [analysis, setAnalysis] = useState<string | null>(null);
@@ -693,7 +764,9 @@ function FormAnalyzer() {
     try {
       const data = await proxyToolAdvice({ data: { path: "/v1/tools/form-advice" } });
       const tips = data.tips;
-      setAnalysis(tips && tips.length > 0 ? tips.join("\n") : "No analysis available yet. Generate a plan first.");
+      setAnalysis(
+        tips && tips.length > 0 ? tips.join("\n") : "No analysis available yet. Generate a plan first.",
+      );
     } catch {
       setAnalysis("Failed to analyze. Try again.");
     }
@@ -701,60 +774,48 @@ function FormAnalyzer() {
   };
 
   return (
-    <div className="space-y-5 pt-4">
-      <div className="rounded-2xl border border-border/60 bg-card p-5">
-        <h2 className="flex items-center gap-2 text-lg font-bold">
-          <Shapes className="h-5 w-5 text-primary" /> Form Analyzer
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Describe how you perform an exercise and get AI form tips
-        </p>
-        <div className="mt-4">
-          <p className="text-xs text-muted-foreground mb-1">Select exercise</p>
-          <div className="flex flex-wrap gap-1.5">
-            {EXERCISE_LIST.map((e) => (
-              <button
-                key={e}
-                onClick={() => { setExercise(e); setAnalysis(null); }}
-                className={cn(
-                  "rounded-full px-3 py-1 text-xs font-medium border transition",
-                  exercise === e
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border/60 text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-        </div>
-        {exercise && (
-          <>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={`Describe how you do ${exercise} — stance, grip, depth, any pain or discomfort...`}
-              className="mt-4 w-full rounded-xl border border-border/60 bg-background p-3 text-sm outline-none resize-none"
-              rows={3}
-            />
-            <Button
-              size="sm"
-              className="mt-2 w-full"
-              onClick={analyze}
-              disabled={loading}
-            >
-              {loading ? <Loader className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {loading ? "Analyzing..." : "Analyze Form"}
-            </Button>
-          </>
-        )}
-        {analysis && (
-          <div className="mt-4 rounded-xl bg-background p-4 text-sm whitespace-pre-wrap">
-            {analysis}
-          </div>
-        )}
+    <ToolShell
+      eyebrow="07"
+      title="Form check"
+      description="Describe the lift the way you'd explain it to a friend. Specifics get better answers."
+    >
+      <p className="label-micro text-muted-foreground">Exercise</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {EXERCISE_LIST.map((e) => (
+          <button
+            key={e}
+            onClick={() => {
+              setExercise(e);
+              setAnalysis(null);
+            }}
+            className={cn(
+              "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
+              exercise === e
+                ? "border-orange bg-orange/10 text-orange"
+                : "border-border text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {e}
+          </button>
+        ))}
       </div>
-    </div>
+
+      {exercise ? (
+        <>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={`How do you perform the ${exercise.toLowerCase()}? Stance, grip, depth, pain…`}
+            className="mt-5 w-full resize-none rounded-2xl border border-border bg-background p-4 text-sm outline-none focus:border-orange"
+            rows={3}
+          />
+          <AIButton loading={loading} onClick={analyze}>
+            Analyze form
+          </AIButton>
+        </>
+      ) : null}
+      <AdviceBox text={analysis} />
+    </ToolShell>
   );
 }
 
@@ -848,7 +909,7 @@ function CommunityFeed() {
       const result = await community.createPost(newPost.trim(), []);
       setPosts((prev) => [toCommunityView(result.createPost), ...prev]);
       setNewPost("");
-      toast.success("Posted!");
+      toast.success("Posted");
     } catch {
       toast.error("Failed to post");
     }
@@ -862,11 +923,7 @@ function CommunityFeed() {
       setPosts((prev) =>
         prev.map((p) =>
           p.id === postId
-            ? {
-                ...p,
-                likedByMe: result.toggleLike.liked,
-                likes: result.toggleLike.count,
-              }
+            ? { ...p, likedByMe: result.toggleLike.liked, likes: result.toggleLike.count }
             : p,
         ),
       );
@@ -881,13 +938,11 @@ function CommunityFeed() {
       const { community } = await import("@/utils/community");
       await community.replyToPost(postId, replyText.trim(), []);
       setPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId ? { ...p, replyCount: p.replyCount + 1 } : p,
-        ),
+        prev.map((p) => (p.id === postId ? { ...p, replyCount: p.replyCount + 1 } : p)),
       );
       setReplyText("");
       setReplyTo(null);
-      toast.success("Replied!");
+      toast.success("Replied");
     } catch {
       toast.error("Failed to reply");
     }
@@ -899,7 +954,7 @@ function CommunityFeed() {
       const { community } = await import("@/utils/community");
       const result = await community.resharePost(postId);
       setPosts((prev) => [toCommunityView(result.resharePost), ...prev]);
-      toast.success("Reshared!");
+      toast.success("Reshared");
     } catch {
       toast.error("Failed to reshare");
     }
@@ -971,192 +1026,198 @@ function CommunityFeed() {
   const displayPosts = isSearching ? searchResults : posts;
 
   return (
-    <div className="space-y-5 pt-4">
-      <div className="rounded-2xl border border-border/60 bg-card p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-lg font-bold">
-            <Users className="h-5 w-5 text-primary" /> Community
-          </h2>
+    <div className="space-y-5">
+      <section className="rounded-[2rem] border border-border bg-card p-6 lg:p-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <SectionLabel index="08">Community</SectionLabel>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">
+              The floor.
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Wins, questions, and the days nobody feels like training.
+            </p>
+          </div>
           <button
             onClick={() => {
               setShowNotifications(!showNotifications);
               if (!showNotifications) loadNotifications();
             }}
-            className="relative rounded-full p-1.5 hover:bg-muted"
+            className="relative flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+            aria-label="Notifications"
           >
             <Bell className="h-4 w-4" />
-            {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+            {unreadCount > 0 ? (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange px-1 text-[9px] font-bold text-ink">
                 {unreadCount > 9 ? "9+" : unreadCount}
               </span>
-            )}
+            ) : null}
           </button>
         </div>
 
-        {showNotifications && (
-          <div className="mt-3 rounded-xl border border-border/60 bg-background p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-xs font-semibold text-muted-foreground">
-                Notifications
-              </p>
-              {unreadCount > 0 && (
-                <button
-                  onClick={markAllRead}
-                  className="text-[10px] text-primary hover:underline"
-                >
+        {showNotifications ? (
+          <div className="mt-5 rounded-2xl border border-border bg-background p-4">
+            <div className="flex items-center justify-between">
+              <p className="label-micro text-muted-foreground">Notifications</p>
+              {unreadCount > 0 ? (
+                <button onClick={markAllRead} className="text-[10px] text-orange hover:underline">
                   Mark all read
                 </button>
-              )}
+              ) : null}
             </div>
-            {notifications.length === 0 && (
-              <p className="py-2 text-center text-xs text-muted-foreground">
-                No notifications yet
-              </p>
-            )}
-            {notifications.slice(0, 10).map((n: any) => (
-              <div
-                key={n.id}
-                className={cn(
-                  "flex items-start gap-2 rounded-lg px-2 py-1.5 text-xs",
-                  !n.read && "bg-primary/5",
-                )}
-              >
-                <span className="text-muted-foreground">
-                  {n.type === "like"
-                    ? "❤️"
-                    : n.type === "reply"
-                      ? "💬"
-                      : "🔁"}
-                </span>
-                <span>
-                  <span className="font-semibold">
-                    {String(n.actor_id ?? "").split(":").pop()}
-                  </span>{" "}
-                  {n.type === "like"
-                    ? "liked your post"
-                    : n.type === "reply"
-                      ? "replied to your post"
-                      : "reshared your post"}
-                </span>
-              </div>
-            ))}
+            {notifications.length === 0 ? (
+              <p className="py-4 text-center text-xs text-muted-foreground">Nothing yet.</p>
+            ) : null}
+            <div className="mt-2 space-y-1">
+              {notifications.slice(0, 10).map((n: any) => (
+                <div
+                  key={n.id}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-3 py-2 text-xs",
+                    !n.read && "bg-orange/5",
+                  )}
+                >
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-secondary">
+                    {n.type === "like" ? (
+                      <Heart className="h-3 w-3 text-orange" />
+                    ) : n.type === "reply" ? (
+                      <MessageCircle className="h-3 w-3 text-orange" />
+                    ) : (
+                      <Repeat2 className="h-3 w-3 text-orange" />
+                    )}
+                  </span>
+                  <span className="text-muted-foreground">
+                    <span className="font-semibold text-foreground">
+                      {String(n.actor_id ?? "").split(":").pop()}
+                    </span>{" "}
+                    {n.type === "like"
+                      ? "liked your post"
+                      : n.type === "reply"
+                        ? "replied to your post"
+                        : "reshared your post"}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        )}
+        ) : null}
 
-        <div className="mt-3 flex gap-2">
-          <input
-            type="text"
-            placeholder="Search community..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSearch();
-              if (e.key === "Escape") {
-                setSearchQuery("");
-                setSearchResults([]);
-                setIsSearching(false);
-              }
-            }}
-            className="flex-1 rounded-xl border border-border/60 bg-background px-3 py-2 text-sm outline-none"
-          />
-          <Button size="icon" variant="outline" onClick={handleSearch}>
+        <div className="mt-6 flex gap-2">
+          <div className="flex flex-1 items-center gap-2 rounded-full border border-border bg-background px-4">
+            <Search className="h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search the community…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSearch();
+                if (e.key === "Escape") {
+                  setSearchQuery("");
+                  setSearchResults([]);
+                  setIsSearching(false);
+                }
+              }}
+              className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <button
+            onClick={handleSearch}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-foreground text-background"
+            aria-label="Search"
+          >
             <Search className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-4 rounded-2xl border border-border bg-background p-4">
+          <p className="label-micro text-muted-foreground">New post</p>
           <textarea
-            placeholder="Share something with the community..."
+            placeholder="What happened today?"
             value={newPost}
             onChange={(e) => setNewPost(e.target.value)}
-            className="w-full resize-none rounded-xl border border-border/60 bg-background p-3 text-sm outline-none"
-            rows={2}
+            className="mt-2 w-full resize-none bg-transparent text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+            rows={3}
           />
-          <div className="mt-2 flex justify-end">
-            <Button
-              size="sm"
+          <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+            <span className="text-[10px] text-muted-foreground">Keep it useful or keep it kind.</span>
+            <button
               onClick={addPost}
               disabled={posting || !newPost.trim()}
+              className="inline-flex items-center gap-2 rounded-full bg-foreground py-1.5 pl-4 pr-2 text-xs font-semibold text-background disabled:opacity-40"
             >
-              {posting ? (
-                <Loader className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
+              {posting ? <Loader className="h-3.5 w-3.5 animate-spin" /> : "Post"}
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-orange text-ink">
+                <Send className="h-3 w-3" />
+              </span>
+            </button>
           </div>
         </div>
 
-        {isSearching && (
-          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-            <span>Search results for "{searchQuery}"</span>
+        {isSearching ? (
+          <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+            <span>Results for "{searchQuery}"</span>
             <button
               onClick={() => {
                 setSearchQuery("");
                 setSearchResults([]);
                 setIsSearching(false);
               }}
-              className="text-primary hover:underline"
+              className="text-orange hover:underline"
             >
               Clear
             </button>
           </div>
-        )}
+        ) : null}
 
         <div className="mt-5 space-y-3">
-          {loading && (
-            <div className="py-8 text-center">
-              <Loader className="mx-auto h-6 w-6 animate-spin text-muted-foreground" />
+          {loading ? (
+            <div className="py-10 text-center">
+              <Loader className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          )}
-          {!loading && displayPosts.length === 0 && (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              {isSearching
-                ? "No results found"
-                : "No posts yet. Be the first to share!"}
+          ) : null}
+          {!loading && displayPosts.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              {isSearching ? "No results." : "No posts yet. Be the first."}
             </p>
-          )}
+          ) : null}
+
           {displayPosts.map((post) => (
-            <div
-              key={post.id}
-              className="rounded-xl border border-border/60 bg-background p-3.5"
-            >
-              {post.reshareId && (
-                <div className="mb-2 flex items-center gap-1 text-[10px] text-muted-foreground">
-                  <Repeat2 className="h-3 w-3" />
-                  <span>Reshared</span>
+            <article key={post.id} className="rounded-2xl border border-border bg-background p-5">
+              {post.reshareId ? (
+                <div className="mb-3 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  <Repeat2 className="h-3 w-3" /> Reshared
                 </div>
-              )}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
+              ) : null}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange font-wordmark text-[10px] text-ink">
                     {(post.author[0] ?? "U").toUpperCase()}
                   </div>
                   <div>
-                    <span className="text-sm font-semibold">{post.author}</span>
-                    <span className="ml-2 text-[10px] text-muted-foreground">
+                    <p className="text-sm font-semibold">{post.author}</p>
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                       {new Date(post.timestamp).toLocaleDateString("en-IN", {
                         day: "numeric",
                         month: "short",
                       })}
-                    </span>
+                    </p>
                   </div>
                 </div>
                 <div className="relative">
                   <button
-                    onClick={() =>
-                      setMenuOpen(menuOpen === post.id ? null : post.id)
-                    }
-                    className="rounded p-1 hover:bg-muted"
+                    onClick={() => setMenuOpen(menuOpen === post.id ? null : post.id)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
+                    aria-label="Post menu"
                   >
-                    <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                    <MoreHorizontal className="h-4 w-4" />
                   </button>
-                  {menuOpen === post.id && (
-                    <div className="absolute right-0 top-8 z-20 w-40 rounded-xl border border-border/60 bg-card p-1 shadow-lg">
+                  {menuOpen === post.id ? (
+                    <div className="absolute right-0 top-9 z-20 w-40 rounded-2xl border border-border bg-card p-1 shadow-card">
                       {post.userId === userId ? (
                         <button
                           onClick={() => deletePost(post.id)}
-                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs text-red-500 hover:bg-muted"
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs text-destructive hover:bg-secondary"
                         >
                           <Trash2 className="h-3 w-3" /> Delete
                         </button>
@@ -1164,87 +1225,83 @@ function CommunityFeed() {
                         <>
                           <button
                             onClick={() => reportPost(post.id)}
-                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs hover:bg-muted"
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs hover:bg-secondary"
                           >
                             <Flag className="h-3 w-3" /> Report
                           </button>
                           <button
                             onClick={() => blockUser(post.userId)}
-                            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs hover:bg-muted"
+                            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs hover:bg-secondary"
                           >
                             <Ban className="h-3 w-3" /> Block user
                           </button>
                         </>
                       )}
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
-              <p className="mt-2 text-sm whitespace-pre-wrap">{post.text}</p>
-              <div className="mt-3 flex items-center gap-4">
+
+              <p className="mt-4 whitespace-pre-wrap text-[15px] leading-relaxed">{post.text}</p>
+
+              <div className="mt-5 flex items-center gap-5 border-t border-border pt-4">
                 <button
                   onClick={() => toggleLike(post.id)}
                   className={cn(
-                    "flex items-center gap-1 text-xs transition-colors",
+                    "flex items-center gap-1.5 text-xs transition-colors",
                     post.likedByMe
-                      ? "text-primary"
+                      ? "text-orange"
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  <Heart
-                    className={cn(
-                      "h-3.5 w-3.5",
-                      post.likedByMe && "fill-primary",
-                    )}
-                  />
+                  <Heart className={cn("h-4 w-4", post.likedByMe && "fill-orange")} />
                   {post.likes}
                 </button>
                 <button
-                  onClick={() =>
-                    setReplyTo(replyTo === post.id ? null : post.id)
-                  }
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setReplyTo(replyTo === post.id ? null : post.id)}
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                 >
-                  <MessageCircle className="h-3.5 w-3.5" />
+                  <MessageCircle className="h-4 w-4" />
                   {post.replyCount}
                 </button>
                 <button
                   onClick={() => reshare(post.id)}
                   disabled={resharing === post.id}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                 >
                   {resharing === post.id ? (
-                    <Loader className="h-3.5 w-3.5 animate-spin" />
+                    <Loader className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Repeat2 className="h-3.5 w-3.5" />
+                    <Repeat2 className="h-4 w-4" />
                   )}
                   {post.reshareCount}
                 </button>
               </div>
-              {replyTo === post.id && (
-                <div className="mt-2 flex gap-2">
-                  <Input
-                    placeholder="Write a reply..."
+
+              {replyTo === post.id ? (
+                <div className="mt-3 flex gap-2">
+                  <input
+                    placeholder="Write a reply…"
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}
-                    className="flex-1 text-xs"
+                    className="h-9 min-w-0 flex-1 rounded-full border border-border bg-card px-4 text-xs outline-none focus:border-orange"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") addReply(post.id);
                     }}
                   />
-                  <Button
-                    size="sm"
+                  <button
                     onClick={() => addReply(post.id)}
                     disabled={!replyText.trim()}
+                    className="rounded-full bg-foreground px-4 text-xs font-semibold text-background disabled:opacity-40"
                   >
                     Reply
-                  </Button>
+                  </button>
                 </div>
-              )}
-            </div>
+              ) : null}
+            </article>
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

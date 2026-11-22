@@ -1,7 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   saveProfile,
   type Profile,
@@ -12,26 +10,39 @@ import {
   type Gender,
 } from "@/utils/profile";
 import { proxyUpdateProfile } from "@/services/api-proxy";
-import { ChevronLeft } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Check } from "lucide-react";
 import { cn } from "@/utils/cn";
-import logoImg from "@/assets/logo-v2.png";
+import { PrimaryButton, SectionLabel, Wordmark } from "@/components/editorial";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const Route = createFileRoute("/onboarding")({
-  head: () => ({ meta: [{ title: "Welcome to FitMentor AI" }] }),
+  head: () => ({ meta: [{ title: "Set up — FitMentor" }] }),
   component: Onboarding,
 });
 
 type Step = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
+const STEP_LABELS = [
+  "Welcome",
+  "Name",
+  "Body",
+  "Goal",
+  "Place",
+  "Level",
+  "Days",
+  "Health",
+  "Food",
+];
+
 const HEALTH_OPTIONS = [
-  { v: "none", l: "None (I'm healthy)", e: "✅" },
-  { v: "diabetes", l: "Diabetes", e: "🩸" },
-  { v: "heart_disease", l: "Heart Disease", e: "❤️" },
-  { v: "bp", l: "High / Low BP", e: "🩺" },
-  { v: "thyroid", l: "Thyroid", e: "🔬" },
-  { v: "asthma", l: "Asthma", e: "🫁" },
-  { v: "joint", l: "Joint / Back Pain", e: "🦴" },
-  { v: "other", l: "Other", e: "📋" },
+  { v: "none", l: "None — I'm healthy" },
+  { v: "diabetes", l: "Diabetes" },
+  { v: "heart_disease", l: "Heart disease" },
+  { v: "bp", l: "High or low BP" },
+  { v: "thyroid", l: "Thyroid" },
+  { v: "asthma", l: "Asthma" },
+  { v: "joint", l: "Joint or back pain" },
+  { v: "other", l: "Something else" },
 ];
 
 function Onboarding() {
@@ -86,16 +97,16 @@ function Onboarding() {
       await proxyUpdateProfile({
         data: {
           name: p.name,
-        age: p.age,
-        gender: p.gender,
-        heightCm: p.heightCm,
-        weightKg: p.weightKg,
-        goal: p.goal,
-        place: p.place,
-        experience: p.experience,
-        diet: p.diet,
-        daysPerWeek: p.daysPerWeek,
-        budgetPerDay: p.budgetPerDay,
+          age: p.age,
+          gender: p.gender,
+          heightCm: p.heightCm,
+          weightKg: p.weightKg,
+          goal: p.goal,
+          place: p.place,
+          experience: p.experience,
+          diet: p.diet,
+          daysPerWeek: p.daysPerWeek,
+          budgetPerDay: p.budgetPerDay,
           healthConditions: p.healthConditions,
         },
       });
@@ -105,211 +116,279 @@ function Onboarding() {
     navigate({ to: "/dashboard" });
   };
 
-  const totalSteps = 9;
-
   return (
-    <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-background px-6 pt-14 pb-8">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-80 [background:var(--gradient-glow)]" />
-      <div className="relative flex items-center gap-3">
-        {step > 0 ? (
-          <button
-            onClick={back}
-            className="rounded-full p-2 text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-        ) : (
-          <div className="h-9 w-9" />
-        )}
-        <div className="flex flex-1 gap-1.5">
-          {Array.from({ length: totalSteps }).map((_, i) => (
-            <div
-              key={i}
-              className={cn("h-1 flex-1 rounded-full", i <= step ? "bg-primary" : "bg-muted")}
-            />
-          ))}
+    <div className="min-h-screen bg-background">
+      <header className="mx-auto flex max-w-6xl items-center justify-between px-5 py-6 lg:px-8">
+        <Wordmark href="/" />
+        <div className="flex items-center gap-4">
+          <span className="label-micro text-muted-foreground">
+            {String(step + 1).padStart(2, "0")} / 09
+          </span>
+          <ThemeToggle />
         </div>
-      </div>
+      </header>
 
-      <div className="relative mt-10 flex-1">
-        {step === 0 && <Welcome onNext={next} />}
-        {step === 1 && (
-          <Field title="What should we call you?" sub="Just a first name works.">
-            <Input
-              autoFocus
-              placeholder="Your name"
-              value={draft.name ?? ""}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              className="h-14 text-lg"
-            />
-          </Field>
-        )}
-        {step === 2 && (
-          <Field title="Tell us about you" sub="We'll calculate your needs.">
-            <div className="grid grid-cols-2 gap-3">
-              <NumInput
-                label="Age"
-                value={draft.age}
-                onChange={(v) => setDraft({ ...draft, age: v })}
-                suffix="yrs"
-              />
-              <Select
-                label="Gender"
-                value={draft.gender ?? "male"}
-                options={[
-                  { v: "male", l: "Male" },
-                  { v: "female", l: "Female" },
-                  { v: "other", l: "Other" },
-                ]}
-                onChange={(v) => setDraft({ ...draft, gender: v as Gender })}
-              />
-              <NumInput
-                label="Height"
-                value={draft.heightCm}
-                onChange={(v) => setDraft({ ...draft, heightCm: v })}
-                suffix="cm"
-              />
-              <NumInput
-                label="Weight"
-                value={draft.weightKg}
-                onChange={(v) => setDraft({ ...draft, weightKg: v })}
-                suffix="kg"
-              />
-            </div>
-          </Field>
-        )}
-        {step === 3 && (
-          <Field title="What's your goal?" sub="Pick the one that matters most right now.">
-            <Choices
-              value={draft.goal}
-              onChange={(v) => setDraft({ ...draft, goal: v as Goal })}
-              options={[
-                { v: "muscle_gain", l: "Build Muscle", e: "💪" },
-                { v: "fat_loss", l: "Lose Fat", e: "🔥" },
-                { v: "strength", l: "Get Stronger", e: "🏋️" },
-                { v: "recomp", l: "Body Recomp", e: "⚖️" },
-                { v: "general", l: "Stay Fit", e: "✨" },
-              ]}
-            />
-          </Field>
-        )}
-        {step === 4 && (
-          <Field title="Where will you train?" sub="We'll generate the right plan.">
-            <Choices
-              value={draft.place}
-              onChange={(v) => setDraft({ ...draft, place: v as Place })}
-              options={[
-                { v: "gym", l: "Gym", e: "🏟️" },
-                { v: "home", l: "Home (no equipment)", e: "🏠" },
-              ]}
-            />
-          </Field>
-        )}
-        {step === 5 && (
-          <Field title="How experienced are you?" sub="Be honest — we adjust everything.">
-            <Choices
-              value={draft.experience}
-              onChange={(v) => setDraft({ ...draft, experience: v as Experience })}
-              options={[
-                { v: "beginner", l: "Beginner (< 6 months)", e: "🌱" },
-                { v: "intermediate", l: "Intermediate (6m – 2y)", e: "🔥" },
-                { v: "advanced", l: "Advanced (2y+)", e: "🚀" },
-              ]}
-            />
-          </Field>
-        )}
-        {step === 6 && (
-          <Field title="How many days per week?" sub={`${draft.daysPerWeek} days/week`}>
-            <input
-              id="days-per-week"
-              type="range"
-              min={2}
-              max={6}
-              value={draft.daysPerWeek}
-              onChange={(e) => setDraft({ ...draft, daysPerWeek: Number(e.target.value) })}
-              className="w-full accent-[var(--primary)]"
-            />
-            <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-              <span>2</span>
-              <span>3</span>
-              <span>4</span>
-              <span>5</span>
-              <span>6</span>
-            </div>
-          </Field>
-        )}
-        {step === 7 && (
-          <Field
-            title="Any health conditions?"
-            sub="We'll keep your workouts safe. Select all that apply."
-          >
-            <div className="space-y-2">
-              {HEALTH_OPTIONS.map((o) => {
-                const selected = draft.healthConditions?.includes(o.v) ?? false;
-                return (
-                  <button
-                    key={o.v}
-                    onClick={() => toggleHealth(o.v)}
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 pb-16 lg:grid-cols-[0.32fr_0.68fr] lg:gap-16 lg:px-8">
+        <aside className="hidden pt-8 lg:block">
+          <SectionLabel index="Setup">Your plan</SectionLabel>
+          <p className="mt-6 max-w-xs text-2xl font-medium leading-snug tracking-[-0.02em]">
+            A few answers, then your first week is ready.
+          </p>
+          <ol className="mt-10 space-y-1">
+            {STEP_LABELS.map((label, i) => {
+              const done = i < step;
+              const active = i === step;
+              return (
+                <li
+                  key={label}
+                  className={cn(
+                    "flex items-center gap-4 rounded-full py-2 text-sm transition-colors",
+                    active ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  <span
                     className={cn(
-                      "flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition",
-                      selected
-                        ? "border-primary bg-primary/10 shadow-glow"
-                        : "border-border/60 bg-card hover:border-primary/40",
+                      "flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums",
+                      active
+                        ? "bg-orange text-ink"
+                        : done
+                          ? "bg-ink text-cream dark:bg-cream dark:text-ink"
+                          : "border border-border",
                     )}
                   >
-                    <span className="text-2xl">{o.e}</span>
-                    <span className="font-semibold">{o.l}</span>
-                    {selected && <span className="ml-auto text-primary">✓</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </Field>
-        )}
-        {step === 8 && (
-          <Field title="Food & budget" sub="We'll suggest meals you can actually afford.">
-            <Choices
-              value={draft.diet}
-              onChange={(v) => setDraft({ ...draft, diet: v as Diet })}
-              options={[
-                { v: "veg", l: "Vegetarian", e: "🥗" },
-                { v: "nonveg", l: "Non-vegetarian", e: "🍗" },
-                { v: "egg", l: "Eggetarian", e: "🥚" },
-              ]}
-            />
-            <div className="mt-4">
-              <label className="mb-2 block text-sm text-muted-foreground">
-                Food budget: ₹{draft.budgetPerDay}/day
-              </label>
-              <input
-                id="budget-per-day"
-                type="range"
-                min={80}
-                max={400}
-                step={10}
-                value={draft.budgetPerDay}
-                onChange={(e) => setDraft({ ...draft, budgetPerDay: Number(e.target.value) })}
-                className="w-full accent-[var(--primary)]"
-              />
-            </div>
-          </Field>
-        )}
-      </div>
+                    {done ? <Check className="h-3 w-3" /> : String(i + 1).padStart(2, "0")}
+                  </span>
+                  {label}
+                </li>
+              );
+            })}
+          </ol>
+        </aside>
 
-      <div className="relative mt-6">
-        {step === 0 ? null : step < 8 ? (
-          <Button size="lg" className="h-14 w-full text-base font-semibold" onClick={next}>
-            Continue
-          </Button>
-        ) : (
-          <Button
-            size="lg"
-            className="h-14 w-full bg-gradient-hero text-base font-semibold text-primary-foreground shadow-glow"
-            onClick={finish}
-          >
-            Start my journey
-          </Button>
-        )}
+        <main className="pt-2 lg:pt-8">
+          <div className="flex gap-1.5 lg:hidden">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <span
+                key={i}
+                className={cn(
+                  "h-1 flex-1 rounded-full",
+                  i <= step ? "bg-orange" : "bg-muted",
+                )}
+              />
+            ))}
+          </div>
+
+          <div className="mt-8 min-h-[440px] lg:mt-0">
+            {step === 0 && <Welcome onNext={next} />}
+            {step === 1 && (
+              <Field
+                index="02"
+                title="What should we call you?"
+                sub="Just a first name. The coach will use it."
+              >
+                <BigInput
+                  autoFocus
+                  label="First name"
+                  placeholder="Your name"
+                  value={draft.name ?? ""}
+                  onChange={(v) => setDraft({ ...draft, name: v })}
+                />
+              </Field>
+            )}
+            {step === 2 && (
+              <Field index="03" title="Tell us about your body." sub="We use this for calories and targets.">
+                <div className="grid grid-cols-2 gap-x-8 gap-y-9">
+                  <NumInput
+                    label="Age"
+                    value={draft.age}
+                    onChange={(v) => setDraft({ ...draft, age: v })}
+                    suffix="years"
+                  />
+                  <Select
+                    label="Gender"
+                    value={draft.gender ?? "male"}
+                    options={[
+                      { v: "male", l: "Male" },
+                      { v: "female", l: "Female" },
+                      { v: "other", l: "Other" },
+                    ]}
+                    onChange={(v) => setDraft({ ...draft, gender: v as Gender })}
+                  />
+                  <NumInput
+                    label="Height"
+                    value={draft.heightCm}
+                    onChange={(v) => setDraft({ ...draft, heightCm: v })}
+                    suffix="cm"
+                  />
+                  <NumInput
+                    label="Weight"
+                    value={draft.weightKg}
+                    onChange={(v) => setDraft({ ...draft, weightKg: v })}
+                    suffix="kg"
+                  />
+                </div>
+              </Field>
+            )}
+            {step === 3 && (
+              <Field index="04" title="What matters most right now?" sub="Pick one. You can change it later.">
+                <Choices
+                  value={draft.goal}
+                  onChange={(v) => setDraft({ ...draft, goal: v as Goal })}
+                  options={[
+                    { v: "muscle_gain", l: "Build muscle" },
+                    { v: "fat_loss", l: "Lose fat" },
+                    { v: "strength", l: "Get stronger" },
+                    { v: "recomp", l: "Body recomposition" },
+                    { v: "general", l: "Stay fit" },
+                  ]}
+                />
+              </Field>
+            )}
+            {step === 4 && (
+              <Field index="05" title="Where will you train?" sub="The plan matches your equipment.">
+                <Choices
+                  value={draft.place}
+                  onChange={(v) => setDraft({ ...draft, place: v as Place })}
+                  options={[
+                    { v: "gym", l: "Gym — full equipment" },
+                    { v: "home", l: "Home — minimal equipment" },
+                  ]}
+                />
+              </Field>
+            )}
+            {step === 5 && (
+              <Field index="06" title="How long have you been training?" sub="Honesty makes the plan better.">
+                <Choices
+                  value={draft.experience}
+                  onChange={(v) => setDraft({ ...draft, experience: v as Experience })}
+                  options={[
+                    { v: "beginner", l: "Beginner — under 6 months" },
+                    { v: "intermediate", l: "Intermediate — 6 months to 2 years" },
+                    { v: "advanced", l: "Advanced — 2 years or more" },
+                  ]}
+                />
+              </Field>
+            )}
+            {step === 6 && (
+              <Field
+                index="07"
+                title="How many days a week?"
+                sub="Two consistent days beat five imaginary ones."
+              >
+                <div className="rounded-[1.75rem] border border-border bg-card p-6">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-6xl font-medium tabular-nums">{draft.daysPerWeek}</span>
+                    <span className="text-sm text-muted-foreground">days / week</span>
+                  </div>
+                  <input
+                    id="days-per-week"
+                    type="range"
+                    min={2}
+                    max={6}
+                    value={draft.daysPerWeek}
+                    onChange={(e) => setDraft({ ...draft, daysPerWeek: Number(e.target.value) })}
+                    className="mt-8 w-full accent-orange"
+                  />
+                  <div className="mt-3 flex justify-between text-xs tabular-nums text-muted-foreground">
+                    {[2, 3, 4, 5, 6].map((n) => (
+                      <span key={n} className={n === draft.daysPerWeek ? "text-orange" : ""}>
+                        {n}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </Field>
+            )}
+            {step === 7 && (
+              <Field
+                index="08"
+                title="Anything we should work around?"
+                sub="Select all that apply. This keeps the plan safe."
+              >
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {HEALTH_OPTIONS.map((o) => {
+                    const selected = draft.healthConditions?.includes(o.v) ?? false;
+                    return (
+                      <button
+                        key={o.v}
+                        onClick={() => toggleHealth(o.v)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-2xl border p-4 text-left text-sm transition-colors",
+                          selected
+                            ? "border-orange bg-orange/10"
+                            : "border-border bg-card hover:border-foreground/25",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border",
+                            selected ? "border-orange bg-orange text-ink" : "border-border",
+                          )}
+                        >
+                          {selected ? <Check className="h-3 w-3" /> : null}
+                        </span>
+                        {o.l}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+            )}
+            {step === 8 && (
+              <Field index="09" title="Food and budget." sub="Meals you can actually afford and cook.">
+                <Choices
+                  value={draft.diet}
+                  onChange={(v) => setDraft({ ...draft, diet: v as Diet })}
+                  options={[
+                    { v: "veg", l: "Vegetarian" },
+                    { v: "nonveg", l: "Non-vegetarian" },
+                    { v: "egg", l: "Eggetarian" },
+                  ]}
+                />
+                <div className="mt-7 rounded-[1.75rem] border border-border bg-card p-6">
+                  <div className="flex items-baseline justify-between">
+                    <p className="label-micro text-muted-foreground">Food budget</p>
+                    <p className="text-2xl font-medium tabular-nums">
+                      ₹{draft.budgetPerDay}
+                      <span className="ml-1 text-xs text-muted-foreground">/ day</span>
+                    </p>
+                  </div>
+                  <input
+                    id="budget-per-day"
+                    type="range"
+                    min={80}
+                    max={400}
+                    step={10}
+                    value={draft.budgetPerDay}
+                    onChange={(e) => setDraft({ ...draft, budgetPerDay: Number(e.target.value) })}
+                    className="mt-6 w-full accent-orange"
+                  />
+                </div>
+              </Field>
+            )}
+          </div>
+
+          <div className="mt-8 flex items-center justify-between gap-4 border-t border-border pt-6">
+            <button
+              onClick={back}
+              disabled={step === 0}
+              className={cn(
+                "inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
+                step === 0 && "invisible",
+              )}
+            >
+              <ArrowLeft className="h-4 w-4" /> Back
+            </button>
+
+            {step === 0 ? (
+              <span className="text-xs text-muted-foreground">Takes under a minute</span>
+            ) : step < 8 ? (
+              <PrimaryButton onClick={next}>Continue</PrimaryButton>
+            ) : (
+              <PrimaryButton onClick={finish}>Start my first week</PrimaryButton>
+            )}
+          </div>
+        </main>
       </div>
     </div>
   );
@@ -317,44 +396,83 @@ function Onboarding() {
 
 function Welcome({ onNext }: { onNext: () => void }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center text-center">
-      <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-hero shadow-glow p-1">
-        <img src={logoImg} alt="FitMentor AI logo" className="h-full w-full object-contain" />
-      </div>
-      <h1 className="mt-8 text-4xl font-bold leading-tight">
-        Welcome to <span className="text-gradient">FitMentor AI</span>
+    <div>
+      <SectionLabel index="01">Welcome</SectionLabel>
+      <h1 className="mt-5 text-5xl font-semibold leading-[0.9] tracking-[-0.05em] sm:text-7xl">
+        Let's build
+        <br />
+        your first <span className="text-orange">week.</span>
       </h1>
-      <p className="mt-3 max-w-xs text-base text-muted-foreground">
-        Your pocket fitness coach. Personalized workouts, Indian meal plans, and a smart AI trainer
-        — all for free.
+      <p className="mt-6 max-w-md text-sm leading-relaxed text-muted-foreground">
+        Nine quick questions. We'll turn them into a training split, daily targets, and a
+        meal plan built around Indian food and your budget.
       </p>
-      <Button
-        size="lg"
-        className="mt-10 h-14 w-full bg-gradient-hero font-semibold text-primary-foreground shadow-glow"
-        onClick={onNext}
-      >
-        Let's go
-      </Button>
-      <p className="mt-4 text-xs text-muted-foreground">Takes less than 60 seconds</p>
+      <div className="mt-10">
+        <PrimaryButton onClick={onNext}>Let's go</PrimaryButton>
+      </div>
+      <div className="mt-12 grid max-w-md grid-cols-3 gap-4 border-t border-border pt-6">
+        {[
+          ["09", "questions"],
+          ["60s", "to finish"],
+          ["₹0", "to start"],
+        ].map(([value, label]) => (
+          <div key={label}>
+            <p className="text-2xl font-medium">{value}</p>
+            <p className="label-micro mt-1 text-muted-foreground">{label}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
 function Field({
+  index,
   title,
   sub,
   children,
 }: {
+  index: string;
   title: string;
   sub?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <h2 className="text-2xl font-bold leading-tight">{title}</h2>
-      {sub && <p className="mt-1 text-sm text-muted-foreground">{sub}</p>}
-      <div className="mt-6">{children}</div>
+      <SectionLabel index={index}>Setup</SectionLabel>
+      <h2 className="mt-4 text-3xl font-semibold leading-[0.95] tracking-[-0.035em] sm:text-4xl">
+        {title}
+      </h2>
+      {sub ? <p className="mt-3 text-sm text-muted-foreground">{sub}</p> : null}
+      <div className="mt-9">{children}</div>
     </div>
+  );
+}
+
+function BigInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  autoFocus,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  autoFocus?: boolean;
+}) {
+  return (
+    <label className="block max-w-md">
+      <span className="label-micro text-muted-foreground">{label}</span>
+      <input
+        autoFocus={autoFocus}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-3 w-full border-b-2 border-border bg-transparent pb-3 text-4xl font-medium outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-orange"
+      />
+    </label>
   );
 }
 
@@ -370,19 +488,19 @@ function NumInput({
   suffix?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <div className="mt-1 flex items-end gap-1">
+    <label className="block">
+      <span className="label-micro text-muted-foreground">{label}</span>
+      <span className="mt-3 flex items-end gap-2 border-b-2 border-border pb-2 transition-colors focus-within:border-orange">
         <input
-          id={label?.toLowerCase().replace(/\s+/g, "-") || "field"}
+          id={label.toLowerCase().replace(/\s+/g, "-")}
           inputMode="numeric"
           value={(value as string | number) ?? ""}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full bg-transparent text-2xl font-bold outline-none"
+          className="w-full bg-transparent text-4xl font-medium tabular-nums outline-none"
         />
-        {suffix && <span className="pb-1 text-xs text-muted-foreground">{suffix}</span>}
-      </div>
-    </div>
+        {suffix ? <span className="pb-1.5 text-xs text-muted-foreground">{suffix}</span> : null}
+      </span>
+    </label>
   );
 }
 
@@ -398,12 +516,12 @@ function Select({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
+    <label className="block">
+      <span className="label-micro text-muted-foreground">{label}</span>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full bg-transparent text-lg font-semibold outline-none"
+        className="mt-3 w-full appearance-none border-b-2 border-border bg-transparent pb-3 text-2xl font-medium outline-none transition-colors focus:border-orange"
       >
         {options.map((o) => (
           <option key={o.v} value={o.v} className="bg-card text-foreground">
@@ -411,7 +529,7 @@ function Select({
           </option>
         ))}
       </select>
-    </div>
+    </label>
   );
 }
 
@@ -422,25 +540,43 @@ function Choices<T extends string>({
 }: {
   value: T | undefined;
   onChange: (v: T) => void;
-  options: { v: T; l: string; e: string }[];
+  options: { v: T; l: string }[];
 }) {
   return (
-    <div className="space-y-3">
-      {options.map((o) => (
-        <button
-          key={o.v}
-          onClick={() => onChange(o.v)}
-          className={cn(
-            "flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition",
-            value === o.v
-              ? "border-primary bg-primary/10 shadow-glow"
-              : "border-border/60 bg-card hover:border-primary/40",
-          )}
-        >
-          <span className="text-2xl">{o.e}</span>
-          <span className="font-semibold">{o.l}</span>
-        </button>
-      ))}
+    <div className="space-y-2.5">
+      {options.map((o, i) => {
+        const selected = value === o.v;
+        return (
+          <button
+            key={o.v}
+            onClick={() => onChange(o.v)}
+            className={cn(
+              "group flex w-full items-center gap-5 rounded-2xl border p-4 text-left transition-colors sm:p-5",
+              selected
+                ? "border-orange bg-orange/10"
+                : "border-border bg-card hover:border-foreground/25",
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-wordmark text-[10px]",
+                selected ? "bg-orange text-ink" : "bg-secondary text-muted-foreground",
+              )}
+            >
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <span className="flex-1 text-base font-medium">{o.l}</span>
+            <span
+              className={cn(
+                "flex h-7 w-7 items-center justify-center rounded-full transition-colors",
+                selected ? "bg-ink text-cream dark:bg-cream dark:text-ink" : "text-border",
+              )}
+            >
+              <ArrowUpRight className="h-4 w-4" />
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

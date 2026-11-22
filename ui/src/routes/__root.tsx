@@ -90,25 +90,25 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { name: "theme-color", content: "#0a0a1a" },
-      { title: "FitMentor AI — Your Pocket Fitness Coach" },
+      { name: "theme-color", content: "#F7F3ED", media: "(prefers-color-scheme: light)" },
+      { name: "theme-color", content: "#0B0B0B", media: "(prefers-color-scheme: dark)" },
+      { title: "FitMentor — Train like you mean it" },
       {
         name: "description",
         content:
-          "AI fitness coach for Indian beginners. Personalized workouts, affordable meal plans, and progress tracking — built for students and gym newbies.",
+          "AI fitness coaching for India. Personalized workouts, Indian meal plans, and a coach that knows your plan.",
       },
-      { name: "author", content: "FitMentor AI" },
+      { name: "author", content: "FitMentor" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
-      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
       { name: "mobile-web-app-capable", content: "yes" },
-      { property: "og:title", content: "FitMentor AI — Your Pocket Fitness Coach" },
+      { property: "og:title", content: "FitMentor — Train like you mean it" },
       {
         property: "og:description",
         content: "Personalized workouts, Indian meal plans, and an AI coach in your pocket.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
@@ -116,7 +116,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "manifest", href: "/manifest.json" },
-      { rel: "apple-touch-icon", href: "/icons/icon-192.png" },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: "/icons/icon-32.png" },
+      { rel: "icon", type: "image/png", sizes: "64x64", href: "/icons/icon-64.png" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "/icons/apple-touch-icon.png" },
     ],
   }),
   shellComponent: RootShell,

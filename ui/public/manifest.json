@@ -1,11 +1,11 @@
 {
-  "name": "FitMentor AI",
+  "name": "FitMentor — Train like you mean it",
   "short_name": "FitMentor",
-  "description": "AI fitness coach for Indian beginners. Personalized workouts, affordable meal plans, and progress tracking.",
+  "description": "AI fitness coaching for India: personalized workouts, Indian meal plans, and a coach that knows your plan.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a1a",
-  "theme_color": "#0a0a1a",
+  "background_color": "#F7F3ED",
+  "theme_color": "#FF6C04",
   "orientation": "portrait-primary",
   "icons": [
     {

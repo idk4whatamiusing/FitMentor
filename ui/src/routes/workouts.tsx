@@ -6,13 +6,14 @@ import { useProfile } from "@/utils/profile";
 import { EXERCISE_LIBRARY, type WorkoutDay } from "@/utils/workouts";
 import { saveLog, ensureToday } from "@/utils/habits";
 import { syncWorkoutDone } from "@/services/sync";
-import { Button } from "@/components/ui/button";
-import { Check, ChevronRight, Clock, Dumbbell, RefreshCw } from "lucide-react";
+import { Check, ChevronDown, Clock, Play } from "lucide-react";
 import { toast } from "sonner";
 import { proxyWorkoutPlan } from "@/services/api-proxy";
+import { PageHeader, Pill } from "@/components/editorial";
+import { cn } from "@/utils/cn";
 
 export const Route = createFileRoute("/workouts")({
-  head: () => ({ meta: [{ title: "Workouts — FitMentor" }] }),
+  head: () => ({ meta: [{ title: "Train — FitMentor" }] }),
   component: Workouts,
 });
 
@@ -28,7 +29,10 @@ function Workouts() {
 
   useEffect(() => {
     setFetchError(false);
-    if (!profile) { setLoading(false); return; }
+    if (!profile) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     proxyWorkoutPlan()
       .then((data) => {
@@ -42,129 +46,194 @@ function Workouts() {
 
   return (
     <MobileShell>
-      <div className="px-5 pt-14">
-        <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Training</p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight">Your Plan</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">Built around your goals.</p>
-      </div>
+      <div className="px-5 pt-8 lg:px-8 lg:pt-12">
+        <PageHeader
+          label="Train"
+          title={
+            <>
+              The <span className="text-orange">week.</span>
+            </>
+          }
+          description="Built around your equipment, experience, and the days you can actually show up."
+          action={
+            <Pill>
+              <span className="h-1.5 w-1.5 rounded-full bg-orange" />
+              {plan.length || "—"} day split
+            </Pill>
+          }
+        />
 
-      <div className="mx-5 mt-5 flex rounded-2xl border border-white/10 bg-secondary/40 p-1 backdrop-blur-xl">
-        <TabBtn active={tab === "plan"} onClick={() => setTab("plan")}>This week</TabBtn>
-        <TabBtn active={tab === "library"} onClick={() => setTab("library")}>Library</TabBtn>
-      </div>
-
-      {tab === "plan" && (
-        <div className="px-5 py-4 space-y-3">
-          {loading && (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="animate-pulse rounded-2xl border border-white/10 bg-card/70 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-11 w-11 rounded-xl bg-primary/20" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-3 w-16 rounded bg-primary/10" />
-                      <div className="h-4 w-32 rounded bg-primary/10" />
-                      <div className="h-3 w-24 rounded bg-primary/10" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {!loading && plan.length === 0 && fetchError && (
-            <p className="py-8 text-center text-sm text-muted-foreground">Failed to generate workout plan.</p>
-          )}
-          {!loading && plan.map((day, i) => (
-            <div key={i} className="overflow-hidden rounded-2xl border border-white/10 bg-card/70 backdrop-blur-xl transition hover:border-primary/30">
-              <button
-                onClick={() => setOpenIdx(openIdx === i ? null : i)}
-                className="flex w-full items-center gap-3 p-4 text-left"
-              >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-hero text-primary-foreground shadow-glow">
-                  <Dumbbell className="h-5 w-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Day {i + 1}</p>
-                  <p className="font-bold truncate">{day.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{day.focus}</p>
-                </div>
-                <ChevronRight className={`h-5 w-5 text-muted-foreground transition ${openIdx === i ? "rotate-90" : ""}`} />
-              </button>
-              {openIdx === i && (
-                <div className="border-t border-white/5 p-4 space-y-3">
-                  {day.exercises.map((ex, j) => (
-                    <div key={j} className="rounded-xl border border-white/5 bg-secondary/40 p-3 backdrop-blur">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm">{ex.name}</p>
-                          <p className="text-xs text-muted-foreground">{ex.muscles.join(" • ")}</p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-mono text-sm font-bold text-primary">{ex.sets} × {ex.reps}</p>
-                          <p className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" /> {ex.rest}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="mt-2 text-xs text-muted-foreground">💡 {ex.tips}</p>
-                      {ex.alt && <p className="mt-1 text-xs text-muted-foreground">↔ Alt: {ex.alt}</p>}
-                    </div>
-                  ))}
-                  {workoutDone ? (
-                    <Button disabled className="mt-2 w-full h-12 text-base font-semibold bg-green-500/20 text-green-400 border border-green-500/30 cursor-default">
-                      <Check className="mr-2 h-4 w-4" /> Completed
-                    </Button>
-                  ) : (
-                    <Button
-                      className="mt-2 w-full bg-gradient-hero text-primary-foreground shadow-glow h-12 text-base font-semibold"
-                      onClick={() => {
-                        const log = ensureToday();
-                        saveLog({ ...log, workoutDone: true });
-                        setWorkoutDone(true);
-                        sync({ data: { workoutDone: true } });
-                        toast.success("Workout logged!");
-                      }}
-                    >
-                      <Check className="mr-2 h-4 w-4" /> Mark complete
-                    </Button>
-                  )}
-                </div>
+        <div className="mt-8 inline-flex rounded-full border border-border bg-card p-1">
+          {(
+            [
+              ["plan", "This week"],
+              ["library", "Exercise library"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={cn(
+                "rounded-full px-5 py-2 text-xs font-semibold uppercase tracking-[0.1em] transition-colors",
+                tab === key
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground",
               )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab === "library" && (
-        <div className="grid grid-cols-2 gap-3 px-5 py-4">
-          {EXERCISE_LIBRARY.map((ex) => (
-            <Link
-              key={ex.name}
-              to="/exercise/$name"
-              params={{ name: ex.name }}
-              className="group relative overflow-hidden rounded-2xl border border-white/10 bg-card/70 p-3 backdrop-blur-xl transition hover:border-primary/30"
             >
-              <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-primary/10 blur-2xl transition group-hover:bg-primary/20" />
-              <div className="relative">
-                <div className="text-3xl">{ex.emoji}</div>
-                <p className="mt-2 text-sm font-semibold leading-tight">{ex.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{ex.muscles.slice(0, 2).join(", ")}</p>
-              </div>
-            </Link>
+              {label}
+            </button>
           ))}
         </div>
-      )}
-    </MobileShell>
-  );
-}
 
-function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition ${active ? "bg-card text-foreground shadow-card border border-white/10" : "text-muted-foreground"}`}
-    >
-      {children}
-    </button>
+        {tab === "plan" ? (
+          <div className="mt-6 space-y-3 pb-4">
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="animate-pulse rounded-[1.75rem] border border-border bg-card p-6">
+                    <div className="h-3 w-16 rounded bg-muted" />
+                    <div className="mt-4 h-6 w-48 rounded bg-muted" />
+                    <div className="mt-2 h-3 w-32 rounded bg-muted" />
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {!loading && plan.length === 0 ? (
+              <div className="rounded-[1.75rem] border border-border bg-card p-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  {fetchError
+                    ? "Couldn't load your plan. Pull to retry in a moment."
+                    : "Your plan will appear here once your profile is saved."}
+                </p>
+              </div>
+            ) : null}
+
+            {!loading &&
+              plan.map((day, i) => {
+                const open = openIdx === i;
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      "overflow-hidden rounded-[1.75rem] border transition-colors",
+                      open ? "border-foreground/25 bg-card" : "border-border bg-card",
+                    )}
+                  >
+                    <button
+                      onClick={() => setOpenIdx(open ? null : i)}
+                      className="flex w-full items-center gap-5 p-5 text-left sm:p-6"
+                    >
+                      <span
+                        className={cn(
+                          "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl font-wordmark text-xs",
+                          open ? "bg-orange text-ink" : "bg-secondary text-muted-foreground",
+                        )}
+                      >
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="label-micro text-muted-foreground">Day {i + 1}</p>
+                        <p className="mt-1 truncate text-lg font-semibold">{day.title}</p>
+                        <p className="truncate text-xs text-muted-foreground">{day.focus}</p>
+                      </div>
+                      <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+                        <Clock className="h-3.5 w-3.5" /> {day.exercises.length} moves
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "h-5 w-5 shrink-0 text-muted-foreground transition-transform",
+                          open && "rotate-180",
+                        )}
+                      />
+                    </button>
+
+                    {open ? (
+                      <div className="border-t border-border px-5 pb-5 sm:px-6">
+                        <div className="divide-y divide-border">
+                          {day.exercises.map((ex, j) => (
+                            <div key={j} className="flex gap-4 py-4">
+                              <span className="label-micro mt-1 w-6 shrink-0 text-orange">
+                                {String(j + 1).padStart(2, "0")}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                                  <p className="text-sm font-semibold">{ex.name}</p>
+                                  <p className="font-wordmark text-[11px] text-foreground">
+                                    {ex.sets} × {ex.reps}
+                                  </p>
+                                </div>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                  {ex.muscles.join(" · ")} · rest {ex.rest}
+                                </p>
+                                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                                  {ex.tips}
+                                </p>
+                                {ex.alt ? (
+                                  <p className="mt-1 text-xs text-muted-foreground/70">
+                                    Swap: {ex.alt}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {workoutDone ? (
+                          <div className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-border bg-secondary py-3 text-sm font-semibold text-muted-foreground">
+                            <Check className="h-4 w-4 text-orange" /> Session complete
+                          </div>
+                        ) : (
+                          <button
+                            className="group mt-2 flex w-full items-center justify-between rounded-full bg-foreground py-2 pl-6 pr-2 text-sm font-semibold text-background"
+                            onClick={() => {
+                              const log = ensureToday();
+                              saveLog({ ...log, workoutDone: true });
+                              setWorkoutDone(true);
+                              sync({ data: { workoutDone: true } });
+                              toast.success("Workout logged");
+                            }}
+                          >
+                            Mark session complete
+                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-orange text-ink">
+                              <Check className="h-4 w-4" />
+                            </span>
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+          </div>
+        ) : (
+          <div className="mt-6 grid grid-cols-2 gap-3 pb-4 sm:grid-cols-3 lg:grid-cols-4">
+            {EXERCISE_LIBRARY.map((ex, i) => (
+              <Link
+                key={ex.name}
+                to="/exercise/$name"
+                params={{ name: ex.name }}
+                className="group flex flex-col justify-between rounded-[1.5rem] border border-border bg-card p-5 transition-colors hover:border-foreground/30"
+              >
+                <div className="flex items-start justify-between">
+                  <span className="label-micro text-muted-foreground">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-secondary text-muted-foreground transition-colors group-hover:bg-orange group-hover:text-ink">
+                    <Play className="h-3 w-3" />
+                  </span>
+                </div>
+                <div className="mt-8">
+                  <p className="text-sm font-semibold leading-tight">{ex.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {ex.muscles.slice(0, 2).join(", ")}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </MobileShell>
   );
 }

@@ -1,79 +1,100 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Home, Dumbbell, Sparkles, Apple, User, Wrench, Moon, Sun } from "lucide-react";
-import { type ReactNode, useState, useEffect } from "react";
+import { Home, Dumbbell, Sparkles, Apple, User, Wrench } from "lucide-react";
+import { type ReactNode } from "react";
 import { cn } from "@/utils/cn";
-import { saveTheme, loadTheme } from "@/utils/theme";
+import { Wordmark } from "@/components/editorial";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const TABS = [
   { to: "/dashboard", label: "Home", icon: Home },
   { to: "/workouts", label: "Train", icon: Dumbbell },
-  { to: "/tools", label: "Tools", icon: Wrench },
-  { to: "/coach", label: "Coach", icon: Sparkles, accent: true },
   { to: "/nutrition", label: "Food", icon: Apple },
+  { to: "/coach", label: "Coach", icon: Sparkles, accent: true },
+  { to: "/tools", label: "Tools", icon: Wrench },
   { to: "/profile", label: "You", icon: User },
 ] as const;
 
-export function MobileShell({ children }: { children: ReactNode }) {
+function isActive(pathname: string, to: string) {
+  return to === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(to);
+}
+
+export function MobileShell({ children, wide }: { children: ReactNode; wide?: boolean }) {
   const { pathname } = useLocation();
-  const [isDark, setIsDark] = useState(true);
-
-  useEffect(() => {
-    setIsDark(document.documentElement.classList.contains("dark"));
-  }, []);
-
-  const toggleTheme = () => {
-    const next = !document.documentElement.classList.contains("dark");
-    document.documentElement.classList.toggle("dark", next);
-    saveTheme(next ? "dark" : "light");
-    setIsDark(next);
-  };
 
   return (
-    <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-background">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-gradient-mesh" />
-      <button
-        onClick={toggleTheme}
-        className="fixed right-4 z-50 flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-card/80 text-muted-foreground shadow-card backdrop-blur-xl transition-colors hover:text-foreground"
-        style={{ top: "max(1.5rem, calc(env(safe-area-inset-top) + 0.75rem))" }}
-        aria-label="Toggle theme"
+    <div className="relative min-h-screen bg-background text-foreground">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-5 lg:px-8">
+          <Wordmark href="/dashboard" />
+
+          <nav className="hidden items-center gap-7 md:flex" aria-label="Primary">
+            {TABS.map((tab) => {
+              const active = isActive(pathname, tab.to);
+              return (
+                <Link
+                  key={tab.to}
+                  to={tab.to}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "label-micro relative py-2 transition-colors",
+                    active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {tab.label}
+                  {active ? (
+                    <span className="absolute -bottom-0.5 left-0 h-0.5 w-full bg-orange" aria-hidden />
+                  ) : null}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
+
+      <main className={cn("mx-auto w-full", wide ? "max-w-7xl" : "max-w-6xl", "pb-32 md:pb-16")}>
+        {children}
+      </main>
+
+      <nav
+        className="fixed inset-x-0 bottom-0 z-50 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden"
+        aria-label="Primary"
       >
-        {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-      </button>
-      <main className="relative flex-1 pb-28 pt-safe">{children}</main>
-      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md px-4 pb-4">
-        <div className="relative flex items-center justify-around rounded-3xl border border-border/60 bg-card/70 px-1 py-2 shadow-card backdrop-blur-2xl">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            const active = t.to === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(t.to);
-            const accent = "accent" in t && t.accent;
+        <div className="mx-auto flex max-w-md items-center justify-between rounded-[1.75rem] border border-border bg-card/95 px-1.5 py-2 shadow-card backdrop-blur-xl">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const active = isActive(pathname, tab.to);
+            const accent = "accent" in tab && tab.accent;
             return (
               <Link
-                key={t.to}
-                to={t.to}
-                className={cn(
-                  "relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl py-1.5 text-[10px] font-medium transition-all duration-300",
-                  active && !accent
-                    ? "text-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
+                key={tab.to}
+                to={tab.to}
+                aria-current={active ? "page" : undefined}
+                className="flex flex-1 flex-col items-center gap-1 py-0.5"
               >
-                {accent ? (
-                  <span
-                    className={cn(
-                      "-mt-7 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-hero text-primary-foreground shadow-glow ring-4 ring-background transition-transform duration-300 hover:scale-105",
-                    )}
-                  >
-                    <Icon className="h-6 w-6" />
-                  </span>
-                ) : (
-                  <>
-                    {active && (
-                      <span className="absolute -top-1 h-1 w-8 rounded-full bg-gradient-hero shadow-glow" />
-                    )}
-                    <Icon className={cn("h-5 w-5 transition-transform", active && "scale-110")} />
-                  </>
-                )}
-                <span className={accent ? "mt-1" : ""}>{t.label}</span>
+                <span
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
+                    active
+                      ? accent
+                        ? "bg-orange text-ink"
+                        : "bg-foreground text-background"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  <Icon className="h-[18px] w-[18px]" strokeWidth={1.9} />
+                </span>
+                <span
+                  className={cn(
+                    "text-[9px] font-semibold uppercase tracking-[0.12em]",
+                    active ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {tab.label}
+                </span>
               </Link>
             );
           })}
@@ -82,3 +103,5 @@ export function MobileShell({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+export const AppShell = MobileShell;
