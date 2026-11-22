@@ -4,15 +4,15 @@
 use slint::ComponentHandle;
 
 fn main() -> Result<(), slint::PlatformError> {
-    // Headless smoke check used by CI/dev: `fitmentor-slint --check-api`.
+    // Headless smoke check used by CI/dev: `fitmentor-native --check-api`.
     if std::env::args().any(|arg| arg == "--check-api") {
         if let Some(token) = std::env::var("FITMENTOR_JWT")
             .ok()
-            .or_else(fitmentor_slint::api::load_token)
+            .or_else(fitmentor_native::api::load_token)
         {
-            fitmentor_slint::api::set_token(Some(token));
+            fitmentor_native::api::set_token(Some(token));
         }
-        match fitmentor_slint::api::fetch_today() {
+        match fitmentor_native::api::fetch_today() {
             Ok(log) => println!("{log:?}"),
             Err(error) => {
                 eprintln!("{error}");
@@ -25,26 +25,26 @@ fn main() -> Result<(), slint::PlatformError> {
     if std::env::args().any(|arg| arg == "--check-community") {
         if let Some(token) = std::env::var("FITMENTOR_JWT")
             .ok()
-            .or_else(fitmentor_slint::api::load_token)
+            .or_else(fitmentor_native::api::load_token)
         {
-            fitmentor_slint::api::set_token(Some(token));
+            fitmentor_native::api::set_token(Some(token));
         }
-        match fitmentor_slint::api::fetch_community_feed(5) {
+        match fitmentor_native::api::fetch_community_feed(5) {
             Ok(posts) => println!("feed: {} posts", posts.len()),
             Err(error) => eprintln!("feed: {error}"),
         }
-        match fitmentor_slint::api::create_community_post("Slint community smoke test") {
+        match fitmentor_native::api::create_community_post("Slint community smoke test") {
             Ok(post) => {
                 println!("created: {} {}", post.id, post.text);
-                match fitmentor_slint::api::toggle_community_like(&post.id) {
+                match fitmentor_native::api::toggle_community_like(&post.id) {
                     Ok((liked, count)) => println!("like: liked={liked} count={count}"),
                     Err(error) => eprintln!("like: {error}"),
                 }
-                match fitmentor_slint::api::reply_community_post(&post.id, "Slint reply test") {
+                match fitmentor_native::api::reply_community_post(&post.id, "Slint reply test") {
                     Ok(reply) => println!("reply: {}", reply.id),
                     Err(error) => eprintln!("reply: {error}"),
                 }
-                match fitmentor_slint::api::fetch_community_post(&post.id) {
+                match fitmentor_native::api::fetch_community_post(&post.id) {
                     Ok((_, replies)) => println!("replies: {}", replies.len()),
                     Err(error) => eprintln!("post: {error}"),
                 }
@@ -57,11 +57,11 @@ fn main() -> Result<(), slint::PlatformError> {
     if std::env::args().any(|arg| arg == "--check-checkout") {
         if let Some(token) = std::env::var("FITMENTOR_JWT")
             .ok()
-            .or_else(fitmentor_slint::api::load_token)
+            .or_else(fitmentor_native::api::load_token)
         {
-            fitmentor_slint::api::set_token(Some(token));
+            fitmentor_native::api::set_token(Some(token));
         }
-        match fitmentor_slint::api::create_checkout("pro") {
+        match fitmentor_native::api::create_checkout("pro") {
             Ok(url) => println!("checkout: {url}"),
             Err(error) => {
                 eprintln!("{error}");
@@ -74,11 +74,11 @@ fn main() -> Result<(), slint::PlatformError> {
     if std::env::args().any(|arg| arg == "--check-chat") {
         if let Some(token) = std::env::var("FITMENTOR_JWT")
             .ok()
-            .or_else(fitmentor_slint::api::load_token)
+            .or_else(fitmentor_native::api::load_token)
         {
-            fitmentor_slint::api::set_token(Some(token));
+            fitmentor_native::api::set_token(Some(token));
         }
-        match fitmentor_slint::api::fetch_coach_session() {
+        match fitmentor_native::api::fetch_coach_session() {
             Ok(session) => {
                 println!("session: {}", session.id);
                 for message in session.messages.iter().rev().take(6).rev() {
@@ -96,11 +96,11 @@ fn main() -> Result<(), slint::PlatformError> {
     if std::env::args().any(|arg| arg == "--check-workout") {
         if let Some(token) = std::env::var("FITMENTOR_JWT")
             .ok()
-            .or_else(fitmentor_slint::api::load_token)
+            .or_else(fitmentor_native::api::load_token)
         {
-            fitmentor_slint::api::set_token(Some(token));
+            fitmentor_native::api::set_token(Some(token));
         }
-        match fitmentor_slint::api::fetch_workout() {
+        match fitmentor_native::api::fetch_workout() {
             Ok(days) => {
                 for day in days {
                     println!(
@@ -121,18 +121,18 @@ fn main() -> Result<(), slint::PlatformError> {
     if std::env::args().any(|arg| arg == "--check-nutrition") {
         if let Some(token) = std::env::var("FITMENTOR_JWT")
             .ok()
-            .or_else(fitmentor_slint::api::load_token)
+            .or_else(fitmentor_native::api::load_token)
         {
-            fitmentor_slint::api::set_token(Some(token));
+            fitmentor_native::api::set_token(Some(token));
         }
-        match fitmentor_slint::api::fetch_profile() {
+        match fitmentor_native::api::fetch_profile() {
             Ok(profile) => println!(
                 "targets: {:?}",
-                fitmentor_slint::api::calc_targets(&profile)
+                fitmentor_native::api::calc_targets(&profile)
             ),
             Err(error) => eprintln!("profile: {error}"),
         }
-        match fitmentor_slint::api::fetch_meal_plan() {
+        match fitmentor_native::api::fetch_meal_plan() {
             Ok(plan) => println!("meal plan: {plan:?}"),
             Err(error) => eprintln!("meal plan: {error}"),
         }
@@ -142,11 +142,11 @@ fn main() -> Result<(), slint::PlatformError> {
     if std::env::args().any(|arg| arg == "--check-profile") {
         if let Some(token) = std::env::var("FITMENTOR_JWT")
             .ok()
-            .or_else(fitmentor_slint::api::load_token)
+            .or_else(fitmentor_native::api::load_token)
         {
-            fitmentor_slint::api::set_token(Some(token));
+            fitmentor_native::api::set_token(Some(token));
         }
-        match fitmentor_slint::api::fetch_profile() {
+        match fitmentor_native::api::fetch_profile() {
             Ok(profile) => println!("{profile:?}"),
             Err(error) => {
                 eprintln!("{error}");
@@ -156,6 +156,6 @@ fn main() -> Result<(), slint::PlatformError> {
         return Ok(());
     }
 
-    let ui = fitmentor_slint::create_window()?;
+    let ui = fitmentor_native::create_window()?;
     ui.run()
 }

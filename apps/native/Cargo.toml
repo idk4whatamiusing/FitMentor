@@ -1,14 +1,14 @@
 [package]
-name = "fitmentor-slint"
+name = "fitmentor-native"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "fitmentor_slint"
+name = "fitmentor_native"
 crate-type = ["cdylib", "rlib"]
 
 [[bin]]
-name = "fitmentor-slint"
+name = "fitmentor-native"
 path = "src/main.rs"
 
 [dependencies]
@@ -31,7 +31,7 @@ name = "android.app.NativeActivity"
 
 [[package.metadata.android.application.activity.meta_data]]
 name = "android.app.lib_name"
-value = "fitmentor_slint"
+value = "fitmentor_native"
 
 [[package.metadata.android.application.activity.intent_filter]]
 actions = ["android.intent.action.MAIN", "android.intent.action.VIEW"]

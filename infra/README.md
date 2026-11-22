@@ -104,7 +104,7 @@ namespace.
 - Community is live: feed, posts, likes, replies, reshares, notifications,
   search, reports, and blocks. Media uploads are not enabled yet (text-only).
 - Remaining cleanup: rotate the CockroachDB `ai` password, enable MFA on the
-  AWS root/admin account, and decide on the Slint Android migration.
+  AWS root/admin account, and finish the native app visual redesign.
 
 ## Notes
 
@@ -119,8 +119,8 @@ namespace.
 - `JWT_SECRET` signs the mobile JWTs (30-day TTL, `JWT_TTL_DAYS`).
 - `GOOGLE_CLIENT_IDS` is a comma-separated allow-list of Google OAuth client
   IDs accepted by `POST /v1/auth/google`. It should include the web client ID.
-- `GOOGLE_WEB_CLIENT_ID` / `GOOGLE_WEB_CLIENT_SECRET` drive the Slint browser
-  redirect flow (`/v1/auth/google/start`, `/v1/auth/google/callback`,
+- `GOOGLE_WEB_CLIENT_ID` / `GOOGLE_WEB_CLIENT_SECRET` drive the native app's
+  browser redirect flow (`/v1/auth/google/start`, `/v1/auth/google/callback`,
   `/v1/auth/google/poll`). The client must be a **Web application** OAuth client
   with `GOOGLE_WEB_REDIRECT_URI` registered as an authorized redirect URI.
 - `GOOGLE_CLIENT_SECRET` is kept for the legacy device-code flow

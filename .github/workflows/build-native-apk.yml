@@ -1,12 +1,12 @@
-name: Build Slint APK
+name: Build Native APK
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
-      - "apps/slint/**"
-      - ".github/workflows/build-slint-apk.yml"
+      - "apps/native/**"
+      - ".github/workflows/build-native-apk.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -14,13 +14,13 @@ concurrency:
 
 jobs:
   build:
-    name: Slint Android (arm64)
+    name: Native Android (arm64)
     runs-on: ubuntu-latest
     env:
       HAS_RELEASE_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     defaults:
       run:
-        working-directory: apps/slint
+        working-directory: apps/native
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +44,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: apps/slint
+          workspaces: apps/native
 
       - name: Install cargo-apk2
         run: cargo install cargo-apk2 --locked
@@ -69,14 +69,14 @@ jobs:
         if: env.HAS_RELEASE_KEYSTORE == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: FitMentor-Slint-APK
-          path: apps/slint/target/release/apk/*.apk
+          name: FitMentor-Native-APK
+          path: apps/native/target/release/apk/*.apk
           if-no-files-found: error
 
       - name: Upload debug APK
         if: env.HAS_RELEASE_KEYSTORE == 'false'
         uses: actions/upload-artifact@v4
         with:
-          name: FitMentor-Slint-APK-debug
-          path: apps/slint/target/debug/apk/*.apk
+          name: FitMentor-Native-APK-debug
+          path: apps/native/target/debug/apk/*.apk
           if-no-files-found: error

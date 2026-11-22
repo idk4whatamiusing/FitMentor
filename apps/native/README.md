@@ -1,13 +1,13 @@
-# FitMentor Slint (Android spike)
+# FitMentor Native
 
-A native Rust/Slint mobile client for FitMentor. This is the first spike:
-Today dashboard + quick log + live API refresh, with placeholder tabs for
-Nutrition, Workouts, Coach, and Profile.
+The native FitMentor client: Rust + Slint, one codebase for **desktop**
+(macOS/Linux/Windows) and **Android**. Both targets share the same UI, API
+client, auth flow, and persistence.
 
 ## Desktop
 
 ```bash
-cd apps/slint
+cd apps/native
 FITMENTOR_API_URL="https://...lambda-url...on.aws" \
 FITMENTOR_API_KEY="$API_SHARED_SECRET" \
 FITMENTOR_USER_ID="google:..." \
@@ -37,23 +37,20 @@ cargo apk2 build --target aarch64-linux-android --lib --release
 ```
 
 The APK is written to `target/release/apk/`. The GitHub workflow is
-`.github/workflows/build-slint-apk.yml` and uploads `FitMentor-Slint-APK`.
+`.github/workflows/build-native-apk.yml` and uploads
+`FitMentor-Native-APK`.
 
-## Current scope
+## What's included
 
-- Native Slint UI with bottom navigation and a dark mobile theme.
-- Today screen with water/sleep/steps/protein cards.
-- Quick log increments (local state).
-- Live API refresh (desktop spike).
-- Placeholder tabs for the remaining screens.
-
-## Next
-
-- Mobile auth: Google Sign-In + short-lived JWT (do not ship the shared secret
-  in the APK).
-- Port Onboarding, Nutrition, Workouts, Coach, Progress, Tools, and Profile.
-- Persist quick-log changes to the API.
-- Wire Polar checkout to open in the system browser and refresh the tier.
+- Google sign-in with browser redirect + JWT persistence.
+- Today dashboard: water, sleep, steps, protein, quick log.
+- Food: daily targets and today's AI meal plan.
+- Train: today's workout plan, exercise summaries, completions.
+- Coach: persistent chat sessions with AI quota handling.
+- Feed: community posts, likes, replies, notifications.
+- You: profile, subscription, edit profile, sign out.
+- Checkout: opens Polar in the system browser.
+- Light and dark themes, following the system by default.
 
 ## Sign in with Google
 

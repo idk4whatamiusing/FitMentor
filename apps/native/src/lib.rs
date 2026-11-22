@@ -1,4 +1,4 @@
-//! FitMentor Slint Android spike.
+//! FitMentor native client (desktop + Android).
 //!
 //! The UI is a native Slint window. On Android it runs through
 //! `android-activity`; on desktop `main.rs` runs the same window.
