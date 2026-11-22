@@ -63,7 +63,6 @@ jobs:
 
       - name: Build APK (debug-signed fallback)
         if: env.HAS_RELEASE_KEYSTORE == 'false'
-        env:
         run: cargo apk2 build --target aarch64-linux-android --lib
 
       - name: Upload release APK
