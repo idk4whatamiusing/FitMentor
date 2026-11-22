@@ -39,9 +39,11 @@ function Nutrition() {
     };
     window.addEventListener("storage", onStorage);
     window.addEventListener("fitmentor:protein-target", onStorage);
+    window.addEventListener("fitmentor:logs", onStorage);
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("fitmentor:protein-target", onStorage);
+      window.removeEventListener("fitmentor:logs", onStorage);
     };
   }, []);
 

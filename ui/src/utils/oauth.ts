@@ -289,6 +289,11 @@ export const exchangeGoogleCode = createServerFn({ method: "POST" })
   .handler(async (ctx) => exchangeProviderCode("google", ctx.data.code, ctx.data.state));
 
 export function logout() {
+  try {
+    localStorage.removeItem("fitmentor.habits.v1");
+  } catch {
+    // ignore
+  }
   window.location.href = "/";
 }
 

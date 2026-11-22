@@ -1,9 +1,12 @@
 import { Link, useLocation } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { Home, Dumbbell, Sparkles, Apple, User, Wrench } from "lucide-react";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { cn } from "@/utils/cn";
 import { Wordmark } from "@/components/editorial";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { fetchLogRange, syncLocalLogs, upsertTodayLog } from "@/services/sync";
+import { allLogs, ensureToday, mergeServerLogs, todayKey } from "@/utils/habits";
 
 const TABS = [
   { to: "/dashboard", label: "Home", icon: Home },
@@ -18,8 +21,40 @@ function isActive(pathname: string, to: string) {
   return to === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(to);
 }
 
+let logsHydrated = false;
+
+function daysAgo(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
 export function MobileShell({ children, wide }: { children: ReactNode; wide?: boolean }) {
   const { pathname } = useLocation();
+  const fetchRange = useServerFn(fetchLogRange);
+  const syncLogs = useServerFn(syncLocalLogs);
+  const upsertLog = useServerFn(upsertTodayLog);
+
+  useEffect(() => {
+    if (logsHydrated) return;
+    logsHydrated = true;
+    const local = allLogs();
+    syncLogs({ data: { logs: local } })
+      .catch(() => null)
+      .then(() => fetchRange({ data: { from: daysAgo(120), to: todayKey() } }))
+      .then((remote) => mergeServerLogs(remote as Parameters<typeof mergeServerLogs>[0]))
+      .catch(() => null);
+  }, [syncLogs, fetchRange]);
+
+  useEffect(() => {
+    const syncToday = () => {
+      const log = ensureToday();
+      if (!log.water && !log.sleep && !log.steps && !log.proteinG && !log.workoutDone) return;
+      upsertLog({ data: log }).catch(() => undefined);
+    };
+    window.addEventListener("fitmentor:logs", syncToday);
+    return () => window.removeEventListener("fitmentor:logs", syncToday);
+  }, [upsertLog]);
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">

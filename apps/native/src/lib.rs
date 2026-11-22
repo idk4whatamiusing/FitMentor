@@ -110,6 +110,15 @@ fn refresh_history(ui: &AppWindow) {
     ui.set_weight_path(weight_path.into());
 }
 
+fn log_has_activity(log: &api::LogRecord) -> bool {
+    log.water > 0
+        || log.sleep > 0
+        || log.steps > 0
+        || log.protein > 0
+        || log.workout
+        || log.weight > 0
+}
+
 fn persist_today(
     ui: &AppWindow,
     water: Option<i64>,
@@ -120,6 +129,13 @@ fn persist_today(
     weight: Option<i64>,
 ) {
     api::patch_today(water, sleep, steps, protein, workout, weight);
+    if let Some(record) = api::load_logs().get(&api::today_key()).cloned() {
+        if log_has_activity(&record) {
+            std::thread::spawn(move || {
+                let _ = api::upsert_today_log(&record);
+            });
+        }
+    }
     refresh_history(ui);
 }
 
@@ -273,6 +289,15 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
         }
         let handle = handle.clone();
         std::thread::spawn(move || {
+            let local = api::load_logs();
+            let _ = api::sync_logs(&local);
+            let today = api::today_key();
+            let from = (chrono::Utc::now() - chrono::Duration::days(120))
+                .format("%Y-%m-%d")
+                .to_string();
+            if let Ok(remote) = api::fetch_logs_range(&from, &today) {
+                api::merge_logs(remote);
+            }
             let result = api::fetch_today();
             let handle = handle.clone();
             slint::invoke_from_event_loop(move || {
@@ -287,8 +312,8 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                                 Some(log.sleep),
                                 Some(log.steps),
                                 Some(log.protein_g),
-                                None,
-                                None,
+                                Some(log.workout_done),
+                                log.weight_kg.map(|weight| weight.round() as i64),
                             );
                             ui.set_status_text("Synced just now".into());
                         }
@@ -510,6 +535,9 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             ui.set_community_replies(ModelRc::new(VecModel::from(Vec::<CommunityPost>::new())));
             ui.set_community_reply_status("".into());
             ui.set_status_text("Connect your account to sync today's log.".into());
+            ui.set_history(ModelRc::new(VecModel::from(Vec::<DayLog>::new())));
+            ui.set_streak(0);
+            api::clear_logs();
             ui.set_tab(0);
         }
     });
@@ -682,9 +710,15 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                                 })
                                 .collect();
                             let empty = items.is_empty();
-                            if let Some(day) = items.first() {
-                                ui.set_session_title(
-                                    friendly_session_title(&day.title, &day.focus).into(),
+                            if !items.is_empty() {
+                                let weekday = chrono::Datelike::weekday(&chrono::Local::now())
+                                    .num_days_from_sunday()
+                                    as usize;
+                                let day = &items[weekday % items.len()];
+                                ui.set_session_title(day.title.clone().into());
+                                ui.set_session_focus(day.focus.clone().into());
+                                ui.set_session_meta(
+                                    format!("{} moves · ~45 min", day.exercises.row_count()).into(),
                                 );
                             }
                             ui.set_workout_days(ModelRc::new(VecModel::from(items)));
@@ -1176,11 +1210,11 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             if tab == 1 {
                 ui.invoke_load_workout();
             }
+            if tab == 2 {
+                ui.invoke_load_nutrition();
+            }
             if tab == 3 {
                 ui.invoke_load_chat();
-            }
-            if tab == 4 {
-                ui.invoke_load_nutrition();
             }
             if tab == 5 {
                 ui.invoke_load_profile();

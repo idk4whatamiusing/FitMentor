@@ -416,7 +416,7 @@ export component StatBlock inherits Rectangle {
     in property <bool> invert: false;
     in property <bool> highlight: false;
 
-    height: 116px;
+    height: 128px;
     border-radius: 24px;
     background: root.invert ? Theme.ink : Theme.surface;
     border-width: 1px;
@@ -844,8 +844,8 @@ export component BottomNav inherits Rectangle {
             clicked => { root.select(1); }
         }
         NavItem {
-            label: "TOOLS";
-            icon: @image-url("icons/wrench.png");
+            label: "FOOD";
+            icon: @image-url("icons/apple.png");
             active: root.active == 2;
             clicked => { root.select(2); }
         }
@@ -857,8 +857,8 @@ export component BottomNav inherits Rectangle {
             clicked => { root.select(3); }
         }
         NavItem {
-            label: "FOOD";
-            icon: @image-url("icons/apple.png");
+            label: "TOOLS";
+            icon: @image-url("icons/wrench.png");
             active: root.active == 4;
             clicked => { root.select(4); }
         }
@@ -872,33 +872,6 @@ export component BottomNav inherits Rectangle {
 }
 
 export component ChoiceChip inherits Chip {
-}
-
-export component ThemeToggle inherits Rectangle {
-    callback clicked();
-
-    width: 36px;
-    height: 36px;
-    border-radius: 18px;
-    background: transparent;
-    border-width: 1px;
-    border-color: Theme.line;
-
-    Icon {
-        x: 10px;
-        y: 10px;
-        size: 14px;
-        tint: Theme.muted;
-        source: Theme.dark ? @image-url("icons/sun.png") : @image-url("icons/moon.png");
-    }
-
-    TouchArea {
-        width: 100%;
-        height: 100%;
-        clicked => {
-            root.clicked();
-        }
-    }
 }
 
 export component Avatar inherits Rectangle {

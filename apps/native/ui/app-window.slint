@@ -159,6 +159,8 @@ export component AppWindow inherits Window {
     in-out property <[WorkoutDay]> workout-days: [];
     in-out property <string> workout-status: "Load today's workout.";
     in-out property <string> session-title: "Your first session";
+    in-out property <string> session-focus: "Build the habit first.";
+    in-out property <string> session-meta: "";
     in-out property <int> workout-tab: 0;
     in-out property <int> open-workout: 0;
     in-out property <[string]> exercise-names: [];
@@ -384,9 +386,7 @@ export component AppWindow inherits Window {
                                 }
 
                                 Text {
-                                    text: root.workout-days.length > 0
-                                        ? root.workout-days[0].focus + " · " + root.workout-days[0].summary
-                                        : "Build the habit first.";
+                                    text: root.session-focus + (root.session-meta != "" ? " · " + root.session-meta : "");
                                     color: rgba(247, 243, 237, 0.6);
                                     font-size: 14px;
                                     wrap: word-wrap;
@@ -1109,7 +1109,7 @@ export component AppWindow inherits Window {
                 // --------------------------------------------------------
                 // TOOLS
                 // --------------------------------------------------------
-                if root.tab == 2 : VerticalLayout {
+                if root.tab == 4 : VerticalLayout {
                     spacing: 16px;
                     alignment: start;
 
@@ -1544,7 +1544,7 @@ export component AppWindow inherits Window {
                 // --------------------------------------------------------
                 // FOOD
                 // --------------------------------------------------------
-                if root.tab == 4 : VerticalLayout {
+                if root.tab == 2 : VerticalLayout {
                     spacing: 16px;
                     alignment: start;
 

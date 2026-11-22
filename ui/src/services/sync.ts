@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie } from "@tanstack/react-start/server";
-import type { Profile } from "@fitmentor/shared";
+import type { Profile, DailyLog } from "@fitmentor/shared";
 import { resolveSessionFromToken } from "@/utils/session";
 import { getEnv } from "@/utils/env";
 
@@ -98,7 +98,7 @@ export const syncWorkoutDone = createServerFn({ method: "POST" })
         "X-User-Id": session.sub,
         "X-User-Email": session.email,
       },
-      body: JSON.stringify({ workout_done: workoutDone }),
+      body: JSON.stringify({ workoutDone }),
     });
     return { ok: res.ok };
   });
@@ -117,4 +117,76 @@ export const fetchSubscription = createServerFn({ method: "POST" }).handler(asyn
     });
     if (!res.ok) return { data: { subscription: null } };
     return res.json();
+  });
+
+
+function logHeaders(session: { sub: string; email: string }, apiKey: string) {
+  return {
+    "Content-Type": "application/json",
+    "X-Api-Key": apiKey,
+    "X-User-Id": session.sub,
+    "X-User-Email": session.email,
+  };
+}
+
+export const fetchLogRange = createServerFn({ method: "GET" })
+  .validator((d: unknown) => d as { from: string; to: string })
+  .handler(async ({ data }) => {
+    const session = await resolveSession();
+    const apiKey = getEnv("API_SHARED_SECRET");
+    if (!session || !apiKey) return [] as DailyLog[];
+    const url = `${getEnv("API_URL")}/v1/logs?from=${encodeURIComponent(data.from)}&to=${encodeURIComponent(data.to)}`;
+    const res = await fetch(url, { headers: logHeaders(session, apiKey) });
+    if (!res.ok) return [] as DailyLog[];
+    const json = (await res.json()) as { data?: { logs?: DailyLog[] } };
+    return json?.data?.logs ?? [];
+  });
+
+function isEmptyLog(log: DailyLog) {
+  return (
+    !log.water &&
+    !log.sleep &&
+    !log.steps &&
+    !log.proteinG &&
+    !log.workoutDone &&
+    !(log.weightKg && log.weightKg > 0)
+  );
+}
+
+export const upsertTodayLog = createServerFn({ method: "POST" })
+  .validator((d: unknown) => d as DailyLog)
+  .handler(async ({ data }) => {
+    if (isEmptyLog(data)) return { ok: true };
+    const session = await resolveSession();
+    const apiKey = getEnv("API_SHARED_SECRET");
+    if (!session || !apiKey) return { ok: false };
+    const res = await fetch(`${getEnv("API_URL")}/v1/logs/today`, {
+      method: "PUT",
+      headers: logHeaders(session, apiKey),
+      body: JSON.stringify({
+        water: data.water,
+        sleep: data.sleep,
+        steps: data.steps,
+        proteinG: data.proteinG,
+        ...(data.workoutDone ? { workoutDone: true } : {}),
+        weightKg: data.weightKg ?? null,
+      }),
+    });
+    return { ok: res.ok };
+  });
+
+export const syncLocalLogs = createServerFn({ method: "POST" })
+  .validator((d: unknown) => d as { logs: DailyLog[] })
+  .handler(async ({ data }) => {
+    const session = await resolveSession();
+    const apiKey = getEnv("API_SHARED_SECRET");
+    if (!session || !apiKey || data.logs.length === 0) return { ok: false, inserted: 0 };
+    const res = await fetch(`${getEnv("API_URL")}/v1/logs/sync`, {
+      method: "POST",
+      headers: logHeaders(session, apiKey),
+      body: JSON.stringify({ logs: data.logs }),
+    });
+    if (!res.ok) return { ok: false, inserted: 0 };
+    const json = (await res.json()) as { data?: { inserted?: number } };
+    return { ok: true, inserted: json?.data?.inserted ?? 0 };
   });

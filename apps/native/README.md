@@ -14,8 +14,9 @@ and licenses are listed in [`ASSETS.md`](../../ASSETS.md).
 
 The theme follows the system on first launch and is persisted next to the
 token. For previews, `FITMENTOR_THEME=light|dark` overrides it and
-`FITMENTOR_TAB=0..5` opens a specific tab (Today, Food, Train, Coach, You,
-Feed).
+`FITMENTOR_TAB=0..5` opens a specific tab (Home, Train, Food, Coach, Tools,
+You). Daily logs are stored server-side in CockroachDB; the local file is only
+an offline cache.
 
 ## Mobile-web parity
 
@@ -23,7 +24,7 @@ The native screens are mirrored from the mobile web build at a 390 × 844
 viewport. Preview flags:
 
 ```bash
-FITMENTOR_TAB=0..5          # Home, Train, Tools, Coach, Food, You
+FITMENTOR_TAB=0..5          # Home, Train, Food, Coach, Tools, You
 FITMENTOR_PROGRESS=1        # open the progress screen
 FITMENTOR_ONBOARDING=1      # open onboarding
 FITMENTOR_STEP=0..8         # onboarding step

@@ -34,6 +34,20 @@ export function ensureToday(): DailyLog {
   return all[k];
 }
 
+export function mergeServerLogs(remote: DailyLog[]) {
+  if (typeof window === "undefined" || remote.length === 0) return;
+  const merged = { ...loadLogs() };
+  for (const log of remote) {
+    if (log?.date) merged[log.date] = log;
+  }
+  localStorage.setItem(KEY, JSON.stringify(merged));
+  window.dispatchEvent(new Event("fitmentor:logs"));
+}
+
+export function allLogs(): DailyLog[] {
+  return Object.values(loadLogs());
+}
+
 export function computeStreak(): number {
   const logs = loadLogs();
   let streak = 0;

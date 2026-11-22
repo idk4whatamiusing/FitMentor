@@ -72,6 +72,7 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/logs/today", put(logs::upsert_today))
         .route("/v1/logs/streak", get(logs::streak))
         .route("/v1/logs", get(logs::range))
+        .route("/v1/logs/sync", post(logs::sync))
         // coach
         .route("/v1/coach/sessions", get(coach::list))
         .route("/v1/coach/sessions", post(coach::create))

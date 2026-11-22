@@ -59,34 +59,33 @@ pub async fn upsert_today(
         .map_err(|_| ApiError::Internal("user not found".into()))?;
 
     let id = Uuid::new_v4().to_string();
-    let water = body.get("water").and_then(Value::as_i64).unwrap_or(0);
+    // Partial update: a missing field keeps its stored value instead of resetting to 0.
+    let water = body.get("water").and_then(Value::as_i64);
     let sleep = body
         .get("sleep")
         .and_then(Value::as_f64)
-        .unwrap_or(0.0)
-        .round() as i64;
-    let steps = body.get("steps").and_then(Value::as_i64).unwrap_or(0);
+        .map(|value| value.round() as i64);
+    let steps = body.get("steps").and_then(Value::as_i64);
     let protein = body
         .get("proteinG")
         .and_then(Value::as_f64)
-        .unwrap_or(0.0)
-        .round() as i64;
+        .map(|value| value.round() as i64);
     let done = body
         .get("workoutDone")
         .and_then(Value::as_bool)
-        .unwrap_or(false);
+        .map(|value| if value { 1_i64 } else { 0_i64 });
     let weight = body.get("weightKg").and_then(Value::as_f64);
 
     sqlx::query(
         "INSERT INTO daily_logs (id, user_id, date, water, sleep, steps, protein_g, workout_done, weight_kg)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         VALUES ($1, $2, $3, COALESCE($4, 0), COALESCE($5, 0), COALESCE($6, 0), COALESCE($7, 0), COALESCE($8, 0), $9)
          ON CONFLICT (user_id, date) DO UPDATE SET
-            water = excluded.water,
-            sleep = excluded.sleep,
-            steps = excluded.steps,
-            protein_g = excluded.protein_g,
-            workout_done = excluded.workout_done,
-            weight_kg = COALESCE(excluded.weight_kg, daily_logs.weight_kg),
+            water = COALESCE($4, daily_logs.water),
+            sleep = COALESCE($5, daily_logs.sleep),
+            steps = COALESCE($6, daily_logs.steps),
+            protein_g = COALESCE($7, daily_logs.protein_g),
+            workout_done = COALESCE($8, daily_logs.workout_done),
+            weight_kg = COALESCE($9, daily_logs.weight_kg),
             updated_at = now()::text",
     )
     .bind(&id)
@@ -96,7 +95,7 @@ pub async fn upsert_today(
     .bind(sleep)
     .bind(steps)
     .bind(protein)
-    .bind(if done { 1_i64 } else { 0_i64 })
+    .bind(done)
     .bind(weight)
     .execute(&state.pool)
     .await?;
@@ -110,6 +109,83 @@ pub async fn upsert_today(
     .await?;
 
     Ok(Json(json!({ "data": { "log": row.map(|r| r.to_json()) } })))
+}
+
+#[derive(Deserialize)]
+pub struct SyncRequest {
+    logs: Vec<Value>,
+}
+
+pub async fn sync(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<SyncRequest>,
+) -> ApiResult {
+    let auth_user = auth::require_user(&headers, &state.config)?;
+    let uid = user_id_for(&state.pool, &auth_user.user_id)
+        .await
+        .map_err(|_| ApiError::Internal("user not found".into()))?;
+
+    let mut inserted = 0_i64;
+    for item in body.logs.iter().take(400) {
+        let Some(date) = item.get("date").and_then(Value::as_str) else {
+            continue;
+        };
+        if chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_err() {
+            continue;
+        }
+        let id = Uuid::new_v4().to_string();
+        let water = item.get("water").and_then(Value::as_i64).unwrap_or(0);
+        let sleep = item
+            .get("sleep")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            .round() as i64;
+        let steps = item.get("steps").and_then(Value::as_i64).unwrap_or(0);
+        let protein = item
+            .get("proteinG")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0)
+            .round() as i64;
+        let workout = item
+            .get("workoutDone")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        let weight = item.get("weightKg").and_then(Value::as_f64);
+
+        let result = sqlx::query(
+            "INSERT INTO daily_logs (id, user_id, date, water, sleep, steps, protein_g, workout_done, weight_kg)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             ON CONFLICT (user_id, date) DO UPDATE SET
+                water = excluded.water,
+                sleep = excluded.sleep,
+                steps = excluded.steps,
+                protein_g = excluded.protein_g,
+                workout_done = excluded.workout_done,
+                weight_kg = excluded.weight_kg,
+                updated_at = now()::text
+             WHERE daily_logs.water = 0
+               AND daily_logs.sleep = 0
+               AND daily_logs.steps = 0
+               AND daily_logs.protein_g = 0
+               AND daily_logs.workout_done = 0
+               AND daily_logs.weight_kg IS NULL",
+        )
+        .bind(&id)
+        .bind(&uid)
+        .bind(date)
+        .bind(water)
+        .bind(sleep)
+        .bind(steps)
+        .bind(protein)
+        .bind(if workout { 1_i64 } else { 0_i64 })
+        .bind(weight)
+        .execute(&state.pool)
+        .await?;
+        inserted += result.rows_affected() as i64;
+    }
+
+    Ok(Json(json!({ "data": { "inserted": inserted } })))
 }
 
 #[derive(Deserialize)]
@@ -152,8 +228,9 @@ pub async fn streak(State(state): State<AppState>, headers: HeaderMap) -> ApiRes
         .await
         .map_err(|_| ApiError::Internal("user not found".into()))?;
 
-    let rows = sqlx::query_scalar::<_, String>(
-        "SELECT date FROM daily_logs WHERE user_id = $1 AND workout_done = 1 ORDER BY date DESC LIMIT 100",
+    let rows = sqlx::query_as::<_, (String, i64, i64, i64)>(
+        "SELECT date, water, protein_g, workout_done FROM daily_logs
+         WHERE user_id = $1 ORDER BY date DESC LIMIT 400",
     )
     .bind(&uid)
     .fetch_all(&state.pool)
@@ -161,8 +238,11 @@ pub async fn streak(State(state): State<AppState>, headers: HeaderMap) -> ApiRes
 
     let mut streak: i64 = 0;
     let mut expected = today();
-    for date in &rows {
-        if date == &expected {
+    for (date, water, protein, workout_done) in &rows {
+        if date != &expected {
+            break;
+        }
+        if *workout_done != 0 || *water >= 6 || *protein > 0 {
             streak += 1;
             if let Ok(parsed) = chrono::NaiveDate::parse_from_str(&expected, "%Y-%m-%d") {
                 expected = (parsed - chrono::Duration::days(1))

@@ -5,7 +5,7 @@ import { loadProfile, saveProfile, calcTargets, type Profile } from "@/utils/pro
 import { ensureToday, computeStreak, type DailyLog } from "@/utils/habits";
 import { generateWorkoutPlan } from "@/utils/workouts";
 import { useServerFn } from "@tanstack/react-start";
-import { proxyMe } from "@/services/api-proxy";
+import { proxyMe, proxyWorkoutPlan } from "@/services/api-proxy";
 import { MobileShell } from "@/components/MobileShell";
 import { DailyHabits } from "@/components/dashboard/DailyHabits";
 import { CoachChat } from "@/components/dashboard/CoachChat";
@@ -22,7 +22,20 @@ function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [log, setLog] = useState<DailyLog | null>(null);
   const [streak, setStreak] = useState(0);
+  const [apiPlan, setApiPlan] = useState<ReturnType<typeof generateWorkoutPlan>>([]);
   const meFn = useServerFn(proxyMe);
+  const workoutFn = useServerFn(proxyWorkoutPlan);
+
+  useEffect(() => {
+    workoutFn()
+      .then((data) => {
+        const body = data as { data?: { plan?: ReturnType<typeof generateWorkoutPlan> }; plan?: ReturnType<typeof generateWorkoutPlan> };
+        const plan = body?.data?.plan ?? body?.plan;
+        if (Array.isArray(plan) && plan.length > 0) setApiPlan(plan);
+      })
+      .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -72,7 +85,7 @@ function DashboardPage() {
   }
 
   const t = calcTargets(profile);
-  const plan = generateWorkoutPlan(profile);
+  const plan = apiPlan.length > 0 ? apiPlan : generateWorkoutPlan(profile);
   const todayIdx = new Date().getDay() % plan.length;
   const todays = plan[todayIdx];
   const firstName = profile.name.trim().split(/\s+/)[0];

@@ -115,6 +115,8 @@ pub struct TodayLog {
     pub sleep: i64,
     pub steps: i64,
     pub protein_g: i64,
+    pub workout_done: bool,
+    pub weight_kg: Option<f64>,
 }
 
 #[derive(Debug, Clone)]
@@ -139,6 +141,10 @@ struct Log {
     sleep: Option<i64>,
     steps: Option<i64>,
     protein_g: Option<i64>,
+    #[serde(rename = "workoutDone")]
+    workout_done: Option<bool>,
+    #[serde(rename = "weightKg")]
+    weight_kg: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -198,6 +204,8 @@ pub fn fetch_today() -> Result<TodayLog, String> {
         sleep: log.sleep.unwrap_or(0),
         steps: log.steps.unwrap_or(0),
         protein_g: log.protein_g.unwrap_or(0),
+        workout_done: log.workout_done.unwrap_or(false),
+        weight_kg: log.weight_kg,
     })
 }
 
@@ -1113,7 +1121,115 @@ fn logs_path() -> Option<PathBuf> {
 }
 
 pub fn today_key() -> String {
-    chrono::Local::now().format("%Y-%m-%d").to_string()
+    chrono::Utc::now().format("%Y-%m-%d").to_string()
+}
+
+fn log_from_value(value: &serde_json::Value) -> LogRecord {
+    LogRecord {
+        water: value
+            .get("water")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        sleep: value
+            .get("sleep")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        steps: value
+            .get("steps")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        protein: value
+            .get("proteinG")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0),
+        workout: value
+            .get("workoutDone")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        weight: value
+            .get("weightKg")
+            .and_then(serde_json::Value::as_f64)
+            .map(|weight| weight.round() as i64)
+            .unwrap_or(0),
+    }
+}
+
+fn log_json(date: &str, log: &LogRecord) -> serde_json::Value {
+    serde_json::json!({
+        "date": date,
+        "water": log.water,
+        "sleep": log.sleep,
+        "steps": log.steps,
+        "proteinG": log.protein,
+        "workoutDone": if log.workout { serde_json::Value::Bool(true) } else { serde_json::Value::Null },
+        "weightKg": if log.weight > 0 { serde_json::Value::from(log.weight) } else { serde_json::Value::Null },
+    })
+}
+
+pub fn upsert_today_log(log: &LogRecord) -> Result<(), String> {
+    let body = log_json(&today_key(), log);
+    authorized_request("PUT", "/v1/logs/today", Some(body))
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
+pub fn sync_logs(logs: &HashMap<String, LogRecord>) -> Result<(), String> {
+    if logs.is_empty() {
+        return Ok(());
+    }
+    let entries = logs
+        .iter()
+        .map(|(date, log)| log_json(date, log))
+        .collect::<Vec<_>>();
+    authorized_request(
+        "POST",
+        "/v1/logs/sync",
+        Some(serde_json::json!({ "logs": entries })),
+    )
+    .map(|_| ())
+    .map_err(|error| error.to_string())
+}
+
+pub fn fetch_logs_range(from: &str, to: &str) -> Result<Vec<(String, LogRecord)>, String> {
+    let path = format!("/v1/logs?from={}&to={}", urlencoding(from), urlencoding(to));
+    let response = authorized_get(&path)?;
+    let value: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse logs: {error}"))?;
+    let rows = value
+        .get("data")
+        .and_then(|data| data.get("logs"))
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let date = row.get("date").and_then(serde_json::Value::as_str)?;
+            Some((date.to_string(), log_from_value(row)))
+        })
+        .collect())
+}
+
+pub fn merge_logs(remote: Vec<(String, LogRecord)>) {
+    if remote.is_empty() {
+        return;
+    }
+    let mut logs = load_logs();
+    for (date, log) in remote {
+        logs.insert(date, log);
+    }
+    store_logs(&logs);
+}
+
+fn urlencoding(value: &str) -> String {
+    value
+        .chars()
+        .map(|c| match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
+            _ => format!("%{:02X}", c as u32),
+        })
+        .collect()
 }
 
 pub fn load_logs() -> HashMap<String, LogRecord> {
@@ -1135,6 +1251,12 @@ fn store_logs(logs: &HashMap<String, LogRecord>) {
     }
     if let Ok(raw) = serde_json::to_string(logs) {
         let _ = fs::write(path, raw);
+    }
+}
+
+pub fn clear_logs() {
+    if let Some(path) = logs_path() {
+        let _ = fs::remove_file(path);
     }
 }
 
@@ -1181,7 +1303,7 @@ pub fn last7() -> Vec<(String, LogRecord)> {
     let logs = load_logs();
     let mut out = Vec::with_capacity(7);
     for offset in (0..7).rev() {
-        let date = chrono::Local::now() - chrono::Duration::days(offset);
+        let date = chrono::Utc::now() - chrono::Duration::days(offset);
         let key = date.format("%Y-%m-%d").to_string();
         out.push((key.clone(), logs.get(&key).cloned().unwrap_or_default()));
     }
@@ -1192,7 +1314,7 @@ pub fn compute_streak() -> i64 {
     let logs = load_logs();
     let mut streak = 0;
     for offset in 0..365 {
-        let date = chrono::Local::now() - chrono::Duration::days(offset);
+        let date = chrono::Utc::now() - chrono::Duration::days(offset);
         let key = date.format("%Y-%m-%d").to_string();
         let Some(entry) = logs.get(&key) else {
             break;

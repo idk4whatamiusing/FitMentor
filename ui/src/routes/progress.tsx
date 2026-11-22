@@ -153,8 +153,13 @@ function ProgressPage() {
   const { profile } = useProfile();
 
   useEffect(() => {
-    setLogs(last7());
-    setStreak(computeStreak());
+    const refresh = () => {
+      setLogs(last7());
+      setStreak(computeStreak());
+    };
+    refresh();
+    window.addEventListener("fitmentor:logs", refresh);
+    return () => window.removeEventListener("fitmentor:logs", refresh);
   }, []);
 
   const targets = profile ? calcTargets(profile) : null;
