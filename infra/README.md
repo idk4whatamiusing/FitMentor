@@ -24,8 +24,10 @@ cd infra/bootstrap
 terraform init
 terraform apply
 
-# 3. CockroachDB schema (creates 15 app tables)
-psql "$DATABASE_URL" -f api/migrations/cockroach/0001_init.sql
+# 3. CockroachDB schema (apply migrations in filename order)
+for migration in api/migrations/cockroach/*.sql; do
+  psql "$DATABASE_URL" -f "$migration"
+done
 ```
 
 The bootstrap output contains `deploy_role_arn`; add it (plus `DATABASE_URL`
