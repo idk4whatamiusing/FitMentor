@@ -779,6 +779,7 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             .ok();
 
             let deadline = Instant::now() + Duration::from_secs(600);
+            let mut consecutive_errors = 0u32;
             loop {
                 if Instant::now() > deadline {
                     finish_google_error(&handle, "Google sign-in timed out.");
@@ -786,7 +787,9 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                 }
                 std::thread::sleep(Duration::from_secs(2));
                 match api::poll_google_login(&started.state) {
-                    Ok(api::GooglePoll::Pending) => {}
+                    Ok(api::GooglePoll::Pending) => {
+                        consecutive_errors = 0;
+                    }
                     Ok(api::GooglePoll::Ok { token, name }) => {
                         api::set_token(Some(token));
                         let ui_handle = handle.clone();
@@ -816,8 +819,11 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                         return;
                     }
                     Err(error) => {
-                        finish_google_error(&handle, &error);
-                        return;
+                        consecutive_errors += 1;
+                        if consecutive_errors >= 15 {
+                            finish_google_error(&handle, &error);
+                            return;
+                        }
                     }
                 }
             }
