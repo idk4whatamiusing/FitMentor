@@ -168,6 +168,19 @@ function DashboardPage() {
           </div>
         </div>
 
+        <Link
+          to="/progress"
+          className="mt-4 flex items-center justify-between rounded-[1.25rem] border border-border bg-card px-5 py-4 transition-colors hover:border-foreground/25"
+        >
+          <div>
+            <SectionLabel>Progress</SectionLabel>
+            <p className="mt-1.5 text-sm font-medium">Last 7 days</p>
+          </div>
+          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground">
+            <ArrowUpRight className="h-4 w-4" />
+          </span>
+        </Link>
+
         <div className="mt-4 grid gap-4 lg:grid-cols-3">
           <div className="space-y-4 lg:col-span-1">
             <DailyHabits

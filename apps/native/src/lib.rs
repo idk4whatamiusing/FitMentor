@@ -18,6 +18,111 @@ fn apply_log(ui: &AppWindow, log: &api::TodayLog) {
     ui.set_protein(log.protein_g as i32);
 }
 
+fn first_word(name: &str) -> String {
+    name.split_whitespace()
+        .next()
+        .unwrap_or("Friend")
+        .to_string()
+}
+
+fn friendly_session_title(title: &str, focus: &str) -> String {
+    let focus = focus.to_lowercase();
+    if focus.contains("chest") || focus.contains("shoulder") || focus.contains("tricep") {
+        "Push Day".into()
+    } else if focus.contains("back") || focus.contains("bicep") {
+        "Pull Day".into()
+    } else if focus.contains("quad") || focus.contains("hamstring") || focus.contains("glute") {
+        "Leg Day".into()
+    } else {
+        title.to_string()
+    }
+}
+
+fn apply_today_label(ui: &AppWindow) {
+    let now = chrono::Local::now();
+    ui.set_today_day(now.format("%-d").to_string().into());
+    ui.set_today_label(now.format("%A, %-d %B").to_string().to_uppercase().into());
+}
+
+fn refresh_history(ui: &AppWindow) {
+    let entries = api::last7()
+        .into_iter()
+        .map(|(date, log)| DayLog {
+            date: date.into(),
+            water: log.water as i32,
+            sleep: log.sleep as i32,
+            steps: log.steps as i32,
+            protein: log.protein as i32,
+            workout: log.workout,
+            weight: log.weight as i32,
+        })
+        .collect::<Vec<_>>();
+    let week_workouts = entries.iter().filter(|entry| entry.workout).count() as i32;
+    let avg_protein = if entries.is_empty() {
+        0
+    } else {
+        entries.iter().map(|entry| entry.protein).sum::<i32>() / entries.len() as i32
+    };
+    let avg_sleep = if entries.is_empty() {
+        0.0
+    } else {
+        entries.iter().map(|entry| entry.sleep as f64).sum::<f64>() / entries.len() as f64
+    };
+    let weights = entries
+        .iter()
+        .enumerate()
+        .filter(|(_, entry)| entry.weight > 0)
+        .map(|(index, entry)| (index as f64, entry.weight as f64))
+        .collect::<Vec<_>>();
+    let weight_path = if weights.len() < 2 {
+        String::new()
+    } else {
+        let min = weights
+            .iter()
+            .map(|(_, weight)| *weight)
+            .fold(f64::INFINITY, f64::min);
+        let max = weights
+            .iter()
+            .map(|(_, weight)| *weight)
+            .fold(f64::NEG_INFINITY, f64::max);
+        let span = (max - min).max(1.0);
+        let points = weights
+            .iter()
+            .map(|(index, weight)| {
+                let x = index / 6.0 * 310.0;
+                let y = 130.0 - ((weight - min) / span * 120.0);
+                (x, y)
+            })
+            .collect::<Vec<_>>();
+        let mut commands = String::new();
+        for (index, (x, y)) in points.iter().enumerate() {
+            commands.push_str(if index == 0 { "M " } else { " L " });
+            commands.push_str(&format!("{x:.1} {y:.1}"));
+        }
+        commands
+    };
+
+    ui.set_history(ModelRc::new(VecModel::from(entries)));
+    ui.set_streak(api::compute_streak() as i32);
+    ui.set_week_workouts(week_workouts);
+    ui.set_avg_protein(avg_protein);
+    ui.set_avg_sleep(format!("{avg_sleep:.1}").into());
+    ui.set_weight_path(weight_path.into());
+}
+
+fn persist_today(
+    ui: &AppWindow,
+    water: Option<i64>,
+    sleep: Option<i64>,
+    steps: Option<i64>,
+    protein: Option<i64>,
+    workout: Option<bool>,
+    weight: Option<i64>,
+) {
+    api::patch_today(water, sleep, steps, protein, workout, weight);
+    refresh_history(ui);
+}
+
 fn finish_google_error(handle: &slint::Weak<AppWindow>, message: &str) {
     let handle = handle.clone();
     let message = message.to_string();
@@ -45,6 +150,11 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     {
         ui.set_signed_in(true);
         ui.set_needs_onboarding(true);
+        if let Ok(step) = env::var("FITMENTOR_STEP") {
+            if let Ok(step) = step.parse::<i32>() {
+                ui.set_onboarding_step(step.clamp(0, 8));
+            }
+        }
     }
     if let Ok(tab) = env::var("FITMENTOR_TAB") {
         if let Ok(tab) = tab.parse::<i32>() {
@@ -58,6 +168,55 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             .unwrap_or_else(|_| "Friend".into())
             .into(),
     );
+    ui.set_first_name(first_word(&ui.get_user_name()).into());
+    apply_today_label(&ui);
+    refresh_history(&ui);
+
+    let foods = vec![
+        ("Roti (1)", 100, 3),
+        ("Rice (1 cup)", 200, 4),
+        ("Dal (1 katori)", 150, 9),
+        ("Egg (1 whole)", 75, 6),
+        ("Paneer (100g)", 260, 18),
+        ("Milk (250ml)", 150, 8),
+        ("Chicken breast (100g)", 165, 31),
+        ("Fish (100g)", 130, 22),
+        ("Soya chunks (50g dry)", 170, 26),
+        ("Oats (50g)", 190, 7),
+        ("Banana (1)", 100, 1),
+        ("Peanut butter (1 tbsp)", 95, 4),
+    ]
+    .into_iter()
+    .map(|(name, kcal, protein)| QuickFood {
+        name: name.into(),
+        kcal,
+        protein,
+    })
+    .collect::<Vec<_>>();
+    ui.set_quick_foods(ModelRc::new(VecModel::from(foods)));
+
+    let exercises = vec![
+        "Bench Press",
+        "Back Squat",
+        "Deadlift",
+        "Pull-up",
+        "Push-up",
+        "Shoulder Press",
+        "Barbell Row",
+        "Walking Lunges",
+        "Plank",
+        "Lat Pulldown",
+        "Bicep Curl",
+        "Tricep Pushdown",
+        "Leg Press",
+        "Lateral Raise",
+        "Romanian Deadlift",
+        "Face Pull",
+    ]
+    .into_iter()
+    .map(|name| name.into())
+    .collect::<Vec<slint::SharedString>>();
+    ui.set_exercise_names(ModelRc::new(VecModel::from(exercises)));
 
     let initial_token = env::var("FITMENTOR_JWT").ok().or_else(api::load_token);
     if let Some(token) = initial_token {
@@ -116,6 +275,15 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                     match result {
                         Ok(log) => {
                             apply_log(&ui, &log);
+                            persist_today(
+                                &ui,
+                                Some(log.water),
+                                Some(log.sleep),
+                                Some(log.steps),
+                                Some(log.protein_g),
+                                None,
+                                None,
+                            );
                             ui.set_status_text("Synced just now".into());
                         }
                         Err(error) => ui.set_status_text(error.into()),
@@ -129,22 +297,116 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     let handle = ui.as_weak();
     ui.on_add_water(move || {
         if let Some(ui) = handle.upgrade() {
-            ui.set_water(ui.get_water() + 1);
+            let water = ui.get_water() + 1;
+            ui.set_water(water);
+            persist_today(&ui, Some(water as i64), None, None, None, None, None);
         }
     });
 
     let handle = ui.as_weak();
     ui.on_add_steps(move || {
         if let Some(ui) = handle.upgrade() {
-            ui.set_steps(ui.get_steps() + 1000);
+            let steps = ui.get_steps() + 1000;
+            ui.set_steps(steps);
+            persist_today(&ui, None, None, Some(steps as i64), None, None, None);
         }
     });
 
     let handle = ui.as_weak();
     ui.on_add_protein(move || {
         if let Some(ui) = handle.upgrade() {
-            ui.set_protein(ui.get_protein() + 10);
+            let protein = ui.get_protein() + 10;
+            ui.set_protein(protein);
+            persist_today(&ui, None, None, None, Some(protein as i64), None, None);
         }
+    });
+
+    let handle = ui.as_weak();
+    ui.on_add_steps_by(move |amount| {
+        if let Some(ui) = handle.upgrade() {
+            let steps = (ui.get_steps() + amount).clamp(0, 50_000);
+            ui.set_steps(steps);
+            persist_today(&ui, None, None, Some(steps as i64), None, None, None);
+        }
+    });
+
+    let handle = ui.as_weak();
+    ui.on_add_protein_by(move |amount| {
+        if let Some(ui) = handle.upgrade() {
+            let protein = (ui.get_protein() + amount).max(0);
+            ui.set_protein(protein);
+            persist_today(&ui, None, None, None, Some(protein as i64), None, None);
+        }
+    });
+
+    let handle = ui.as_weak();
+    ui.on_log_sleep(move |hours| {
+        if let Some(ui) = handle.upgrade() {
+            ui.set_sleep(hours);
+            persist_today(&ui, None, Some(hours as i64), None, None, None, None);
+        }
+    });
+
+    let handle = ui.as_weak();
+    ui.on_log_weight(move || {
+        if let Some(ui) = handle.upgrade() {
+            if let Ok(weight) = ui.get_weight_input().trim().parse::<i64>() {
+                if weight > 0 {
+                    persist_today(&ui, None, None, None, None, None, Some(weight));
+                    ui.set_profile_weight(weight as i32);
+                    ui.set_weight_input("".into());
+                }
+            }
+        }
+    });
+
+    let handle = ui.as_weak();
+    ui.on_open_progress(move || {
+        if let Some(ui) = handle.upgrade() {
+            refresh_history(&ui);
+            ui.set_show_progress(true);
+        }
+    });
+
+    let handle = ui.as_weak();
+    ui.on_close_progress(move || {
+        if let Some(ui) = handle.upgrade() {
+            ui.set_show_progress(false);
+        }
+    });
+
+    let handle = ui.as_weak();
+    ui.on_run_tool(move || {
+        let Some(ui) = handle.upgrade() else {
+            return;
+        };
+        let path = match ui.get_tool() {
+            0 => "/v1/tools/bmi-advice",
+            1 => "/v1/tools/sleep-advice",
+            3 => "/v1/tools/injury-advice",
+            6 => "/v1/tools/form-advice",
+            _ => return,
+        };
+        ui.set_tool_busy(true);
+        ui.set_tool_advice("".into());
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::fetch_tool_advice(path);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    ui.set_tool_busy(false);
+                    match result {
+                        Ok(tips) if !tips.is_empty() => ui.set_tool_advice(tips.join("\n").into()),
+                        Ok(_) => ui.set_tool_advice(
+                            "No advice available yet. Generate a plan first.".into(),
+                        ),
+                        Err(error) => ui.set_tool_advice(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
     });
 
     let handle = ui.as_weak();
@@ -171,7 +433,14 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                             _ => "Free",
                         };
                         let needs_onboarding = profile.name == "Friend";
-                        ui.set_needs_onboarding(needs_onboarding);
+                        if env::var("FITMENTOR_ONBOARDING")
+                            .map(|v| v == "1")
+                            .unwrap_or(false)
+                        {
+                            ui.set_needs_onboarding(true);
+                        } else {
+                            ui.set_needs_onboarding(needs_onboarding);
+                        }
                         ui.set_form_name(if needs_onboarding {
                             "".into()
                         } else {
@@ -187,7 +456,10 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                         ui.set_form_diet(profile.diet.clone().into());
                         ui.set_form_days(profile.days_per_week.to_string().into());
                         ui.set_form_budget(profile.budget_per_day.to_string().into());
+                        ui.set_form_days_num(profile.days_per_week as i32);
+                        ui.set_form_budget_num(profile.budget_per_day as i32);
                         let name = profile.name;
+                        ui.set_first_name(first_word(&name).into());
                         ui.set_user_name(name.clone().into());
                         ui.set_profile_name(name.into());
                         ui.set_profile_email(profile.email.into());
@@ -216,6 +488,7 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             ui.set_auth_token("".into());
             ui.set_auth_error("".into());
             ui.set_user_name("Friend".into());
+            ui.set_first_name("Friend".into());
             ui.set_profile_name("Friend".into());
             ui.set_profile_email("".into());
             ui.set_profile_tier("Free".into());
@@ -267,6 +540,7 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                             };
                             ui.set_needs_onboarding(false);
                             ui.set_form_error("".into());
+                            ui.set_first_name(first_word(&profile.name).into());
                             ui.set_user_name(profile.name.clone().into());
                             ui.set_profile_name(profile.name.into());
                             ui.set_profile_email(profile.email.into());
@@ -360,9 +634,29 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                                     focus: day.focus.clone().into(),
                                     summary: day.summary.clone().into(),
                                     completed: day.completed,
+                                    exercises: ModelRc::new(VecModel::from(
+                                        day.exercises
+                                            .iter()
+                                            .map(|exercise| ExerciseItem {
+                                                index: exercise.index as i32,
+                                                name: exercise.name.clone().into(),
+                                                sets: exercise.sets as i32,
+                                                reps: exercise.reps.clone().into(),
+                                                rest: exercise.rest.clone().into(),
+                                                muscles: exercise.muscles.clone().into(),
+                                                tips: exercise.tips.clone().into(),
+                                                alt: exercise.alt.clone().into(),
+                                            })
+                                            .collect::<Vec<_>>(),
+                                    )),
                                 })
                                 .collect();
                             let empty = items.is_empty();
+                            if let Some(day) = items.first() {
+                                ui.set_session_title(
+                                    friendly_session_title(&day.title, &day.focus).into(),
+                                );
+                            }
                             ui.set_workout_days(ModelRc::new(VecModel::from(items)));
                             ui.set_workout_status(if empty {
                                 "No workout plan yet — the daily planner will fill this after it runs.".into()
@@ -752,19 +1046,16 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
         if let Some(ui) = handle.upgrade() {
             ui.set_tab(tab);
             if tab == 1 {
-                ui.invoke_load_nutrition();
-            }
-            if tab == 2 {
                 ui.invoke_load_workout();
             }
             if tab == 3 {
                 ui.invoke_load_chat();
             }
             if tab == 4 {
-                ui.invoke_load_profile();
+                ui.invoke_load_nutrition();
             }
             if tab == 5 {
-                ui.invoke_load_community();
+                ui.invoke_load_profile();
             }
         }
     });
@@ -862,6 +1153,9 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     ui.invoke_refresh();
     if ui.get_signed_in() {
         ui.invoke_load_profile();
+        ui.invoke_load_workout();
+        ui.invoke_load_nutrition();
+        ui.invoke_load_community();
     }
     Ok(ui)
 }

@@ -1,10 +1,21 @@
-// Shared editorial components for the FitMentor native app.
+// Shared components mirrored from the mobile web UI.
 
 import { Theme } from "theme.slint";
 
+export component Icon inherits Image {
+    in property <length> size: 18px;
+    in property <color> tint: Theme.text;
+
+    width: root.size;
+    height: root.size;
+    colorize: root.tint;
+    image-fit: contain;
+}
+
 export component Wordmark inherits Rectangle {
     in property <bool> on-dark: false;
-    height: 18px;
+
+    height: 16px;
     width: word.width + 10px;
 
     word := Text {
@@ -20,7 +31,7 @@ export component Wordmark inherits Rectangle {
 
     Rectangle {
         x: parent.width - 5px;
-        y: 10px;
+        y: 9px;
         width: 5px;
         height: 5px;
         background: Theme.accent;
@@ -33,34 +44,74 @@ export component SectionLabel inherits HorizontalLayout {
     in property <bool> on-dark: false;
 
     height: 14px;
-    width: 100%;
     spacing: 8px;
     alignment: start;
+    horizontal-stretch: 1;
 
     Text {
         text: root.index;
         color: Theme.accent;
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 1.5px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 1.8px;
         vertical-alignment: center;
+        visible: root.index != "";
     }
 
     Rectangle {
-        width: root.index == "" ? 0px : 22px;
+        width: root.index == "" ? 0px : 24px;
         height: 1px;
-        background: root.on-dark ? rgba(247, 243, 237, 0.2) : Theme.line;
+        background: root.on-dark ? rgba(247, 243, 237, 0.24) : Theme.line;
     }
 
     Text {
         text: root.label;
-        color: root.on-dark ? rgba(247, 243, 237, 0.5) : Theme.muted;
-        font-size: 10px;
+        color: root.on-dark ? rgba(247, 243, 237, 0.52) : Theme.muted;
+        font-size: 11px;
         font-weight: 600;
-        letter-spacing: 1.5px;
+        letter-spacing: 1.8px;
         horizontal-stretch: 1;
         horizontal-alignment: left;
         vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+export component Pill inherits Rectangle {
+    in property <string> label: "";
+    in property <bool> accent: false;
+    in property <bool> on-dark: false;
+    in property <bool> dot: false;
+
+    height: 26px;
+    width: self.preferred-width;
+    border-radius: 13px;
+    background: root.accent ? Theme.accent : transparent;
+    border-width: root.accent ? 0px : 1px;
+    border-color: root.on-dark ? rgba(247, 243, 237, 0.22) : Theme.line;
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 7px;
+        alignment: center;
+
+        Rectangle {
+            width: root.dot ? 5px : 0px;
+            height: 5px;
+            border-radius: 3px;
+            background: root.accent ? Theme.ink : Theme.accent;
+            visible: root.dot;
+        }
+
+        Text {
+            text: root.label;
+            color: root.accent ? Theme.ink : (root.on-dark ? Theme.cream : Theme.text);
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 1.3px;
+            vertical-alignment: center;
+        }
     }
 }
 
@@ -70,10 +121,11 @@ export component PrimaryButton inherits Rectangle {
     in property <bool> on-dark: false;
     callback clicked();
 
+    width: 100%;
     height: 48px;
     border-radius: 24px;
     background: root.enabled
-        ? (root.on-dark ? Theme.cream : Theme.text)
+        ? (root.on-dark ? Theme.cream : (Theme.dark ? Theme.cream : Theme.text))
         : (root.on-dark ? rgba(247, 243, 237, 0.25) : rgba(11, 11, 11, 0.25));
 
     HorizontalLayout {
@@ -83,8 +135,8 @@ export component PrimaryButton inherits Rectangle {
 
         Text {
             text: root.label;
-            color: root.on-dark ? Theme.ink : Theme.cream;
-            font-size: 13px;
+            color: root.on-dark ? Theme.ink : (Theme.dark ? Theme.ink : Theme.cream);
+            font-size: 14px;
             font-weight: 600;
             vertical-alignment: center;
         }
@@ -95,15 +147,12 @@ export component PrimaryButton inherits Rectangle {
             border-radius: 18px;
             background: Theme.accent;
 
-            Text {
-                width: 100%;
-                height: 100%;
-                text: "→";
-                color: Theme.ink;
-                font-size: 16px;
-                font-weight: 600;
-                horizontal-alignment: center;
-                vertical-alignment: center;
+            Icon {
+                x: 10px;
+                y: 10px;
+                size: 16px;
+                tint: Theme.ink;
+                source: @image-url("icons/arrow-up-right.png");
             }
         }
     }
@@ -118,26 +167,63 @@ export component PrimaryButton inherits Rectangle {
     }
 }
 
+export component SmallPrimary inherits Rectangle {
+    in property <string> label: "";
+    callback clicked();
+
+    width: 150px;
+    height: 48px;
+    border-radius: 24px;
+    background: Theme.dark ? Theme.cream : Theme.ink;
+
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 6px;
+        alignment: space-between;
+        Text {
+            text: root.label;
+            color: Theme.dark ? Theme.ink : Theme.cream;
+            font-size: 14px;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+        Rectangle {
+            width: 36px;
+            height: 36px;
+            border-radius: 18px;
+            background: Theme.accent;
+            Icon { x: 10px; y: 10px; size: 16px; tint: Theme.ink; source: @image-url("icons/arrow-up-right.png"); }
+        }
+    }
+
+    TouchArea { width: 100%; height: 100%; clicked => { root.clicked(); } }
+}
+
 export component GhostButton inherits Rectangle {
     in property <string> label: "";
     in property <bool> active: false;
+    in property <bool> stretch: true;
     callback clicked();
 
-    height: 36px;
-    border-radius: 18px;
+    horizontal-stretch: root.stretch ? 1 : 0;
+    height: 34px;
+    border-radius: 17px;
     background: root.active ? Theme.accent-soft : transparent;
     border-width: 1px;
     border-color: root.active ? Theme.accent : Theme.line;
 
-    Text {
-        width: 100%;
-        height: 100%;
-        text: root.label;
-        color: root.active ? Theme.accent : Theme.muted;
-        font-size: 11px;
-        font-weight: 600;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        alignment: center;
+
+        Text {
+            text: root.label;
+            color: root.active ? Theme.accent : Theme.muted;
+            font-size: 12px;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
     }
 
     TouchArea {
@@ -152,24 +238,36 @@ export component GhostButton inherits Rectangle {
 export component Chip inherits Rectangle {
     in property <string> label: "";
     in property <bool> active: false;
+    in property <bool> show-icon: false;
+    in property <image> icon;
     callback clicked();
 
-    horizontal-stretch: 1;
-    height: 38px;
-    border-radius: 19px;
+    height: 36px;
+    border-radius: 18px;
     background: root.active ? Theme.accent-soft : Theme.surface;
     border-width: 1px;
     border-color: root.active ? Theme.accent : Theme.line;
 
-    Text {
-        width: 100%;
-        height: 100%;
-        text: root.label;
-        color: root.active ? Theme.accent : Theme.muted;
-        font-size: 11px;
-        font-weight: 600;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 6px;
+        alignment: center;
+
+        Icon {
+            size: 14px;
+            tint: root.active ? Theme.accent : Theme.muted;
+            source: root.icon;
+            visible: root.show-icon;
+        }
+
+        Text {
+            text: root.label;
+            color: root.active ? Theme.accent : Theme.muted;
+            font-size: 12px;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
     }
 
     TouchArea {
@@ -181,138 +279,76 @@ export component Chip inherits Rectangle {
     }
 }
 
-component NavItem inherits Rectangle {
+export component ChoiceCard inherits Rectangle {
+    in property <string> index: "";
     in property <string> label: "";
-    in property <bool> active: false;
+    in property <bool> selected: false;
     callback clicked();
 
-    horizontal-stretch: 1;
-    border-radius: 18px;
-    background: root.active ? (Theme.dark ? Theme.cream : Theme.ink) : transparent;
-
-    Text {
-        width: 100%;
-        height: 100%;
-        text: root.label;
-        color: root.active ? (Theme.dark ? Theme.ink : Theme.cream) : Theme.muted;
-        font-size: 9px;
-        font-weight: 700;
-        letter-spacing: 0.8px;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-
-    TouchArea {
-        width: 100%;
-        height: 100%;
-        clicked => {
-            root.clicked();
-        }
-    }
-}
-
-export component BottomNav inherits Rectangle {
-    in property <int> active: 0;
-    callback select(int);
-
-    height: 72px;
-    background: Theme.surface;
-    border-width: 1px;
-    border-color: Theme.line;
-
-    HorizontalLayout {
-        padding: 6px;
-        spacing: 2px;
-
-        NavItem {
-            label: "TODAY";
-            active: root.active == 0;
-            clicked => { root.select(0); }
-        }
-        NavItem {
-            label: "FOOD";
-            active: root.active == 1;
-            clicked => { root.select(1); }
-        }
-        NavItem {
-            label: "TRAIN";
-            active: root.active == 2;
-            clicked => { root.select(2); }
-        }
-        NavItem {
-            label: "COACH";
-            active: root.active == 3;
-            clicked => { root.select(3); }
-        }
-        NavItem {
-            label: "YOU";
-            active: root.active == 4;
-            clicked => { root.select(4); }
-        }
-        NavItem {
-            label: "FEED";
-            active: root.active == 5;
-            clicked => { root.select(5); }
-        }
-    }
-}
-
-export component ThemeToggle inherits Rectangle {
-    callback clicked();
-
-    width: 68px;
-    height: 32px;
-    border-radius: 16px;
-    background: Theme.surface;
-    border-width: 1px;
-    border-color: Theme.line;
-
-    Text {
-        width: 100%;
-        height: 100%;
-        text: Theme.dark ? "LIGHT" : "DARK";
-        color: Theme.muted;
-        font-size: 9px;
-        font-weight: 700;
-        letter-spacing: 1px;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-    }
-
-    TouchArea {
-        width: 100%;
-        height: 100%;
-        clicked => {
-            root.clicked();
-        }
-    }
-}
-
-export component TopBar inherits Rectangle {
-    callback toggle-theme;
-
+    width: 100%;
     height: 64px;
-    background: Theme.bg;
+    border-radius: 20px;
+    background: root.selected ? Theme.accent-soft : Theme.surface;
+    border-width: 1px;
+    border-color: root.selected ? Theme.accent : Theme.line;
 
     HorizontalLayout {
-        padding-left: 20px;
-        padding-right: 16px;
-        alignment: space-between;
+        padding-left: 14px;
+        padding-right: 12px;
+        spacing: 14px;
 
-        Wordmark {}
+        Rectangle {
+            width: 34px;
+            height: 34px;
+            border-radius: 17px;
+            background: root.selected ? Theme.accent : Theme.surface-2;
 
-        ThemeToggle {
-            clicked => {
-                root.toggle-theme();
+            Text {
+                width: 100%;
+                height: 100%;
+                text: root.index;
+                color: root.selected ? Theme.ink : Theme.muted;
+                font-family: Theme.font-wordmark;
+                font-size: 9px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        Text {
+            text: root.label;
+            color: Theme.text;
+            font-size: 15px;
+            font-weight: 500;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        Rectangle {
+            width: 28px;
+            height: 28px;
+            border-radius: 14px;
+            background: root.selected ? Theme.text : transparent;
+            border-width: root.selected ? 0px : 1px;
+            border-color: Theme.line;
+
+            Icon {
+                x: 7px;
+                y: 7px;
+                size: 14px;
+                tint: root.selected ? (Theme.dark ? Theme.ink : Theme.cream) : Theme.line-strong;
+                source: @image-url("icons/arrow-up-right.png");
             }
         }
     }
 
-    Rectangle {
-        y: parent.height - 1px;
+    TouchArea {
         width: 100%;
-        height: 1px;
-        background: Theme.line;
+        height: 100%;
+        clicked => {
+            root.clicked();
+        }
     }
 }
 
@@ -320,25 +356,27 @@ export component StatBlock inherits Rectangle {
     in property <string> label: "";
     in property <string> value: "";
     in property <string> unit: "";
+    in property <string> hint: "";
+    in property <int> progress: -1;
+    in property <bool> invert: false;
     in property <bool> highlight: false;
-    in property <bool> on-dark: false;
 
-    height: 104px;
-    border-radius: 22px;
-    background: root.on-dark ? Theme.ink : Theme.surface;
+    height: 116px;
+    border-radius: 24px;
+    background: root.invert ? Theme.ink : Theme.surface;
     border-width: 1px;
-    border-color: root.on-dark ? rgba(247, 243, 237, 0.14) : Theme.line;
+    border-color: root.invert ? rgba(247, 243, 237, 0.14) : Theme.line;
 
     VerticalLayout {
         padding: 16px;
-        spacing: 8px;
+        spacing: 5px;
 
         Text {
             text: root.label;
-            color: root.on-dark ? rgba(247, 243, 237, 0.5) : Theme.muted;
-            font-size: 9px;
+            color: root.invert ? rgba(247, 243, 237, 0.5) : Theme.muted;
+            font-size: 11px;
             font-weight: 600;
-            letter-spacing: 1.2px;
+            letter-spacing: 1.8px;
         }
 
         HorizontalLayout {
@@ -347,19 +385,58 @@ export component StatBlock inherits Rectangle {
 
             Text {
                 text: root.value;
-                color: root.highlight ? Theme.accent : (root.on-dark ? Theme.cream : Theme.text);
-                font-size: 28px;
+                color: root.highlight ? Theme.accent : (root.invert ? Theme.cream : Theme.text);
+                font-size: 36px;
                 font-weight: 500;
+                letter-spacing: -1.2px;
                 vertical-alignment: bottom;
             }
 
             Text {
                 text: root.unit;
-                color: root.on-dark ? rgba(247, 243, 237, 0.5) : Theme.muted;
-                font-size: 10px;
+                color: root.invert ? rgba(247, 243, 237, 0.5) : Theme.muted;
+                font-size: 12px;
                 vertical-alignment: bottom;
             }
         }
+
+        Rectangle {
+            height: 6px;
+            border-radius: 3px;
+            background: root.invert ? rgba(247, 243, 237, 0.16) : (Theme.dark ? #2B2B2B : #EBEBEB);
+            visible: root.progress >= 0;
+
+            Rectangle {
+                width: parent.width * (root.progress / 100.0);
+                height: 100%;
+                border-radius: 3px;
+                background: Theme.accent;
+            }
+        }
+
+        Text {
+            text: root.hint;
+            color: root.invert ? rgba(247, 243, 237, 0.6) : Theme.muted;
+            font-size: 12px;
+            wrap: word-wrap;
+            visible: root.hint != "" && root.progress < 0;
+        }
+    }
+}
+
+export component ProgressBar inherits Rectangle {
+    in property <int> value: 0;
+    in property <bool> ink: false;
+
+    height: 6px;
+    border-radius: 3px;
+    background: Theme.dark ? #2B2B2B : #EBEBEB;
+
+    Rectangle {
+        width: parent.width * (max(0, min(100, root.value)) / 100);
+        height: 100%;
+        border-radius: 3px;
+        background: root.ink ? (Theme.dark ? Theme.cream : Theme.text) : Theme.accent;
     }
 }
 
@@ -373,15 +450,15 @@ export component Field inherits VerticalLayout {
     Text {
         text: root.label;
         color: Theme.muted;
-        font-size: 9px;
+        font-size: 11px;
         font-weight: 600;
-        letter-spacing: 1.2px;
+        letter-spacing: 1.6px;
     }
 
     Rectangle {
-        height: 48px;
-        border-radius: 14px;
-        background: Theme.surface;
+        height: 40px;
+        border-radius: 12px;
+        background: Theme.bg;
         border-width: 1px;
         border-color: Theme.line;
 
@@ -411,27 +488,350 @@ export component Field inherits VerticalLayout {
     }
 }
 
-export component ChoiceChip inherits Rectangle {
+export component BigField inherits VerticalLayout {
+    in property <string> label: "";
+    in property <string> placeholder: "";
+    in-out property <string> text;
+
+    spacing: 6px;
+
+    Text {
+        text: root.label;
+        color: Theme.muted;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 1.6px;
+    }
+
+    Rectangle {
+        height: 56px;
+        background: transparent;
+
+        Text {
+            x: 0;
+            y: 0;
+            width: 100%;
+            height: 48px;
+            text: root.placeholder;
+            color: rgba(107, 107, 107, 0.55);
+            font-size: 36px;
+            vertical-alignment: center;
+            visible: root.text == "";
+        }
+
+        TextInput {
+            x: 0;
+            y: 0;
+            width: 100%;
+            height: 48px;
+            text <=> root.text;
+            single-line: true;
+            color: Theme.text;
+            font-size: 36px;
+            vertical-alignment: center;
+        }
+
+        Rectangle {
+            y: parent.height - 2px;
+            width: 100%;
+            height: 2px;
+            background: Theme.line;
+        }
+    }
+}
+
+export component CycleField inherits VerticalLayout {
+    in property <string> label: "";
+    in property <string> value: "";
+    callback clicked();
+
+    spacing: 6px;
+
+    Text {
+        text: root.label;
+        color: Theme.muted;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 1.6px;
+    }
+
+    Rectangle {
+        height: 56px;
+        background: transparent;
+
+        HorizontalLayout {
+            alignment: space-between;
+            Text {
+                text: root.value;
+                color: Theme.text;
+                font-size: 30px;
+                font-weight: 500;
+                vertical-alignment: center;
+            }
+            Icon {
+                size: 16px;
+                tint: Theme.muted;
+                source: @image-url("icons/chevron-down.png");
+            }
+        }
+
+        Rectangle {
+            y: parent.height - 2px;
+            width: 100%;
+            height: 2px;
+            background: Theme.line;
+        }
+
+        TouchArea {
+            width: 100%;
+            height: 100%;
+            clicked => { root.clicked(); }
+        }
+    }
+}
+
+export component BackButton inherits Rectangle {
+    in property <string> label: "Back";
+    callback clicked();
+
+    width: 92px;
+    height: 48px;
+    background: transparent;
+
+    HorizontalLayout {
+        spacing: 6px;
+        Icon { size: 16px; tint: Theme.muted; source: @image-url("icons/arrow-left.png"); }
+        Text {
+            text: root.label;
+            color: Theme.muted;
+            font-size: 14px;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
+    }
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        clicked => { root.clicked(); }
+    }
+}
+
+export component TabButton inherits Rectangle {
     in property <string> label: "";
     in property <bool> active: false;
     callback clicked();
 
     horizontal-stretch: 1;
-    height: 42px;
-    border-radius: 14px;
-    background: root.active ? Theme.accent-soft : Theme.surface;
-    border-width: 1px;
-    border-color: root.active ? Theme.accent : Theme.line;
+    height: 36px;
+    border-radius: 18px;
+    background: root.active ? (Theme.dark ? Theme.cream : Theme.ink) : transparent;
 
     Text {
         width: 100%;
         height: 100%;
         text: root.label;
-        color: root.active ? Theme.accent : Theme.muted;
+        color: root.active ? (Theme.dark ? Theme.ink : Theme.cream) : Theme.muted;
         font-size: 11px;
         font-weight: 600;
+        letter-spacing: 1.2px;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component IconButton inherits Rectangle {
+    in property <image> icon;
+    in property <color> tint: Theme.muted;
+    callback clicked();
+
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
+    background: transparent;
+    border-width: 1px;
+    border-color: Theme.line;
+
+    Icon {
+        x: 10px;
+        y: 10px;
+        size: 14px;
+        tint: root.tint;
+        source: root.icon;
+    }
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component TopBar inherits Rectangle {
+    callback toggle-theme;
+
+    height: Theme.header-h;
+    background: Theme.bg;
+
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 16px;
+        alignment: space-between;
+
+        Wordmark {}
+
+        IconButton {
+            icon: Theme.dark ? @image-url("icons/sun.png") : @image-url("icons/moon.png");
+            clicked => {
+                root.toggle-theme();
+            }
+        }
+    }
+
+    Rectangle {
+        y: parent.height - 1px;
+        width: 100%;
+        height: 1px;
+        background: Theme.line;
+    }
+}
+
+component NavItem inherits Rectangle {
+    in property <string> label: "";
+    in property <image> icon;
+    in property <bool> active: false;
+    in property <bool> accent: false;
+    callback clicked();
+
+    horizontal-stretch: 1;
+
+    VerticalLayout {
+        width: parent.width;
+        spacing: 4px;
+        alignment: center;
+
+        Rectangle {
+            width: 32px;
+            height: 32px;
+            border-radius: 16px;
+            background: root.active
+                ? (root.accent ? Theme.accent : (Theme.dark ? Theme.cream : Theme.ink))
+                : transparent;
+
+            Icon {
+                x: 7px;
+                y: 7px;
+                size: 18px;
+                tint: root.active
+                    ? (root.accent ? Theme.ink : (Theme.dark ? Theme.ink : Theme.cream))
+                    : Theme.muted;
+                source: root.icon;
+            }
+        }
+
+        Text {
+            width: 54px;
+            text: root.label;
+            color: root.active ? Theme.text : Theme.muted;
+            font-size: 9px;
+            font-weight: root.active ? 700 : 600;
+            letter-spacing: 0.8px;
+            horizontal-alignment: center;
+        }
+    }
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component BottomNav inherits Rectangle {
+    in property <int> active: 0;
+    callback select(int);
+
+    height: Theme.nav-h;
+    border-radius: 28px;
+    background: Theme.surface;
+    border-width: 1px;
+    border-color: Theme.line;
+
+    HorizontalLayout {
+        padding: 6px;
+        spacing: 0;
+
+        NavItem {
+            label: "HOME";
+            icon: @image-url("icons/house.png");
+            active: root.active == 0;
+            clicked => { root.select(0); }
+        }
+        NavItem {
+            label: "TRAIN";
+            icon: @image-url("icons/dumbbell.png");
+            active: root.active == 1;
+            clicked => { root.select(1); }
+        }
+        NavItem {
+            label: "TOOLS";
+            icon: @image-url("icons/wrench.png");
+            active: root.active == 2;
+            clicked => { root.select(2); }
+        }
+        NavItem {
+            label: "COACH";
+            icon: @image-url("icons/sparkles.png");
+            active: root.active == 3;
+            accent: true;
+            clicked => { root.select(3); }
+        }
+        NavItem {
+            label: "FOOD";
+            icon: @image-url("icons/apple.png");
+            active: root.active == 4;
+            clicked => { root.select(4); }
+        }
+        NavItem {
+            label: "YOU";
+            icon: @image-url("icons/user.png");
+            active: root.active == 5;
+            clicked => { root.select(5); }
+        }
+    }
+}
+
+export component ChoiceChip inherits Chip {
+}
+
+export component ThemeToggle inherits Rectangle {
+    callback clicked();
+
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
+    background: transparent;
+    border-width: 1px;
+    border-color: Theme.line;
+
+    Icon {
+        x: 10px;
+        y: 10px;
+        size: 14px;
+        tint: Theme.muted;
+        source: Theme.dark ? @image-url("icons/sun.png") : @image-url("icons/moon.png");
     }
 
     TouchArea {
@@ -449,7 +849,7 @@ export component Avatar inherits Rectangle {
 
     width: root.size * 1px;
     height: root.size * 1px;
-    border-radius: root.size * 0.28px;
+    border-radius: root.size * 0.3px;
     background: Theme.accent;
 
     Text {
@@ -462,4 +862,73 @@ export component Avatar inherits Rectangle {
         horizontal-alignment: center;
         vertical-alignment: center;
     }
+}
+
+export component SliderTrack inherits Rectangle {
+    in-out property <int> value: 0;
+    in property <int> minimum: 0;
+    in property <int> maximum: 100;
+    in property <int> step: 1;
+    callback changed(int);
+
+    height: 20px;
+    background: transparent;
+
+    Rectangle {
+        y: 7px;
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: Theme.dark ? #2B2B2B : #EBEBEB;
+    }
+
+    Rectangle {
+        y: 7px;
+        width: parent.width * (max(0, min(100, (root.value - root.minimum) * 100.0 / max(1, root.maximum - root.minimum))) / 100.0);
+        height: 6px;
+        border-radius: 3px;
+        background: Theme.accent;
+    }
+
+    Rectangle {
+        x: parent.width * (max(0, min(100, (root.value - root.minimum) * 100.0 / max(1, root.maximum - root.minimum))) / 100.0) - 8px;
+        y: 2px;
+        width: 16px;
+        height: 16px;
+        border-radius: 8px;
+        background: Theme.accent;
+        border-width: 2px;
+        border-color: Theme.surface;
+    }
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+
+        clicked => {
+            set-from-x(self.mouse-x);
+        }
+
+        moved => {
+            if self.pressed {
+                set-from-x(self.mouse-x);
+            }
+        }
+
+        function set-from-x(x: length) {
+            if (root.width <= 0px) {
+                return;
+            }
+            let ratio = max(0, min(1, x / root.width));
+            let raw = root.minimum + ratio * (root.maximum - root.minimum);
+            let stepped = round(raw / root.step) * root.step;
+            root.value = round(stepped);
+            root.changed(root.value);
+        }
+    }
+}
+
+export component Divider inherits Rectangle {
+    height: 1px;
+    background: Theme.line;
 }

@@ -1,6 +1,7 @@
 //! Minimal FitMentor API client for the Slint spike.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -640,6 +641,19 @@ pub struct WorkoutDayView {
     pub focus: String,
     pub summary: String,
     pub completed: bool,
+    pub exercises: Vec<ExerciseView>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ExerciseView {
+    pub index: i64,
+    pub name: String,
+    pub sets: i64,
+    pub reps: String,
+    pub rest: String,
+    pub muscles: String,
+    pub tips: String,
+    pub alt: String,
 }
 
 #[derive(Debug, Default)]
@@ -647,6 +661,7 @@ struct PlanDay {
     title: String,
     focus: String,
     summary: String,
+    exercises: Vec<ExerciseView>,
 }
 
 pub fn fetch_workout() -> Result<Vec<WorkoutDayView>, String> {
@@ -659,8 +674,9 @@ pub fn fetch_workout() -> Result<Vec<WorkoutDayView>, String> {
             day_index: index as i64,
             title: day.title,
             focus: day.focus,
-            summary: day.summary,
+            summary: format!("{} moves · ~45 min", day.exercises.len()),
             completed: completed.contains(&(index as i64)),
+            exercises: day.exercises,
         })
         .collect())
 }
@@ -691,33 +707,56 @@ fn fetch_workout_plan() -> Result<Vec<PlanDay>, String> {
                         .and_then(serde_json::Value::as_array)
                         .cloned()
                         .unwrap_or_default();
-                    let summary = exercises
+                    let exercise_views = exercises
                         .iter()
-                        .map(|exercise| {
-                            let name = exercise
-                                .get("name")
-                                .and_then(serde_json::Value::as_str)
-                                .unwrap_or("Exercise");
-                            let sets = exercise
-                                .get("sets")
-                                .and_then(serde_json::Value::as_i64)
-                                .unwrap_or(0);
-                            let reps = exercise
-                                .get("reps")
-                                .and_then(serde_json::Value::as_str)
-                                .unwrap_or("");
-                            let rest = exercise
-                                .get("rest")
-                                .and_then(serde_json::Value::as_str)
-                                .unwrap_or("");
-                            if rest.is_empty() {
-                                format!("• {name} — {sets}×{reps}")
-                            } else {
-                                format!("• {name} — {sets}×{reps} · {rest}")
+                        .enumerate()
+                        .map(|(index, exercise)| {
+                            let muscles = exercise
+                                .get("muscles")
+                                .and_then(serde_json::Value::as_array)
+                                .map(|values| {
+                                    values
+                                        .iter()
+                                        .filter_map(serde_json::Value::as_str)
+                                        .collect::<Vec<_>>()
+                                        .join(" · ")
+                                })
+                                .unwrap_or_default();
+                            ExerciseView {
+                                index: index as i64,
+                                name: exercise
+                                    .get("name")
+                                    .and_then(serde_json::Value::as_str)
+                                    .unwrap_or("Exercise")
+                                    .to_string(),
+                                sets: exercise
+                                    .get("sets")
+                                    .and_then(serde_json::Value::as_i64)
+                                    .unwrap_or(0),
+                                reps: exercise
+                                    .get("reps")
+                                    .and_then(serde_json::Value::as_str)
+                                    .unwrap_or("")
+                                    .to_string(),
+                                rest: exercise
+                                    .get("rest")
+                                    .and_then(serde_json::Value::as_str)
+                                    .unwrap_or("")
+                                    .to_string(),
+                                muscles,
+                                tips: exercise
+                                    .get("tips")
+                                    .and_then(serde_json::Value::as_str)
+                                    .unwrap_or("")
+                                    .to_string(),
+                                alt: exercise
+                                    .get("alt")
+                                    .and_then(serde_json::Value::as_str)
+                                    .unwrap_or("")
+                                    .to_string(),
                             }
                         })
-                        .collect::<Vec<_>>()
-                        .join("\n");
+                        .collect::<Vec<_>>();
                     PlanDay {
                         title: day
                             .get("title")
@@ -729,7 +768,8 @@ fn fetch_workout_plan() -> Result<Vec<PlanDay>, String> {
                             .and_then(serde_json::Value::as_str)
                             .unwrap_or("")
                             .to_string(),
-                        summary,
+                        summary: format!("{} moves · ~45 min", exercise_views.len()),
+                        exercises: exercise_views,
                     }
                 })
                 .collect())
@@ -1009,4 +1049,135 @@ pub fn reply_community_post(post_id: &str, text: &str) -> Result<CommunityPostVi
         .and_then(|data| data.get("replyToPost"))
         .ok_or_else(|| "Could not reply".to_string())?;
     Ok(parse_community_post(reply))
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct LogRecord {
+    #[serde(default)]
+    pub water: i64,
+    #[serde(default)]
+    pub sleep: i64,
+    #[serde(default)]
+    pub steps: i64,
+    #[serde(default)]
+    pub protein: i64,
+    #[serde(default)]
+    pub workout: bool,
+    #[serde(default)]
+    pub weight: i64,
+}
+
+fn logs_path() -> Option<PathBuf> {
+    storage_dir().map(|dir| dir.join("logs.json"))
+}
+
+pub fn today_key() -> String {
+    chrono::Local::now().format("%Y-%m-%d").to_string()
+}
+
+pub fn load_logs() -> HashMap<String, LogRecord> {
+    let Some(path) = logs_path() else {
+        return HashMap::new();
+    };
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default()
+}
+
+fn store_logs(logs: &HashMap<String, LogRecord>) {
+    let Some(path) = logs_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    if let Ok(raw) = serde_json::to_string(logs) {
+        let _ = fs::write(path, raw);
+    }
+}
+
+pub fn save_day(date: &str, record: &LogRecord) {
+    let mut logs = load_logs();
+    logs.insert(date.to_string(), record.clone());
+    store_logs(&logs);
+}
+
+pub fn patch_today(
+    water: Option<i64>,
+    sleep: Option<i64>,
+    steps: Option<i64>,
+    protein: Option<i64>,
+    workout: Option<bool>,
+    weight: Option<i64>,
+) {
+    let key = today_key();
+    let mut logs = load_logs();
+    let mut entry = logs.get(&key).cloned().unwrap_or_default();
+    if let Some(value) = water {
+        entry.water = value;
+    }
+    if let Some(value) = sleep {
+        entry.sleep = value;
+    }
+    if let Some(value) = steps {
+        entry.steps = value;
+    }
+    if let Some(value) = protein {
+        entry.protein = value;
+    }
+    if let Some(value) = workout {
+        entry.workout = value;
+    }
+    if let Some(value) = weight {
+        entry.weight = value;
+    }
+    logs.insert(key, entry);
+    store_logs(&logs);
+}
+
+pub fn last7() -> Vec<(String, LogRecord)> {
+    let logs = load_logs();
+    let mut out = Vec::with_capacity(7);
+    for offset in (0..7).rev() {
+        let date = chrono::Local::now() - chrono::Duration::days(offset);
+        let key = date.format("%Y-%m-%d").to_string();
+        out.push((key.clone(), logs.get(&key).cloned().unwrap_or_default()));
+    }
+    out
+}
+
+pub fn compute_streak() -> i64 {
+    let logs = load_logs();
+    let mut streak = 0;
+    for offset in 0..365 {
+        let date = chrono::Local::now() - chrono::Duration::days(offset);
+        let key = date.format("%Y-%m-%d").to_string();
+        let Some(entry) = logs.get(&key) else {
+            break;
+        };
+        if entry.workout || entry.water >= 6 || entry.protein > 0 {
+            streak += 1;
+        } else {
+            break;
+        }
+    }
+    streak
+}
+
+pub fn fetch_tool_advice(path: &str) -> Result<Vec<String>, String> {
+    let response = authorized_get(path)?;
+    let value: serde_json::Value = response
+        .into_json()
+        .map_err(|error| format!("Could not parse advice: {error}"))?;
+    let plan = value
+        .get("data")
+        .and_then(|data| data.get("plan"))
+        .and_then(|plan| plan.as_array())
+        .cloned()
+        .unwrap_or_default();
+    Ok(plan
+        .into_iter()
+        .filter_map(|item| item.as_str().map(ToString::to_string))
+        .collect())
 }

@@ -2,15 +2,26 @@ import { ScrollView, Palette } from "std-widgets.slint";
 import { Theme } from "theme.slint";
 import {
     Avatar,
+    BackButton,
+    BigField,
     BottomNav,
     Chip,
+    ChoiceCard,
     ChoiceChip,
+    CycleField,
+    Divider,
     Field,
     GhostButton,
+    Icon,
+    IconButton,
+    Pill,
     PrimaryButton,
+    SmallPrimary,
+    ProgressBar,
     SectionLabel,
+    SliderTrack,
     StatBlock,
-    ThemeToggle,
+    TabButton,
     TopBar,
     Wordmark,
 } from "components.slint";
@@ -22,12 +33,24 @@ export struct MealItem {
     protein: int,
 }
 
+export struct ExerciseItem {
+    index: int,
+    name: string,
+    sets: int,
+    reps: string,
+    rest: string,
+    muscles: string,
+    tips: string,
+    alt: string,
+}
+
 export struct WorkoutDay {
     day_index: int,
     title: string,
     focus: string,
     summary: string,
     completed: bool,
+    exercises: [ExerciseItem],
 }
 
 export struct ChatMessage {
@@ -44,6 +67,22 @@ export struct CommunityPost {
     reply_count: int,
 }
 
+export struct DayLog {
+    date: string,
+    water: int,
+    sleep: int,
+    steps: int,
+    protein: int,
+    workout: bool,
+    weight: int,
+}
+
+export struct QuickFood {
+    name: string,
+    kcal: int,
+    protein: int,
+}
+
 export component AppWindow inherits Window {
     in-out property <int> tab: 0;
     in-out property <bool> dark-mode: Palette.color-scheme == ColorScheme.dark;
@@ -52,6 +91,10 @@ export component AppWindow inherits Window {
     in-out property <int> steps: 0;
     in-out property <int> protein: 0;
     in-out property <string> user-name: "Friend";
+    in-out property <string> first-name: "Friend";
+    in-out property <string> today-day: "22";
+    in-out property <string> today-label: "SUNDAY, 22 NOVEMBER";
+    in-out property <int> streak: 0;
     in-out property <bool> loading: false;
     in-out property <string> status-text: "Connect your account to sync today's log.";
     in-out property <bool> signed-in: false;
@@ -59,6 +102,7 @@ export component AppWindow inherits Window {
     in-out property <string> auth-error: "";
     in-out property <bool> google-busy: false;
     in-out property <string> auth-status: "";
+    in-out property <bool> auth-signup: false;
     in-out property <string> profile-name: "Friend";
     in-out property <string> profile-email: "";
     in-out property <int> profile-age: 0;
@@ -83,7 +127,16 @@ export component AppWindow inherits Window {
     in-out property <string> form-diet: "veg";
     in-out property <string> form-days: "4";
     in-out property <string> form-budget: "150";
+    in-out property <int> form-days-num: 4;
+    in-out property <int> form-budget-num: 150;
+    in-out property <[string]> form-conditions: [];
+    in-out property <bool> health-none: true;
+    in-out property <bool> health-diabetes: false;
+    in-out property <bool> health-heart: false;
+    in-out property <bool> health-bp: false;
+    in-out property <bool> health-joint: false;
     in-out property <string> form-error: "";
+    in-out property <int> onboarding-step: 0;
     in-out property <[MealItem]> nutrition-meals: [];
     in-out property <string> nutrition-title: "";
     in-out property <string> nutrition-status: "Load today's meal plan.";
@@ -91,8 +144,15 @@ export component AppWindow inherits Window {
     in-out property <int> target-protein: 0;
     in-out property <int> target-carbs: 0;
     in-out property <int> target-fat: 0;
+    in-out property <int> custom-protein: 0;
+    in-out property <bool> protein-editing: false;
+    in-out property <int> nutrition-tab: 0;
     in-out property <[WorkoutDay]> workout-days: [];
     in-out property <string> workout-status: "Load today's workout.";
+    in-out property <string> session-title: "Your first session";
+    in-out property <int> workout-tab: 0;
+    in-out property <int> open-workout: 0;
+    in-out property <[string]> exercise-names: [];
     in-out property <[ChatMessage]> chat-messages: [];
     in-out property <string> chat-input: "";
     in-out property <string> chat-status: "Ask about training, food, or recovery.";
@@ -108,6 +168,22 @@ export component AppWindow inherits Window {
     in-out property <[CommunityPost]> community-replies: [];
     in-out property <string> community-reply-input: "";
     in-out property <string> community-reply-status: "";
+    in-out property <int> tool: 0;
+    in-out property <string> tool-advice: "";
+    in-out property <bool> tool-busy: false;
+    in-out property <string> tool-input: "";
+    in-out property <string> injury-area: "";
+    in-out property <string> form-exercise: "";
+    in-out property <int> calorie-deficit: 400;
+    in-out property <int> calorie-weeks: 12;
+    in-out property <bool> show-progress: false;
+    in-out property <[DayLog]> history: [];
+    in-out property <string> weight-path: "";
+    in-out property <int> week-workouts: 0;
+    in-out property <int> avg-protein: 0;
+    in-out property <string> avg-sleep: "0";
+    in-out property <string> weight-input: "";
+    in-out property <[QuickFood]> quick-foods: [];
 
     callback refresh();
     callback sign-in();
@@ -132,9 +208,16 @@ export component AppWindow inherits Window {
     callback checkout(string);
     callback add-water();
     callback add-steps();
+    callback add-steps-by(int);
     callback add-protein();
+    callback add-protein-by(int);
+    callback log-sleep(int);
+    callback log-weight();
+    callback run-tool();
     callback set-tab(int);
     callback toggle-theme();
+    callback open-progress();
+    callback close-progress();
 
     title: "FitMentor";
     icon: @image-url("images/app-icon.png");
@@ -151,847 +234,435 @@ export component AppWindow inherits Window {
         Theme.dark = root.dark-mode;
     }
 
-    VerticalLayout {
-        spacing: 0;
+    // ================================================================
+    // Signed-in app
+    // ================================================================
+    if root.signed-in && !root.needs-onboarding : Rectangle {
+        background: Theme.bg;
 
         TopBar {
+            y: 0;
+            width: 100%;
             toggle-theme => {
                 root.toggle-theme();
             }
         }
 
         ScrollView {
-            vertical-stretch: 1;
+            x: 0;
+            y: Theme.header-h;
+            width: 100%;
+            height: root.height - Theme.header-h;
 
             VerticalLayout {
                 width: 100%;
-                padding: 20px;
+                padding-left: Theme.page-pad;
+                padding-right: Theme.page-pad;
+                padding-top: 32px;
+                padding-bottom: 112px;
                 spacing: 16px;
+                alignment: start;
 
-                // ------------------------------------------------------------
-                // TODAY
-                // ------------------------------------------------------------
+                // --------------------------------------------------------
+                // HOME
+                // --------------------------------------------------------
                 if root.tab == 0 : VerticalLayout {
                     spacing: 16px;
                     alignment: start;
 
                     VerticalLayout {
-                        spacing: 6px;
+                        spacing: 12px;
                         horizontal-stretch: 1;
+                        alignment: start;
 
                         SectionLabel {
-                            index: "01";
-                            label: "TODAY";
+                            index: root.today-day;
+                            label: root.today-label;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+
+                            Text {
+                                text: "Hey,";
+                                color: Theme.text;
+                                font-size: 36px;
+                                font-weight: 600;
+                                letter-spacing: -1.4px;
+                                vertical-alignment: bottom;
+                            }
+
+                            Text {
+                                text: root.first-name + ".";
+                                color: Theme.accent;
+                                font-size: 36px;
+                                font-weight: 600;
+                                letter-spacing: -1.4px;
+                                vertical-alignment: bottom;
+                            }
                         }
 
                         Text {
-                            text: "Hey, \{root.user-name}.";
-                            color: Theme.text;
-                            font-size: 34px;
-                            font-weight: 600;
-                            letter-spacing: -1.2px;
-                            wrap: word-wrap;
-                        }
-
-                        Text {
-                            text: "One session, one plate, one glass at a time.";
+                            text: "One session, one plate, one glass at a time. Here's where today stands.";
                             color: Theme.muted;
-                            font-size: 13px;
+                            font-size: 14px;
                             wrap: word-wrap;
+                            width: 100%;
+                        }
+
+                        Pill {
+                            label: "\{root.streak} DAY STREAK";
+                            dot: true;
                         }
                     }
 
+                    // Session hero
                     Rectangle {
-                        height: 210px;
-                        border-radius: 28px;
+                        height: 300px;
+                        border-radius: Theme.radius-hero;
                         clip: true;
+                        background: Theme.ink;
 
                         Image {
                             width: 100%;
                             height: 100%;
                             source: @image-url("images/train-ropes.jpg");
                             image-fit: cover;
+                            opacity: 0.45;
                         }
 
                         Rectangle {
                             width: 100%;
                             height: 100%;
-                            background: @linear-gradient(180deg, rgba(11, 11, 11, 0.10) 0%, rgba(11, 11, 11, 0.86) 100%);
+                            background: @linear-gradient(90deg, #0B0B0B 0%, rgba(11, 11, 11, 0.86) 50%, rgba(11, 11, 11, 0.18) 100%);
                         }
 
                         VerticalLayout {
-                            padding: 20px;
-                            spacing: 6px;
-                            alignment: end;
+                            padding: 28px;
+                            spacing: 0;
+                            alignment: space-between;
 
-                            Text {
-                                text: "TODAY'S SESSION";
-                                color: Theme.accent;
-                                font-size: 9px;
-                                font-weight: 700;
-                                letter-spacing: 1.6px;
+                            VerticalLayout {
+                                spacing: 12px;
+
+                                Pill {
+                                    label: "TODAY'S SESSION";
+                                    accent: true;
+                                }
+
+                                Text {
+                                    text: root.session-title;
+                                    color: Theme.cream;
+                                    font-size: 30px;
+                                    font-weight: 600;
+                                    letter-spacing: -1px;
+                                    wrap: word-wrap;
+                                }
+
+                                Text {
+                                    text: root.workout-days.length > 0
+                                        ? root.workout-days[0].focus + " · " + root.workout-days[0].summary
+                                        : "Build the habit first.";
+                                    color: rgba(247, 243, 237, 0.6);
+                                    font-size: 14px;
+                                    wrap: word-wrap;
+                                }
                             }
 
-                            Text {
-                                text: root.workout-days.length > 0 ? root.workout-days[0].title : "Your first session";
-                                color: Theme.cream;
-                                font-size: 26px;
-                                font-weight: 600;
-                                letter-spacing: -0.6px;
-                            }
+                            HorizontalLayout {
+                                height: 48px;
+                                alignment: start;
 
-                            Text {
-                                text: root.workout-days.length > 0 ? root.workout-days[0].focus : "Build the habit first.";
-                                color: rgba(247, 243, 237, 0.62);
-                                font-size: 12px;
+                                Rectangle {
+                                    height: 48px;
+                                    border-radius: 24px;
+                                    background: Theme.cream;
+
+                                    HorizontalLayout {
+                                        padding-left: 20px;
+                                        padding-right: 6px;
+                                        spacing: 12px;
+
+                                        Text {
+                                            text: "Start session";
+                                            color: Theme.ink;
+                                            font-size: 14px;
+                                            font-weight: 600;
+                                        }
+
+                                        Rectangle {
+                                            width: 36px;
+                                            height: 36px;
+                                            border-radius: 18px;
+                                            background: Theme.accent;
+
+                                            Icon {
+                                                x: 10px;
+                                                y: 10px;
+                                                size: 16px;
+                                                tint: Theme.ink;
+                                                source: @image-url("icons/arrow-up-right.png");
+                                            }
+                                        }
+                                    }
+
+                                    TouchArea {
+                                        width: 100%;
+                                        height: 100%;
+                                        clicked => {
+                                            root.set-tab(1);
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
 
+                    // Stats 2x2
                     HorizontalLayout {
-                        spacing: 10px;
+                        spacing: 16px;
 
                         StatBlock {
-                            label: "WATER";
-                            value: "\{root.water}";
-                            unit: "glasses";
+                            label: "STREAK";
+                            value: "\{root.streak}";
+                            unit: "days";
+                            hint: "Keep the chain alive";
+                            invert: true;
                         }
-
-                        StatBlock {
-                            label: "STEPS";
-                            value: "\{root.steps}";
-                            unit: "today";
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 10px;
 
                         StatBlock {
                             label: "PROTEIN";
                             value: "\{root.protein}";
-                            unit: "g";
-                            highlight: true;
+                            unit: "/ \{root.custom-protein > 0 ? root.custom-protein : root.target-protein} g";
+                            progress: root.custom-protein > 0
+                                ? min(100, root.protein * 100 / max(1, root.custom-protein))
+                                : min(100, root.protein * 100 / max(1, root.target-protein));
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 16px;
+
+                        StatBlock {
+                            label: "CALORIES";
+                            value: "\{root.target-calories}";
+                            unit: "kcal target";
+                            hint: "\{root.target-carbs} g carbs · \{root.target-fat} g fat";
                         }
 
                         StatBlock {
-                            label: "SLEEP";
-                            value: "\{root.sleep}";
-                            unit: "h";
+                            label: "WATER";
+                            value: "\{root.water}";
+                            unit: "/ 8 glasses";
+                            progress: min(100, root.water * 100 / 8);
                         }
                     }
 
+                    // Progress shortcut
                     Rectangle {
-                        border-radius: 24px;
+                        height: 56px;
+                        border-radius: 20px;
                         background: Theme.surface;
                         border-width: 1px;
                         border-color: Theme.line;
 
-                        VerticalLayout {
-                            padding: 16px;
-                            spacing: 12px;
+                        HorizontalLayout {
+                            padding-left: 20px;
+                            padding-right: 16px;
+                            alignment: space-between;
 
-                            SectionLabel {
-                                label: "QUICK LOG";
-                            }
-
-                            HorizontalLayout {
-                                spacing: 8px;
-
-                                GhostButton {
-                                    label: "+ Water";
-                                    clicked => {
-                                        root.add-water();
-                                    }
-                                }
-
-                                GhostButton {
-                                    label: "+ Steps";
-                                    clicked => {
-                                        root.add-steps();
-                                    }
-                                }
-
-                                GhostButton {
-                                    label: "+ Protein";
-                                    clicked => {
-                                        root.add-protein();
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 12px;
-                        alignment: space-between;
-
-                        Text {
-                            text: root.status-text;
-                            color: Theme.muted;
-                            font-size: 11px;
-                            wrap: word-wrap;
-                            horizontal-stretch: 1;
-                            vertical-alignment: center;
-                        }
-
-                        GhostButton {
-                            label: root.loading ? "Syncing…" : "Refresh";
-                            width: 88px;
-                            clicked => {
-                                root.refresh();
-                            }
-                        }
-                    }
-                }
-
-                // ------------------------------------------------------------
-                // FOOD
-                // ------------------------------------------------------------
-                if root.tab == 1 : VerticalLayout {
-                    spacing: 16px;
-                    alignment: start;
-
-                    VerticalLayout {
-                        spacing: 6px;
-                        horizontal-stretch: 1;
-
-                        SectionLabel {
-                            index: "02";
-                            label: "FUEL";
-                        }
-
-                        Text {
-                            text: "Eat for the work.";
-                            color: Theme.text;
-                            font-size: 34px;
-                            font-weight: 600;
-                            letter-spacing: -1.2px;
-                            wrap: word-wrap;
-                        }
-
-                        Text {
-                            text: "Indian food, your budget, your protein target.";
-                            color: Theme.muted;
-                            font-size: 13px;
-                            wrap: word-wrap;
-                        }
-                    }
-
-                    Rectangle {
-                        border-radius: 24px;
-                        background: Theme.surface;
-                        border-width: 1px;
-                        border-color: Theme.line;
-
-                        VerticalLayout {
-                            padding: 18px;
-                            spacing: 16px;
-
-                            SectionLabel {
-                                label: "DAILY TARGETS";
-                            }
-
-                            HorizontalLayout {
-                                spacing: 8px;
-
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text {
-                                        text: "\{root.target-calories}";
-                                        color: Theme.text;
-                                        font-size: 22px;
-                                        font-weight: 500;
-                                    }
-                                    Text {
-                                        text: "KCAL";
-                                        color: Theme.muted;
-                                        font-size: 8px;
-                                        letter-spacing: 1px;
-                                    }
-                                }
-
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text {
-                                        text: "\{root.target-protein}";
-                                        color: Theme.accent;
-                                        font-size: 22px;
-                                        font-weight: 500;
-                                    }
-                                    Text {
-                                        text: "PROTEIN";
-                                        color: Theme.muted;
-                                        font-size: 8px;
-                                        letter-spacing: 1px;
-                                    }
-                                }
-
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text {
-                                        text: "\{root.target-carbs}";
-                                        color: Theme.text;
-                                        font-size: 22px;
-                                        font-weight: 500;
-                                    }
-                                    Text {
-                                        text: "CARBS";
-                                        color: Theme.muted;
-                                        font-size: 8px;
-                                        letter-spacing: 1px;
-                                    }
-                                }
-
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text {
-                                        text: "\{root.target-fat}";
-                                        color: Theme.text;
-                                        font-size: 22px;
-                                        font-weight: 500;
-                                    }
-                                    Text {
-                                        text: "FAT";
-                                        color: Theme.muted;
-                                        font-size: 8px;
-                                        letter-spacing: 1px;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 12px;
-                        alignment: space-between;
-
-                        Text {
-                            text: root.nutrition-status;
-                            color: Theme.muted;
-                            font-size: 11px;
-                            wrap: word-wrap;
-                            horizontal-stretch: 1;
-                        }
-
-                        GhostButton {
-                            label: "Refresh";
-                            width: 88px;
-                            clicked => {
-                                root.load-nutrition();
-                            }
-                        }
-                    }
-
-                    if root.nutrition-meals.length == 0 : Rectangle {
-                        height: 120px;
-                        border-radius: 22px;
-                        border-width: 1px;
-                        border-color: Theme.line;
-
-                        Text {
-                            text: "No meal plan yet. It appears after the daily planner runs.";
-                            color: Theme.muted;
-                            font-size: 12px;
-                            wrap: word-wrap;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                            x: 24px;
-                            y: 0;
-                            width: parent.width - 48px;
-                            height: 100%;
-                        }
-                    }
-
-                    for meal in root.nutrition-meals : Rectangle {
-                        border-radius: 22px;
-                        background: Theme.surface;
-                        border-width: 1px;
-                        border-color: Theme.line;
-
-                        VerticalLayout {
-                            padding: 16px;
-                            spacing: 6px;
-
-                            HorizontalLayout {
+                            VerticalLayout {
+                                spacing: 2px;
                                 Text {
-                                    text: meal.name;
-                                    color: Theme.text;
-                                    font-size: 15px;
+                                    text: "PROGRESS";
+                                    color: Theme.muted;
+                                    font-size: 10px;
                                     font-weight: 600;
-                                    horizontal-stretch: 1;
+                                    letter-spacing: 1.6px;
                                 }
                                 Text {
-                                    text: "\{meal.kcal} kcal";
-                                    color: Theme.accent;
-                                    font-size: 11px;
-                                    vertical-alignment: center;
+                                    text: "Last 7 days";
+                                    color: Theme.text;
+                                    font-size: 14px;
+                                    font-weight: 500;
                                 }
                             }
 
-                            Text {
-                                text: meal.items;
-                                color: Theme.muted;
-                                font-size: 12px;
-                                wrap: word-wrap;
-                            }
-
-                            Text {
-                                text: "\{meal.protein} g protein";
-                                color: Theme.text;
-                                font-size: 10px;
-                                font-weight: 600;
+                            Icon {
+                                size: 18px;
+                                tint: Theme.muted;
+                                source: @image-url("icons/arrow-up-right.png");
                             }
                         }
-                    }
-                }
 
-                // ------------------------------------------------------------
-                // TRAIN
-                // ------------------------------------------------------------
-                if root.tab == 2 : VerticalLayout {
-                    spacing: 16px;
-                    alignment: start;
-
-                    VerticalLayout {
-                        spacing: 6px;
-                        horizontal-stretch: 1;
-
-                        SectionLabel {
-                            index: "03";
-                            label: "TRAIN";
-                        }
-
-                        Text {
-                            text: "The week.";
-                            color: Theme.text;
-                            font-size: 34px;
-                            font-weight: 600;
-                            letter-spacing: -1.2px;
-                        }
-
-                        Text {
-                            text: "Built around your equipment and schedule.";
-                            color: Theme.muted;
-                            font-size: 13px;
-                            wrap: word-wrap;
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 12px;
-                        alignment: space-between;
-
-                        Text {
-                            text: root.workout-status;
-                            color: Theme.muted;
-                            font-size: 11px;
-                            wrap: word-wrap;
-                            horizontal-stretch: 1;
-                        }
-
-                        GhostButton {
-                            label: "Refresh";
-                            width: 88px;
-                            clicked => {
-                                root.load-workout();
-                            }
-                        }
-                    }
-
-                    if root.workout-days.length == 0 : Rectangle {
-                        height: 120px;
-                        border-radius: 22px;
-                        border-width: 1px;
-                        border-color: Theme.line;
-
-                        Text {
-                            text: "No workout plan yet. It appears after the daily planner runs.";
-                            color: Theme.muted;
-                            font-size: 12px;
-                            wrap: word-wrap;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                            x: 24px;
-                            y: 0;
-                            width: parent.width - 48px;
+                        TouchArea {
+                            width: 100%;
                             height: 100%;
+                            clicked => {
+                                root.open-progress();
+                            }
                         }
                     }
 
-                    for day in root.workout-days : Rectangle {
-                        border-radius: 24px;
+                    // Habits
+                    Rectangle {
+                        border-radius: Theme.radius-card;
                         background: Theme.surface;
                         border-width: 1px;
                         border-color: Theme.line;
 
                         VerticalLayout {
-                            padding: 16px;
-                            spacing: 8px;
+                            padding: 24px;
+                            spacing: 0;
 
                             HorizontalLayout {
-                                spacing: 10px;
+                                alignment: space-between;
+                                SectionLabel {
+                                    label: "DAILY HABITS";
+                                }
+                                Text {
+                                    text: "HABITS";
+                                    color: Theme.muted;
+                                    font-size: 10px;
+                                    font-weight: 600;
+                                    letter-spacing: 1.4px;
+                                }
+                            }
+
+                            VerticalLayout {
+                                spacing: 0;
+                                height: 72px;
+                                alignment: space-between;
+
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text {
+                                        text: "Water";
+                                        color: Theme.text;
+                                        font-size: 14px;
+                                        font-weight: 500;
+                                    }
+                                    Text {
+                                        text: "\{root.water} / 8";
+                                        color: Theme.muted;
+                                        font-size: 14px;
+                                    }
+                                }
+
+                                ProgressBar {
+                                    value: min(100, root.water * 100 / 8);
+                                }
+                            }
+
+                            Rectangle {
+                                height: 33px;
+                                background: transparent;
+                                Rectangle {
+                                    y: 16px;
+                                    height: 1px;
+                                    background: Theme.line;
+                                }
+                            }
+
+                            VerticalLayout {
+                                spacing: 0;
+                                height: 72px;
+                                alignment: space-between;
+
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text {
+                                        text: "Protein";
+                                        color: Theme.text;
+                                        font-size: 14px;
+                                        font-weight: 500;
+                                    }
+                                    Text {
+                                        text: "\{root.protein} / \{root.custom-protein > 0 ? root.custom-protein : root.target-protein} g";
+                                        color: Theme.muted;
+                                        font-size: 14px;
+                                    }
+                                }
+
+                                ProgressBar {
+                                    ink: true;
+                                    value: root.custom-protein > 0
+                                        ? min(100, root.protein * 100 / max(1, root.custom-protein))
+                                        : min(100, root.protein * 100 / max(1, root.target-protein));
+                                }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 8px;
+                                padding-top: 14px;
+
+                                GhostButton {
+                                    label: "+ ONE GLASS";
+                                    stretch: false;
+                                    width: 124px;
+                                    clicked => { root.add-water(); }
+                                }
+                                GhostButton {
+                                    label: "+ 20 G PROTEIN";
+                                    stretch: false;
+                                    width: 140px;
+                                    clicked => { root.add-protein(); }
+                                }
+                            }
+                        }
+                    }
+
+                    // Profile summary
+                    Rectangle {
+                        border-radius: Theme.radius-card;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+
+                        VerticalLayout {
+                            padding: 24px;
+                            spacing: 20px;
+
+                            HorizontalLayout {
+                                spacing: 12px;
 
                                 Rectangle {
-                                    width: 40px;
-                                    height: 40px;
-                                    border-radius: 14px;
-                                    background: day.completed ? Theme.accent : Theme.surface-2;
+                                    width: 48px;
+                                    height: 48px;
+                                    border-radius: 16px;
+                                    background: Theme.ink;
 
                                     Text {
                                         width: 100%;
                                         height: 100%;
-                                        text: "\{day.day_index + 1}";
-                                        color: day.completed ? Theme.ink : Theme.muted;
-                                        font-size: 12px;
-                                        font-weight: 700;
-                                        horizontal-alignment: center;
-                                        vertical-alignment: center;
-                                    }
-                                }
-
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 2px;
-                                    Text {
-                                        text: "DAY \{day.day_index + 1}";
-                                        color: Theme.muted;
-                                        font-size: 8px;
-                                        font-weight: 600;
-                                        letter-spacing: 1.2px;
-                                    }
-                                    Text {
-                                        text: day.title;
-                                        color: Theme.text;
-                                        font-size: 16px;
-                                        font-weight: 600;
-                                    }
-                                }
-
-                                if day.completed : Text {
-                                    text: "DONE";
-                                    color: Theme.accent;
-                                    font-size: 9px;
-                                    font-weight: 700;
-                                    letter-spacing: 1px;
-                                    vertical-alignment: center;
-                                }
-                            }
-
-                            Text {
-                                text: day.focus;
-                                color: Theme.accent;
-                                font-size: 11px;
-                                font-weight: 600;
-                            }
-
-                            Text {
-                                text: day.summary;
-                                color: Theme.muted;
-                                font-size: 12px;
-                                wrap: word-wrap;
-                            }
-
-                            GhostButton {
-                                label: day.completed ? "Completed" : "Mark day complete";
-                                active: day.completed;
-                                clicked => {
-                                    if !day.completed {
-                                        root.complete-workout(day.day_index, day.title);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // ------------------------------------------------------------
-                // COACH
-                // ------------------------------------------------------------
-                if root.tab == 3 : VerticalLayout {
-                    spacing: 14px;
-                    alignment: start;
-
-                    HorizontalLayout {
-                        spacing: 12px;
-                        alignment: space-between;
-
-                        VerticalLayout {
-                            spacing: 6px;
-                            horizontal-stretch: 1;
-
-                            SectionLabel {
-                                index: "04";
-                                label: "COACH";
-                            }
-
-                            Text {
-                                text: "Ask the coach.";
-                                color: Theme.text;
-                                font-size: 34px;
-                                font-weight: 600;
-                                letter-spacing: -1.2px;
-                            }
-                        }
-
-                        GhostButton {
-                            label: "New chat";
-                            width: 92px;
-                            clicked => {
-                                root.new-chat();
-                            }
-                        }
-                    }
-
-                    Text {
-                        text: root.chat-status;
-                        color: Theme.muted;
-                        font-size: 11px;
-                        wrap: word-wrap;
-                    }
-
-                    ScrollView {
-                        height: 420px;
-
-                        VerticalLayout {
-                            width: 100%;
-                            spacing: 8px;
-
-                            if root.chat-messages.length == 0 : Text {
-                                text: "Training, food, recovery, or the week you just missed. Start anywhere.";
-                                color: Theme.muted;
-                                font-size: 13px;
-                                wrap: word-wrap;
-                            }
-
-                            for message in root.chat-messages : Rectangle {
-                                border-radius: 20px;
-                                background: message.role == "assistant" ? Theme.surface : Theme.text;
-                                border-width: message.role == "assistant" ? 1px : 0px;
-                                border-color: Theme.line;
-
-                                VerticalLayout {
-                                    padding: 14px;
-                                    spacing: 6px;
-
-                                    if message.role == "assistant" : Text {
-                                        text: "COACH";
+                                        text: "FM";
                                         color: Theme.accent;
-                                        font-size: 8px;
-                                        font-weight: 700;
-                                        letter-spacing: 1.4px;
-                                    }
-
-                                    Text {
-                                        text: message.content;
-                                        color: message.role == "assistant" ? Theme.text : Theme.cream;
-                                        font-size: 13px;
-                                        wrap: word-wrap;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 8px;
-
-                        Rectangle {
-                            horizontal-stretch: 1;
-                            height: 48px;
-                            border-radius: 24px;
-                            background: Theme.surface;
-                            border-width: 1px;
-                            border-color: Theme.line;
-
-                            Text {
-                                x: 16px;
-                                y: 0;
-                                width: parent.width - 32px;
-                                height: 100%;
-                                text: "Ask your coach…";
-                                color: Theme.muted;
-                                font-size: 13px;
-                                vertical-alignment: center;
-                                visible: root.chat-input == "";
-                            }
-
-                            TextInput {
-                                x: 16px;
-                                y: 0;
-                                width: parent.width - 32px;
-                                height: 100%;
-                                text <=> root.chat-input;
-                                single-line: true;
-                                color: Theme.text;
-                                font-size: 13px;
-                                vertical-alignment: center;
-                                accepted => {
-                                    root.send-chat();
-                                }
-                            }
-                        }
-
-                        GhostButton {
-                            label: root.chat-busy ? "…" : "Send";
-                            width: 68px;
-                            clicked => {
-                                root.send-chat();
-                            }
-                        }
-                    }
-                }
-
-                // ------------------------------------------------------------
-                // YOU
-                // ------------------------------------------------------------
-                if root.tab == 4 : VerticalLayout {
-                    spacing: 16px;
-                    alignment: start;
-
-                    HorizontalLayout {
-                        spacing: 14px;
-
-                        Avatar {
-                            initials: "FM";
-                            size: 64;
-                        }
-
-                        VerticalLayout {
-                            spacing: 4px;
-                            horizontal-stretch: 1;
-
-                            SectionLabel {
-                                index: "05";
-                                label: "YOU";
-                            }
-
-                            Text {
-                                text: root.profile-name;
-                                color: Theme.text;
-                                font-size: 28px;
-                                font-weight: 600;
-                                letter-spacing: -0.8px;
-                            }
-
-                            Text {
-                                text: root.profile-email;
-                                color: Theme.muted;
-                                font-size: 12px;
-                                wrap: word-wrap;
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        border-radius: 28px;
-                        background: Theme.surface;
-                        border-width: 1px;
-                        border-color: Theme.line;
-
-                        VerticalLayout {
-                            padding: 20px;
-                            spacing: 10px;
-
-                            SectionLabel {
-                                label: "CURRENT PLAN";
-                            }
-
-                            Text {
-                                text: root.profile-tier;
-                                color: Theme.accent;
-                                font-size: 30px;
-                                font-weight: 600;
-                                letter-spacing: -0.8px;
-                            }
-
-                            Text {
-                                text: "Goal: \{root.profile-goal}  ·  \{root.profile-diet}  ·  \{root.profile-days}× / week";
-                                color: Theme.muted;
-                                font-size: 12px;
-                                wrap: word-wrap;
-                            }
-
-                            HorizontalLayout {
-                                spacing: 8px;
-
-                                GhostButton {
-                                    label: "Basic ₹99";
-                                    clicked => {
-                                        root.checkout("pro");
+                                        font-family: Theme.font-wordmark;
+                                        font-size: 12px;
+                                        horizontal-alignment: center;
                                     }
                                 }
 
-                                GhostButton {
-                                    label: "Elite ₹299";
-                                    clicked => {
-                                        root.checkout("premium");
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 10px;
-
-                        StatBlock {
-                            label: "AGE";
-                            value: "\{root.profile-age}";
-                            unit: "yrs";
-                        }
-
-                        StatBlock {
-                            label: "HEIGHT";
-                            value: "\{root.profile-height}";
-                            unit: "cm";
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 10px;
-
-                        StatBlock {
-                            label: "WEIGHT";
-                            value: "\{root.profile-weight}";
-                            unit: "kg";
-                        }
-
-                        StatBlock {
-                            label: "BUDGET";
-                            value: "₹\{root.profile-budget}";
-                            unit: "/ day";
-                        }
-                    }
-
-                    Rectangle {
-                        border-radius: 24px;
-                        background: Theme.surface;
-                        border-width: 1px;
-                        border-color: Theme.line;
-
-                        VerticalLayout {
-                            padding: 18px;
-                            spacing: 14px;
-
-                            HorizontalLayout {
-                                alignment: space-between;
-                                Text {
-                                    text: "Theme";
-                                    color: Theme.text;
-                                    font-size: 14px;
-                                    font-weight: 500;
-                                    vertical-alignment: center;
+                                VerticalLayout {
+                                    spacing: 3px;
                                     horizontal-stretch: 1;
-                                }
-                                ThemeToggle {
-                                    clicked => {
-                                        root.toggle-theme();
+                                    Text {
+                                        text: root.profile-name;
+                                        color: Theme.text;
+                                        font-size: 14px;
+                                        font-weight: 600;
                                     }
+                                    Text {
+                                        text: root.profile-goal + " · " + root.profile-experience;
+                                        color: Theme.muted;
+                                        font-size: 12px;
+                                    }
+                                }
+
+                                IconButton {
+                                    icon: @image-url("icons/arrow-up-right.png");
+                                    clicked => { root.edit-profile(); }
                                 }
                             }
 
@@ -1000,185 +671,1017 @@ export component AppWindow inherits Window {
                                 background: Theme.line;
                             }
 
-                            GhostButton {
-                                label: "Edit profile";
-                                clicked => {
-                                    root.edit-profile();
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text { text: "CAL"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
+                                    Text { text: "\{root.target-calories}"; color: Theme.text; font-size: 18px; font-weight: 500; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text { text: "PROT"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
+                                    Text { text: "\{root.target-protein}"; color: Theme.accent; font-size: 18px; font-weight: 500; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text { text: "CARBS"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
+                                    Text { text: "\{root.target-carbs}"; color: Theme.text; font-size: 18px; font-weight: 500; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text { text: "FAT"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
+                                    Text { text: "\{root.target-fat}"; color: Theme.text; font-size: 18px; font-weight: 500; }
+                                }
+                            }
+                        }
+                    }
+
+                    // Coach preview
+                    Rectangle {
+                        border-radius: Theme.radius-card;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+
+                        VerticalLayout {
+                            padding: 24px;
+                            spacing: 18px;
+
+                            HorizontalLayout {
+                                alignment: space-between;
+
+                                VerticalLayout {
+                                    spacing: 4px;
+                                    SectionLabel { label: "COACH"; }
+                                    Text {
+                                        text: "Ask about your plan";
+                                        color: Theme.text;
+                                        font-size: 18px;
+                                        font-weight: 600;
+                                    }
+                                }
+
+                                IconButton {
+                                    icon: @image-url("icons/arrow-up-right.png");
+                                    clicked => { root.set-tab(3); }
                                 }
                             }
 
-                            GhostButton {
-                                label: "Refresh profile";
-                                clicked => {
-                                    root.load-profile();
+                            if root.chat-messages.length == 0 : VerticalLayout {
+                                spacing: 14px;
+                                Text {
+                                    text: "Training, food, recovery, or the week you just missed. The coach already knows your targets.";
+                                    color: Theme.muted;
+                                    font-size: 14px;
+                                    wrap: word-wrap;
+                                }
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    GhostButton {
+                                        label: "PROTEIN?";
+                                        stretch: false;
+                                        width: 118px;
+                                        clicked => {
+                                            root.chat-input = "How much protein do I need?";
+                                            root.send-chat();
+                                        }
+                                    }
+                                    GhostButton {
+                                        label: "MISSED DAYS";
+                                        stretch: false;
+                                        width: 126px;
+                                        clicked => {
+                                            root.chat-input = "I missed three days. What now?";
+                                            root.send-chat();
+                                        }
+                                    }
                                 }
                             }
 
-                            GhostButton {
-                                label: "Sign out";
-                                clicked => {
-                                    root.sign-out();
+                            if root.chat-messages.length > 0 : VerticalLayout {
+                                spacing: 10px;
+                                for message in root.chat-messages : Rectangle {
+                                    border-radius: 16px;
+                                    background: message.role == "assistant" ? Theme.surface-2 : Theme.text;
+                                    VerticalLayout {
+                                        padding: 12px;
+                                        spacing: 4px;
+                                        if message.role == "assistant" : Text {
+                                            text: "COACH";
+                                            color: Theme.accent;
+                                            font-size: 9px;
+                                            font-weight: 700;
+                                            letter-spacing: 1.4px;
+                                        }
+                                        Text {
+                                            text: message.content;
+                                            color: message.role == "assistant" ? Theme.text : Theme.cream;
+                                            font-size: 13px;
+                                            wrap: word-wrap;
+                                        }
+                                    }
+                                }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 40px;
+                                    border-radius: 20px;
+                                    background: Theme.bg;
+                                    border-width: 1px;
+                                    border-color: Theme.line;
+
+                                    TextInput {
+                                        x: 14px;
+                                        y: 0;
+                                        width: parent.width - 28px;
+                                        height: 100%;
+                                        text <=> root.chat-input;
+                                        single-line: true;
+                                        color: Theme.text;
+                                        font-size: 13px;
+                                        accepted => { root.send-chat(); }
+                                    }
+                                }
+
+                                Rectangle {
+                                    width: 40px;
+                                    height: 40px;
+                                    border-radius: 20px;
+                                    background: Theme.accent;
+
+                                    Icon {
+                                        x: 11px;
+                                        y: 11px;
+                                        size: 18px;
+                                        tint: Theme.ink;
+                                        source: @image-url("icons/arrow-up.png");
+                                    }
+
+                                    TouchArea {
+                                        width: 100%;
+                                        height: 100%;
+                                        clicked => { root.send-chat(); }
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // ------------------------------------------------------------
-                // FEED
-                // ------------------------------------------------------------
-                if root.tab == 5 : VerticalLayout {
+                // --------------------------------------------------------
+                // TRAIN
+                // --------------------------------------------------------
+                if root.tab == 1 : VerticalLayout {
                     spacing: 16px;
                     alignment: start;
 
                     VerticalLayout {
-                        spacing: 6px;
+                        spacing: 12px;
                         horizontal-stretch: 1;
-
-                        SectionLabel {
-                            index: "06";
-                            label: "FEED";
-                        }
-
+                        SectionLabel { label: "TRAIN"; }
                         Text {
-                            text: "The floor.";
+                            text: "The week.";
                             color: Theme.text;
-                            font-size: 34px;
+                            font-size: 36px;
                             font-weight: 600;
-                            letter-spacing: -1.2px;
+                            letter-spacing: -1.4px;
                         }
-
                         Text {
-                            text: "Wins, questions, and the days nobody feels like training.";
+                            text: "Built around your equipment, experience, and the days you can actually show up.";
                             color: Theme.muted;
-                            font-size: 13px;
+                            font-size: 14px;
                             wrap: word-wrap;
-                        }
-                    }
-
-                    HorizontalLayout {
-                        spacing: 8px;
-                        alignment: space-between;
-
-                        Text {
-                            text: root.community-status;
-                            color: Theme.muted;
-                            font-size: 11px;
-                            wrap: word-wrap;
-                            horizontal-stretch: 1;
-                        }
-
-                        GhostButton {
-                            label: "Refresh";
-                            width: 88px;
-                            clicked => {
-                                root.load-community();
-                            }
                         }
                     }
 
                     Rectangle {
-                        border-radius: 24px;
-                        background: Theme.surface;
-                        border-width: 1px;
-                        border-color: Theme.line;
-
-                        VerticalLayout {
-                            padding: 16px;
-                            spacing: 10px;
-
-                            TextInput {
-                                height: 64px;
-                                text <=> root.community-input;
-                                single-line: false;
-                                wrap: word-wrap;
-                                color: Theme.text;
-                                font-size: 13px;
-                            }
-
-                            HorizontalLayout {
-                                alignment: space-between;
-
-                                Text {
-                                    text: "Keep it useful or keep it kind.";
-                                    color: Theme.muted;
-                                    font-size: 10px;
-                                    vertical-alignment: center;
-                                }
-
-                                GhostButton {
-                                    label: root.community-busy ? "Posting…" : "Post";
-                                    width: 84px;
-                                    clicked => {
-                                        root.post-community();
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if root.community-posts.length == 0 : Text {
-                        text: "No posts yet. Start the conversation.";
-                        color: Theme.muted;
-                        font-size: 13px;
-                        wrap: word-wrap;
-                    }
-
-                    for post in root.community-posts : Rectangle {
+                        height: 44px;
                         border-radius: 22px;
                         background: Theme.surface;
                         border-width: 1px;
                         border-color: Theme.line;
 
-                        VerticalLayout {
-                            padding: 16px;
-                            spacing: 8px;
+                        HorizontalLayout {
+                            padding: 4px;
+                            TabButton {
+                                label: "THIS WEEK";
+                                active: root.workout-tab == 0;
+                                clicked => { root.workout-tab = 0; }
+                            }
+                            TabButton {
+                                label: "EXERCISE LIBRARY";
+                                active: root.workout-tab == 1;
+                                clicked => { root.workout-tab = 1; }
+                            }
+                        }
+                    }
 
-                            HorizontalLayout {
-                                spacing: 8px;
+                    if root.workout-tab == 0 : VerticalLayout {
+                        spacing: 12px;
 
-                                Avatar {
-                                    initials: "U";
-                                    size: 32;
+                        if root.workout-days.length == 0 : Rectangle {
+                            height: 120px;
+                            border-radius: Theme.radius-card;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            Text {
+                                text: root.workout-status;
+                                color: Theme.muted;
+                                font-size: 13px;
+                                wrap: word-wrap;
+                                horizontal-alignment: center;
+                                x: 24px;
+                                y: 0;
+                                width: parent.width - 48px;
+                                height: 100%;
+                            }
+                        }
+
+                        for day in root.workout-days : Rectangle {
+                            border-radius: Theme.radius-card;
+                            background: Theme.surface;
+                            border-width: 1px;
+                            border-color: root.open-workout == day.day_index ? Theme.line-strong : Theme.line;
+
+                            VerticalLayout {
+                                padding: 20px;
+                                spacing: 10px;
+
+                                HorizontalLayout {
+                                    spacing: 14px;
+
+                                    Rectangle {
+                                        width: 40px;
+                                        height: 40px;
+                                        border-radius: 14px;
+                                        background: day.completed || root.open-workout == day.day_index ? Theme.accent : Theme.surface-2;
+                                        Text {
+                                            width: 100%;
+                                            height: 100%;
+                                            text: "\{day.day_index + 1}";
+                                            color: day.completed || root.open-workout == day.day_index ? Theme.ink : Theme.muted;
+                                            font-size: 12px;
+                                            font-weight: 700;
+                                            horizontal-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            width: 100%;
+                                            height: 100%;
+                                            clicked => {
+                                                root.open-workout = root.open-workout == day.day_index ? -1 : day.day_index;
+                                            }
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 2px;
+                                        Text { text: "DAY \{day.day_index + 1}"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
+                                        Text { text: day.title; color: Theme.text; font-size: 16px; font-weight: 600; }
+                                    }
+
+                                    if day.completed : Text {
+                                        text: "DONE";
+                                        color: Theme.accent;
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        letter-spacing: 1.2px;
+                                    }
+
+                                    Icon {
+                                        size: 16px;
+                                        tint: Theme.muted;
+                                        source: @image-url("icons/chevron-down.png");
+                                    }
                                 }
 
+                                Text { text: day.focus; color: Theme.accent; font-size: 12px; font-weight: 500; }
+
+                                if root.open-workout == day.day_index : VerticalLayout {
+                                    spacing: 0;
+
+                                    for exercise in day.exercises : VerticalLayout {
+                                        spacing: 4px;
+                                        Rectangle {
+                                            height: 1px;
+                                            background: Theme.line;
+                                        }
+                                        HorizontalLayout {
+                                            spacing: 12px;
+                                            padding-top: 12px;
+
+                                            Text {
+                                                text: "0\{exercise.index + 1}";
+                                                color: Theme.accent;
+                                                font-size: 10px;
+                                                font-weight: 600;
+                                                letter-spacing: 1.2px;
+                                                width: 24px;
+                                                vertical-alignment: top;
+                                            }
+
+                                            VerticalLayout {
+                                                horizontal-stretch: 1;
+                                                spacing: 3px;
+                                                HorizontalLayout {
+                                                    alignment: space-between;
+                                                    Text { text: exercise.name; color: Theme.text; font-size: 14px; font-weight: 600; horizontal-stretch: 1; }
+                                                    Text { text: "\{exercise.sets} × \{exercise.reps}"; color: Theme.text; font-family: Theme.font-wordmark; font-size: 10px; vertical-alignment: center; }
+                                                }
+                                                Text { text: exercise.muscles + " · rest " + exercise.rest; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                                                Text { text: exercise.tips; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+                                                if exercise.alt != "" : Text { text: "Swap: " + exercise.alt; color: rgba(107, 107, 107, 0.8); font-size: 11px; wrap: word-wrap; }
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        height: 44px;
+                                        border-radius: 22px;
+                                        background: day.completed ? Theme.surface-2 : Theme.text;
+
+                                        Text {
+                                            width: 100%;
+                                            height: 100%;
+                                            text: day.completed ? "COMPLETED" : "MARK SESSION COMPLETE";
+                                            color: day.completed ? Theme.muted : Theme.cream;
+                                            font-size: 13px;
+                                            font-weight: 600;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            width: 100%;
+                                            height: 100%;
+                                            clicked => {
+                                                if !day.completed {
+                                                    root.complete-workout(day.day_index, day.title);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if root.workout-tab == 1 : VerticalLayout {
+                        spacing: 10px;
+                        if root.exercise-names.length == 0 : Text {
+                            text: "Exercise library is loading.";
+                            color: Theme.muted;
+                            font-size: 13px;
+                        }
+                        for name in root.exercise-names : Rectangle {
+                            height: 64px;
+                            border-radius: 20px;
+                            background: Theme.surface;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            HorizontalLayout {
+                                padding-left: 20px;
+                                padding-right: 16px;
+                                alignment: space-between;
                                 Text {
-                                    text: post.author;
+                                    text: name;
+                                    color: Theme.text;
+                                    font-size: 15px;
+                                    font-weight: 500;
+                                }
+                                Icon {
+                                    size: 16px;
+                                    tint: Theme.muted;
+                                    source: @image-url("icons/arrow-up-right.png");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // --------------------------------------------------------
+                // TOOLS
+                // --------------------------------------------------------
+                if root.tab == 2 : VerticalLayout {
+                    spacing: 16px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        spacing: 12px;
+                        horizontal-stretch: 1;
+                        SectionLabel { label: "TOOLS"; }
+                        Text {
+                            text: "Check the numbers.";
+                            color: Theme.text;
+                            font-size: 36px;
+                            font-weight: 600;
+                            letter-spacing: -1.4px;
+                        }
+                        Text {
+                            text: "Fast calculators, recovery checks, and the community — all in one place.";
+                            color: Theme.muted;
+                            font-size: 14px;
+                            wrap: word-wrap;
+                        }
+                        Pill { label: "8 TOOLS"; }
+                    }
+
+                    Rectangle {
+                        height: 40px;
+                        clip: true;
+                        background: transparent;
+
+                        Flickable {
+                            height: 40px;
+                            interactive: true;
+                            content-width: 660px;
+
+                            HorizontalLayout {
+                                width: 660px;
+                                spacing: 8px;
+
+                            Chip { label: "BMI"; active: root.tool == 0; clicked => { root.tool = 0; } }
+                            Chip { label: "Sleep"; active: root.tool == 1; clicked => { root.tool = 1; } }
+                            Chip { label: "Steps"; active: root.tool == 2; clicked => { root.tool = 2; } }
+                            Chip { label: "Injury"; active: root.tool == 3; clicked => { root.tool = 3; } }
+                            Chip { label: "Supplements"; active: root.tool == 4; clicked => { root.tool = 4; } }
+                            Chip { label: "Calories"; active: root.tool == 5; clicked => { root.tool = 5; } }
+                            Chip { label: "Form"; active: root.tool == 6; clicked => { root.tool = 6; } }
+                                Chip { label: "Community"; active: root.tool == 7; clicked => { root.tool = 7; } }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        border-radius: Theme.radius-card;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+
+                        VerticalLayout {
+                            padding: 24px;
+                            spacing: 14px;
+                            alignment: start;
+
+                    if root.tool == 0 : VerticalLayout {
+                        spacing: 14px;
+                        SectionLabel { index: "01"; label: "BMI ANALYZER"; }
+                        Text { text: "BMI analyzer"; color: Theme.text; font-size: 26px; font-weight: 600; letter-spacing: -0.8px; }
+                        Text { text: "Body mass index is a rough screen, not a verdict."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+                        HorizontalLayout {
+                            spacing: 24px;
+                            VerticalLayout {
+                                spacing: 6px;
+                                Text { text: "WEIGHT"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
+                                Text { text: "\{root.profile-weight}"; color: Theme.text; font-size: 30px; font-weight: 500; }
+                            }
+                            VerticalLayout {
+                                spacing: 6px;
+                                Text { text: "HEIGHT"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
+                                Text { text: "\{root.profile-height}"; color: Theme.text; font-size: 30px; font-weight: 500; }
+                            }
+                        }
+                        Text {
+                            text: "Your BMI: " + round(root.profile-weight * 10000 / max(1, root.profile-height * root.profile-height) * 10) / 10;
+                            color: Theme.text;
+                            font-size: 18px;
+                            font-weight: 500;
+                        }
+                        GhostButton { label: "AI RECOMMENDATIONS"; clicked => { root.run-tool(); } }
+                        if root.tool-advice != "" : Text { text: root.tool-advice; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                    }
+
+                    if root.tool == 1 : VerticalLayout {
+                        spacing: 14px;
+                        SectionLabel { index: "02"; label: "SLEEP"; }
+                        Text { text: "Sleep tracker"; color: Theme.text; font-size: 26px; font-weight: 600; }
+                        Text { text: "Recovery is training. Seven nights tell you more than one good one."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+                        HorizontalLayout {
+                            spacing: 24px;
+                            VerticalLayout { Text { text: "TODAY"; color: Theme.muted; font-size: 10px; } Text { text: "\{root.sleep}"; color: Theme.text; font-size: 34px; } }
+                            VerticalLayout { Text { text: "SCORE"; color: Theme.muted; font-size: 10px; } Text { text: "\{min(100, root.sleep * 100 / 8)}%"; color: Theme.accent; font-size: 34px; } }
+                        }
+                        SliderTrack {
+                            value: root.sleep;
+                            minimum: 0;
+                            maximum: 12;
+                            step: 1;
+                            changed(v) => { root.sleep = v; }
+                        }
+                        GhostButton { label: "LOG SLEEP"; clicked => { root.log-sleep(root.sleep); } }
+                    }
+
+                    if root.tool == 2 : VerticalLayout {
+                        spacing: 14px;
+                        SectionLabel { index: "03"; label: "STEPS"; }
+                        Text { text: "Steps"; color: Theme.text; font-size: 26px; font-weight: 600; }
+                        Text { text: "Walking is the cheapest conditioning you have."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+                        Text { text: "\{root.steps}"; color: Theme.text; font-size: 44px; font-weight: 500; }
+                        ProgressBar { value: min(100, root.steps * 100 / 10000); }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            GhostButton { label: "+500"; stretch: false; width: 78px; clicked => { root.add-steps-by(500); } }
+                            GhostButton { label: "+1,000"; stretch: false; width: 84px; clicked => { root.add-steps-by(1000); } }
+                            GhostButton { label: "+2,000"; stretch: false; width: 84px; clicked => { root.add-steps-by(2000); } }
+                        }
+                    }
+
+                    if root.tool == 3 : VerticalLayout {
+                        spacing: 14px;
+                        SectionLabel { index: "04"; label: "INJURY"; }
+                        Text { text: "Injury check"; color: Theme.text; font-size: 26px; font-weight: 600; }
+                        Text { text: "Guidance, not a diagnosis. Sharp pain means a doctor."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            GhostButton { label: "KNEE"; active: root.injury-area == "knee"; clicked => { root.injury-area = "knee"; } }
+                            GhostButton { label: "BACK"; active: root.injury-area == "back"; clicked => { root.injury-area = "back"; } }
+                            GhostButton { label: "SHOULDER"; active: root.injury-area == "shoulder"; clicked => { root.injury-area = "shoulder"; } }
+                        }
+                        Field { label: "DESCRIBE THE PAIN"; placeholder: "When does it hurt?"; text <=> root.tool-input; }
+                        GhostButton { label: "GET AI ADVICE"; clicked => { root.run-tool(); } }
+                        if root.tool-advice != "" : Text { text: root.tool-advice; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                    }
+
+                    if root.tool == 4 : VerticalLayout {
+                        spacing: 14px;
+                        SectionLabel { index: "05"; label: "SUPPLEMENTS"; }
+                        Text { text: "Supplements"; color: Theme.text; font-size: 26px; font-weight: 600; }
+                        Text { text: "Optional, not required. Food first, always."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+                        for item in ["Whey protein", "Creatine", "Vitamin D", "Omega-3", "Multivitamin", "Magnesium"] : Rectangle {
+                            height: 52px;
+                            border-radius: 0px;
+                            border-width: 0px;
+                            border-color: transparent;
+                            HorizontalLayout {
+                                alignment: space-between;
+                                Text { text: item; color: Theme.text; font-size: 14px; font-weight: 500; vertical-alignment: center; }
+                                Text { text: "+"; color: Theme.muted; font-size: 18px; vertical-alignment: center; }
+                            }
+                        }
+                    }
+
+                    if root.tool == 5 : VerticalLayout {
+                        spacing: 14px;
+                        SectionLabel { index: "06"; label: "CALORIES"; }
+                        Text { text: "Calorie timeline"; color: Theme.text; font-size: 26px; font-weight: 600; }
+                        Text { text: "A projection, not a promise."; color: Theme.muted; font-size: 14px; }
+                        SliderTrack { value: root.calorie-deficit; minimum: 100; maximum: 800; step: 50; changed(v) => { root.calorie-deficit = v; } }
+                        SliderTrack { value: root.calorie-weeks; minimum: 4; maximum: 12; step: 4; changed(v) => { root.calorie-weeks = v; } }
+                        HorizontalLayout {
+                            spacing: 12px;
+                            StatBlock { label: "FAT LOSS"; value: "\{round(root.calorie-deficit * root.calorie-weeks / 1100.0)}"; unit: "kg"; invert: true; }
+                            StatBlock { label: "MUSCLE"; value: "\{round(root.calorie-deficit * root.calorie-weeks / 785.0)}"; unit: "kg"; }
+                        }
+                    }
+
+                    if root.tool == 6 : VerticalLayout {
+                        spacing: 14px;
+                        SectionLabel { index: "07"; label: "FORM"; }
+                        Text { text: "Form check"; color: Theme.text; font-size: 26px; font-weight: 600; }
+                        Text { text: "Describe the lift the way you'd explain it to a friend."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            GhostButton { label: "SQUAT"; active: root.form-exercise == "squat"; clicked => { root.form-exercise = "squat"; } }
+                            GhostButton { label: "DEADLIFT"; active: root.form-exercise == "deadlift"; clicked => { root.form-exercise = "deadlift"; } }
+                            GhostButton { label: "BENCH"; active: root.form-exercise == "bench"; clicked => { root.form-exercise = "bench"; } }
+                        }
+                        Field { label: "NOTES"; placeholder: "Stance, grip, depth, pain…"; text <=> root.tool-input; }
+                        GhostButton { label: "ANALYZE FORM"; clicked => { root.run-tool(); } }
+                        if root.tool-advice != "" : Text { text: root.tool-advice; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                    }
+
+                    if root.tool == 7 : VerticalLayout {
+                        spacing: 14px;
+                        SectionLabel { index: "08"; label: "COMMUNITY"; }
+                        Text { text: "The floor."; color: Theme.text; font-size: 26px; font-weight: 600; }
+                        Text { text: "Wins, questions, and the days nobody feels like training."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+
+                        Rectangle {
+                            border-radius: 20px;
+                            background: Theme.surface;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            VerticalLayout {
+                                padding: 14px;
+                                spacing: 10px;
+                                TextInput {
+                                    height: 56px;
+                                    text <=> root.community-input;
+                                    single-line: false;
+                                    wrap: word-wrap;
                                     color: Theme.text;
                                     font-size: 13px;
-                                    font-weight: 600;
-                                    vertical-alignment: center;
-                                    horizontal-stretch: 1;
+                                }
+                                GhostButton { label: root.community-busy ? "POSTING…" : "POST"; clicked => { root.post-community(); } }
+                            }
+                        }
+
+                        Text { text: root.community-status; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
+
+                        for post in root.community-posts : Rectangle {
+                            border-radius: 20px;
+                            background: Theme.surface;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            VerticalLayout {
+                                padding: 16px;
+                                spacing: 10px;
+                                Text { text: post.author; color: Theme.accent; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+                                Text { text: post.text; color: Theme.text; font-size: 14px; wrap: word-wrap; }
+                                HorizontalLayout {
+                                    spacing: 14px;
+                                    Text { text: post.liked_by_me ? "♥ \{post.likes}" : "♡ \{post.likes}"; color: post.liked_by_me ? Theme.accent : Theme.muted; font-size: 12px; }
+                                    Text { text: "\{post.reply_count} replies"; color: Theme.muted; font-size: 12px; }
+                                }
+                                TouchArea {
+                                    width: 100%;
+                                    height: 100%;
+                                    clicked => { root.open-community-post(post.id); }
                                 }
                             }
+                        }
+                    }
+                        }
+                    }
+                }
 
-                            Text {
-                                text: post.text;
-                                color: Theme.text;
-                                font-size: 14px;
-                                wrap: word-wrap;
-                            }
+                // --------------------------------------------------------
+                // COACH
+                // --------------------------------------------------------
+                if root.tab == 3 : VerticalLayout {
+                    spacing: 16px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        spacing: 12px;
+                        horizontal-stretch: 1;
+                        SectionLabel { index: "03"; label: "COACH"; }
+                        Text { text: "Ask the coach."; color: Theme.text; font-size: 36px; font-weight: 600; letter-spacing: -1.4px; }
+                        Text { text: "Your profile, targets, and training history are already in the room."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            GhostButton { label: "RECENTS"; stretch: false; width: 102px; }
+                            GhostButton { label: "NEW CHAT"; stretch: false; width: 106px; clicked => { root.new-chat(); } }
+                        }
+                    }
+
+                    Rectangle {
+                        border-radius: Theme.radius-hero;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+
+                        VerticalLayout {
+                            padding: 0;
+                            spacing: 0;
 
                             HorizontalLayout {
-                                spacing: 8px;
+                                padding: 16px;
+                                spacing: 12px;
+                                alignment: space-between;
+                                Rectangle {
+                                    width: 36px;
+                                    height: 36px;
+                                    border-radius: 18px;
+                                    background: Theme.accent;
+                                    Icon { x: 10px; y: 10px; size: 16px; tint: Theme.ink; source: @image-url("icons/sparkles.png"); }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 2px;
+                                    Text { text: "FitMentor Coach"; color: Theme.text; font-size: 14px; font-weight: 600; }
+                                    Text { text: "ONLINE"; color: Theme.muted; font-size: 9px; font-weight: 600; letter-spacing: 1.4px; }
+                                }
+                            }
 
-                                GhostButton {
-                                    label: post.liked_by_me ? "♥ \{post.likes}" : "♡ \{post.likes}";
-                                    width: 84px;
-                                    active: post.liked_by_me;
-                                    clicked => {
-                                        root.like-community(post.id);
-                                    }
+                            Rectangle { height: 1px; background: Theme.line; }
+
+                            VerticalLayout {
+                                padding: 16px;
+                                spacing: 10px;
+                                height: 360px;
+
+                                if root.chat-messages.length == 0 : VerticalLayout {
+                                    spacing: 12px;
+                                    Text { text: "What do you want to fix this week?"; color: Theme.text; font-size: 22px; font-weight: 500; wrap: word-wrap; }
+                                    Text { text: "Training, food, recovery, or the week you just missed."; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                                    GhostButton { label: "HOW MUCH PROTEIN?"; clicked => { root.chat-input = "How much protein do I need?"; root.send-chat(); } }
+                                    GhostButton { label: "I MISSED THREE DAYS"; clicked => { root.chat-input = "I missed three days. What now?"; root.send-chat(); } }
                                 }
 
-                                GhostButton {
-                                    label: "\{post.reply_count} replies";
-                                    width: 100px;
-                                    clicked => {
-                                        root.open-community-post(post.id);
+                                for message in root.chat-messages : Rectangle {
+                                    border-radius: 16px;
+                                    background: message.role == "assistant" ? Theme.surface-2 : Theme.text;
+                                    VerticalLayout {
+                                        padding: 12px;
+                                        spacing: 4px;
+                                        if message.role == "assistant" : Text { text: "COACH"; color: Theme.accent; font-size: 9px; font-weight: 700; letter-spacing: 1.4px; }
+                                        Text { text: message.content; color: message.role == "assistant" ? Theme.text : Theme.cream; font-size: 13px; wrap: word-wrap; }
                                     }
                                 }
                             }
+
+                            Rectangle { height: 1px; background: Theme.line; }
+
+                            HorizontalLayout {
+                                padding: 10px;
+                                spacing: 8px;
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 40px;
+                                    border-radius: 20px;
+                                    background: Theme.bg;
+                                    border-width: 1px;
+                                    border-color: Theme.line;
+                                    TextInput {
+                                        x: 14px;
+                                        y: 0;
+                                        width: parent.width - 28px;
+                                        height: 100%;
+                                        text <=> root.chat-input;
+                                        single-line: true;
+                                        color: Theme.text;
+                                        font-size: 13px;
+                                        accepted => { root.send-chat(); }
+                                    }
+                                }
+                                Rectangle {
+                                    width: 40px;
+                                    height: 40px;
+                                    border-radius: 20px;
+                                    background: Theme.accent;
+                                    Icon { x: 11px; y: 11px; size: 18px; tint: Theme.ink; source: @image-url("icons/arrow-up.png"); }
+                                    TouchArea { width: 100%; height: 100%; clicked => { root.send-chat(); } }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // --------------------------------------------------------
+                // FOOD
+                // --------------------------------------------------------
+                if root.tab == 4 : VerticalLayout {
+                    spacing: 16px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        spacing: 12px;
+                        horizontal-stretch: 1;
+                        SectionLabel { label: "FUEL"; }
+                        Text { text: "Eat for the work."; color: Theme.text; font-size: 36px; font-weight: 600; letter-spacing: -1.4px; }
+                        Text { text: "Indian food, your budget, and a protein target that actually fits the day."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+                        Pill { label: "AI MEAL PLAN"; accent: false; }
+                    }
+
+                    Rectangle {
+                        border-radius: Theme.radius-hero;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        VerticalLayout {
+                            padding: 24px;
+                            spacing: 18px;
+                            HorizontalLayout {
+                                alignment: space-between;
+                                SectionLabel { label: "DAILY TARGETS"; }
+                                GhostButton {
+                                    label: "PROTEIN";
+                                    stretch: false;
+                                    width: 92px;
+                                    clicked => { root.protein-editing = !root.protein-editing; }
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 20px;
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    Text { text: "CALORIES"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
+                                    Text { text: "\{root.target-calories}"; color: Theme.text; font-size: 36px; font-weight: 500; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    Text { text: "PROTEIN"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
+                                    Text { text: "\{root.custom-protein > 0 ? root.custom-protein : root.target-protein}"; color: Theme.accent; font-size: 36px; font-weight: 500; }
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 20px;
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    Text { text: "CARBS"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
+                                    Text { text: "\{root.target-carbs}"; color: Theme.text; font-size: 36px; font-weight: 500; }
+                                }
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    Text { text: "FAT"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
+                                    Text { text: "\{root.target-fat}"; color: Theme.text; font-size: 36px; font-weight: 500; }
+                                }
+                            }
+
+                            if root.protein-editing : VerticalLayout {
+                                spacing: 8px;
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text { text: "Custom protein target"; color: Theme.text; font-size: 13px; font-weight: 500; }
+                                    Text { text: "\{root.custom-protein} g"; color: Theme.accent; font-size: 12px; font-weight: 600; }
+                                }
+                                SliderTrack {
+                                    value: root.custom-protein > 0 ? root.custom-protein : root.target-protein;
+                                    minimum: 50;
+                                    maximum: 300;
+                                    step: 5;
+                                    changed(v) => { root.custom-protein = v; }
+                                }
+                            }
+
+                            if !root.protein-editing : VerticalLayout {
+                                spacing: 8px;
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text { text: "Protein logged today"; color: Theme.muted; font-size: 12px; }
+                                    Text { text: "\{root.protein} / \{root.custom-protein > 0 ? root.custom-protein : root.target-protein} g"; color: Theme.muted; font-size: 12px; }
+                                }
+                                ProgressBar {
+                                    value: root.custom-protein > 0
+                                        ? min(100, root.protein * 100 / max(1, root.custom-protein))
+                                        : min(100, root.protein * 100 / max(1, root.target-protein));
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 44px;
+                        border-radius: 22px;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        HorizontalLayout {
+                            padding: 4px;
+                            TabButton { label: "MEAL PLANS"; active: root.nutrition-tab == 0; clicked => { root.nutrition-tab = 0; } }
+                            TabButton { label: "QUICK LOG"; active: root.nutrition-tab == 1; clicked => { root.nutrition-tab = 1; } }
+                        }
+                    }
+
+                    if root.nutrition-tab == 0 : VerticalLayout {
+                        spacing: 12px;
+                        if root.nutrition-meals.length > 0 : Rectangle {
+                            border-radius: 20px;
+                            background: Theme.surface;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            VerticalLayout {
+                                padding: 18px;
+                                spacing: 4px;
+                                SectionLabel { label: "MEAL PLAN"; }
+                                Text { text: root.nutrition-title; color: Theme.text; font-size: 18px; font-weight: 600; }
+                            }
+                        }
+                        for meal in root.nutrition-meals : Rectangle {
+                            border-radius: 20px;
+                            background: Theme.surface;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            VerticalLayout {
+                                padding: 16px;
+                                spacing: 6px;
+                                HorizontalLayout {
+                                    Text { text: meal.name; color: Theme.text; font-size: 15px; font-weight: 600; horizontal-stretch: 1; }
+                                    Text { text: "\{meal.kcal} kcal"; color: Theme.accent; font-size: 11px; vertical-alignment: center; }
+                                }
+                                Text { text: meal.items; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                                Text { text: "\{meal.protein} g protein"; color: Theme.text; font-size: 10px; font-weight: 600; }
+                            }
+                        }
+                    }
+
+                    if root.nutrition-tab == 1 : VerticalLayout {
+                        spacing: 8px;
+                        Text { text: "Tap a food to log it for today."; color: Theme.muted; font-size: 13px; }
+                        for food in root.quick-foods : Rectangle {
+                            height: 64px;
+                            border-radius: 18px;
+                            background: Theme.surface;
+                            border-width: 1px;
+                            border-color: Theme.line;
+                            HorizontalLayout {
+                                padding-left: 16px;
+                                padding-right: 12px;
+                                alignment: space-between;
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    Text { text: food.name; color: Theme.text; font-size: 14px; font-weight: 500; }
+                                    Text { text: "\{food.kcal} kcal · \{food.protein} g protein"; color: Theme.muted; font-size: 11px; }
+                                }
+                                Icon { size: 18px; tint: Theme.muted; source: @image-url("icons/plus.png"); }
+                            }
+                            TouchArea {
+                                width: 100%;
+                                height: 100%;
+                                clicked => { root.add-protein-by(food.protein); }
+                            }
+                        }
+                    }
+                }
+
+                // --------------------------------------------------------
+                // YOU
+                // --------------------------------------------------------
+                if root.tab == 5 : VerticalLayout {
+                    spacing: 16px;
+                    alignment: start;
+
+                    HorizontalLayout {
+                        spacing: 16px;
+                        Avatar { initials: "FM"; size: 80; }
+                        VerticalLayout {
+                            spacing: 4px;
+                            horizontal-stretch: 1;
+                            SectionLabel { index: "You"; label: "PROFILE"; }
+                            Text { text: root.profile-name; color: Theme.text; font-size: 36px; font-weight: 600; letter-spacing: -1.2px; }
+                            Text { text: root.profile-email; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                        }
+                    }
+
+                    Rectangle {
+                        border-radius: Theme.radius-card;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        VerticalLayout {
+                            padding: 24px;
+                            spacing: 12px;
+                            SectionLabel { label: "CURRENT PLAN"; }
+                            Text { text: root.profile-tier; color: Theme.accent; font-size: 30px; font-weight: 600; }
+                            Text {
+                                text: "Goal: " + root.profile-goal + "  ·  " + root.profile-diet + "  ·  " + root.profile-days + "× / week";
+                                color: Theme.muted;
+                                font-size: 12px;
+                                wrap: word-wrap;
+                            }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                GhostButton { label: "BASIC ₹99"; clicked => { root.checkout("pro"); } }
+                                GhostButton { label: "ELITE ₹299"; clicked => { root.checkout("premium"); } }
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 16px;
+                        StatBlock { label: "AGE"; value: "\{root.profile-age}"; unit: "yrs"; }
+                        StatBlock { label: "HEIGHT"; value: "\{root.profile-height}"; unit: "cm"; }
+                    }
+                    HorizontalLayout {
+                        spacing: 16px;
+                        StatBlock { label: "WEIGHT"; value: "\{root.profile-weight}"; unit: "kg"; }
+                        StatBlock { label: "BUDGET"; value: "₹\{root.profile-budget}"; unit: "/ day"; }
+                    }
+
+                    Rectangle {
+                        border-radius: Theme.radius-card;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 14px;
+                            HorizontalLayout {
+                                alignment: space-between;
+                                Text { text: "Theme"; color: Theme.text; font-size: 14px; font-weight: 500; vertical-alignment: center; horizontal-stretch: 1; }
+                                IconButton {
+                                    icon: Theme.dark ? @image-url("icons/sun.png") : @image-url("icons/moon.png");
+                                    clicked => { root.toggle-theme(); }
+                                }
+                            }
+                            Rectangle { height: 1px; background: Theme.line; }
+                            GhostButton { label: "EDIT PROFILE"; clicked => { root.edit-profile(); } }
+                            GhostButton { label: "REFRESH PROFILE"; clicked => { root.load-profile(); } }
+                            GhostButton { label: "SIGN OUT"; clicked => { root.sign-out(); } }
+                        }
+                    }
+
+                    Rectangle {
+                        border-radius: Theme.radius-card;
+                        background: Theme.accent;
+                        VerticalLayout {
+                            padding: 24px;
+                            spacing: 10px;
+                            Text { text: "THE STANDARD"; color: rgba(11, 11, 11, 0.6); font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
+                            Text { text: "\"You don't need more motivation. You need a smaller first step.\""; color: Theme.ink; font-size: 18px; font-weight: 600; wrap: word-wrap; }
+                            Text { text: "FitMentor coach"; color: rgba(11, 11, 11, 0.55); font-size: 11px; }
                         }
                     }
                 }
@@ -1186,6 +1689,9 @@ export component AppWindow inherits Window {
         }
 
         BottomNav {
+            x: 16px;
+            y: root.height - 88px;
+            width: root.width - 32px;
             active: root.tab;
             select(tab) => {
                 root.set-tab(tab);
@@ -1193,404 +1699,454 @@ export component AppWindow inherits Window {
         }
     }
 
-    // ----------------------------------------------------------------
+    // ================================================================
     // Sign in
-    // ----------------------------------------------------------------
+    // ================================================================
     if !root.signed-in : Rectangle {
         background: Theme.bg;
 
-        ScrollView {
+        HorizontalLayout {
+            x: 0;
+            y: 0;
             width: 100%;
-            height: 100%;
+            padding: 20px;
+            padding-top: 24px;
+            alignment: space-between;
+            height: 64px;
+
+            Wordmark {}
+
+            IconButton {
+                icon: Theme.dark ? @image-url("icons/sun.png") : @image-url("icons/moon.png");
+                clicked => { root.toggle-theme(); }
+            }
+        }
+
+        VerticalLayout {
+            y: 220px;
+            width: 100%;
+            padding-left: 20px;
+            padding-right: 20px;
+            spacing: 20px;
+            alignment: start;
+
+            SectionLabel {
+                index: root.auth-signup ? "01" : "02";
+                label: root.auth-signup ? "CREATE ACCOUNT" : "WELCOME BACK";
+            }
 
             VerticalLayout {
-                width: 100%;
                 spacing: 0;
-
-                Rectangle {
-                    height: 290px;
-                    clip: true;
-
-                    Image {
-                        width: 100%;
-                        height: 100%;
-                        source: @image-url("images/auth-gym.jpg");
-                        image-fit: cover;
-                    }
-
-                    Rectangle {
-                        width: 100%;
-                        height: 100%;
-                        background: @linear-gradient(180deg, rgba(11, 11, 11, 0.30) 0%, rgba(11, 11, 11, 0.92) 100%);
-                    }
-
-                    VerticalLayout {
-                        padding: 24px;
-                        alignment: space-between;
-
-                        Wordmark {
-                            on-dark: true;
-                        }
-
-                        VerticalLayout {
-                            spacing: 8px;
-
-                            Text {
-                                text: "TRAIN LIKE YOU MEAN IT.";
-                                color: Theme.cream;
-                                font-size: 30px;
-                                font-weight: 600;
-                                letter-spacing: -1px;
-                                wrap: word-wrap;
-                            }
-
-                            Text {
-                                text: "AI coaching, Indian meals, and a plan that fits your week.";
-                                color: rgba(247, 243, 237, 0.6);
-                                font-size: 12px;
-                                wrap: word-wrap;
-                            }
-                        }
-                    }
+                Text {
+                    text: root.auth-signup ? "Start your" : "Back to";
+                    color: Theme.text;
+                    font-size: 48px;
+                    font-weight: 600;
+                    letter-spacing: -2.2px;
                 }
-
-                VerticalLayout {
-                    padding: 24px;
-                    spacing: 14px;
+                HorizontalLayout {
+                    spacing: 8px;
                     alignment: start;
-
-                    SectionLabel {
-                        index: "01";
-                        label: "SIGN IN";
-                    }
-
                     Text {
-                        text: "Connect your account.";
+                        text: root.auth-signup ? "first" : "the";
                         color: Theme.text;
-                        font-size: 28px;
+                        font-size: 48px;
                         font-weight: 600;
-                        letter-spacing: -0.8px;
+                        letter-spacing: -2.2px;
+                        vertical-alignment: bottom;
+                        horizontal-stretch: 0;
                     }
-
                     Text {
-                        text: "Sign in with Google in your browser. You'll come back here when you're done.";
-                        color: Theme.muted;
-                        font-size: 13px;
-                        wrap: word-wrap;
-                    }
-
-                    PrimaryButton {
-                        label: root.google-busy ? "Waiting for Google…" : "Continue with Google";
-                        enabled: !root.google-busy;
-                        clicked => {
-                            root.google-sign-in();
-                        }
-                    }
-
-                    Text {
-                        text: root.auth-status;
+                        text: root.auth-signup ? "week." : "work.";
                         color: Theme.accent;
-                        font-size: 11px;
-                        wrap: word-wrap;
-                        visible: root.auth-status != "";
-                    }
-
-                    Rectangle {
-                        height: 1px;
-                        background: Theme.line;
-                    }
-
-                    Text {
-                        text: "OR PASTE A MOBILE TOKEN";
-                        color: Theme.muted;
-                        font-size: 9px;
+                        font-size: 48px;
                         font-weight: 600;
-                        letter-spacing: 1.2px;
-                    }
-
-                    Field {
-                        label: "Token";
-                        placeholder: "Paste the token from the API";
-                        text <=> root.auth-token;
-                    }
-
-                    GhostButton {
-                        label: "Continue";
-                        clicked => {
-                            root.sign-in();
-                        }
-                    }
-
-                    Text {
-                        text: root.auth-error;
-                        color: #E5484D;
-                        font-size: 12px;
-                        wrap: word-wrap;
-                        visible: root.auth-error != "";
+                        letter-spacing: -2.2px;
+                        vertical-alignment: bottom;
+                        horizontal-stretch: 0;
                     }
                 }
             }
+
+            Text {
+                text: root.auth-signup
+                    ? "One account for your workouts, meals, coach, and progress. Free to start, no card needed."
+                    : "Pick up your plan, your streak, and your coach exactly where you left them.";
+                color: Theme.muted;
+                font-size: 14px;
+                wrap: word-wrap;
+                width: 100%;
+            }
+
+            Rectangle {
+                height: 48px;
+                border-radius: 24px;
+                background: Theme.dark ? Theme.cream : Theme.ink;
+
+                HorizontalLayout {
+                    padding-left: 20px;
+                    padding-right: 6px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        Rectangle {
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 16px;
+                            background: #FFFFFF;
+                            Icon { x: 6px; y: 6px; size: 20px; source: @image-url("icons/google.png"); }
+                        }
+                        Text {
+                            text: root.google-busy ? "Opening Google…" : (root.auth-signup ? "Sign up with Google" : "Continue with Google");
+                            color: Theme.dark ? Theme.ink : Theme.cream;
+                            font-size: 14px;
+                            font-weight: 600;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 18px;
+                        background: Theme.accent;
+                        Icon { x: 10px; y: 10px; size: 16px; tint: Theme.ink; source: @image-url("icons/arrow-up-right.png"); }
+                    }
+                }
+
+                TouchArea {
+                    width: 100%;
+                    height: 100%;
+                    clicked => { root.google-sign-in(); }
+                }
+            }
+
+            Text {
+                text: "By continuing you agree to the terms and privacy policy.";
+                color: Theme.muted;
+                font-size: 12px;
+                wrap: word-wrap;
+                width: 100%;
+            }
+
+            Rectangle {
+                height: 1px;
+                background: Theme.line;
+            }
+
+            HorizontalLayout {
+                spacing: 14px;
+                Text { text: "NO CARD\nREQUIRED"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.2px; }
+                Text { text: "INDIAN MEAL\nPLANS"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.2px; }
+                Text { text: "COACH\nINCLUDED"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.2px; }
+            }
+
+            if root.auth-status != "" : Text {
+                text: root.auth-status;
+                color: Theme.accent;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+
+            if root.auth-error != "" : Text {
+                text: root.auth-error;
+                color: #E5484D;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+        }
+
+        Text {
+            x: 20px;
+            y: root.height - 32px;
+            text: "© 2026 FitMentor · Built in India";
+            color: Theme.muted;
+            font-size: 11px;
         }
     }
 
-    // ----------------------------------------------------------------
+    // ================================================================
     // Onboarding
-    // ----------------------------------------------------------------
+    // ================================================================
     if root.needs-onboarding : Rectangle {
         background: Theme.bg;
 
-        ScrollView {
+        HorizontalLayout {
+            x: 0;
+            y: 0;
             width: 100%;
-            height: 100%;
+            height: 64px;
+            padding-left: 20px;
+            padding-right: 16px;
+            alignment: space-between;
+
+            Wordmark {}
+
+            HorizontalLayout {
+                spacing: 12px;
+                Text {
+                    text: root.onboarding-step < 8 ? "0\{root.onboarding-step + 1} / 09" : "09 / 09";
+                    color: Theme.muted;
+                    font-size: 11px;
+                    font-weight: 600;
+                    letter-spacing: 1.6px;
+                }
+                IconButton {
+                    icon: Theme.dark ? @image-url("icons/sun.png") : @image-url("icons/moon.png");
+                    clicked => { root.toggle-theme(); }
+                }
+            }
+        }
+
+        HorizontalLayout {
+            x: 20px;
+            y: 88px;
+            width: root.width - 40px;
+            height: 4px;
+            spacing: 6px;
+
+            for i in 9 : Rectangle {
+                horizontal-stretch: 1;
+                height: 4px;
+                border-radius: 2px;
+                background: i <= root.onboarding-step ? Theme.accent : Theme.surface-2;
+            }
+        }
+
+        ScrollView {
+            x: 0;
+            y: 108px;
+            width: 100%;
+            height: root.height - 188px;
 
             VerticalLayout {
                 width: 100%;
-                padding: 24px;
-                spacing: 16px;
+                padding-left: 20px;
+                padding-right: 20px;
+                padding-top: 64px;
+                spacing: 18px;
                 alignment: start;
 
-                SectionLabel {
-                    index: "01";
-                    label: "SETUP";
+                if root.onboarding-step == 0 : VerticalLayout {
+                    spacing: 14px;
+                    SectionLabel { index: "01"; label: "WELCOME"; }
+                    VerticalLayout {
+                        spacing: 0;
+                        Text { text: "Let's build"; color: Theme.text; font-size: 48px; font-weight: 600; letter-spacing: -2.2px; }
+                        HorizontalLayout {
+                            spacing: 10px;
+                            alignment: start;
+                            Text { text: "your first"; color: Theme.text; font-size: 48px; font-weight: 600; letter-spacing: -2.2px; vertical-alignment: bottom; }
+                            Text { text: "week."; color: Theme.accent; font-size: 48px; font-weight: 600; letter-spacing: -2.2px; vertical-alignment: bottom; }
+                        }
+                    }
+                    Text { text: "Nine quick questions. We'll turn them into a training split, daily targets, and a meal plan built around Indian food and your budget."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+                    SmallPrimary {
+                        label: "Let's go";
+                        clicked => { root.onboarding-step += 1; }
+                    }
+                    Rectangle { height: 1px; background: Theme.line; }
+                    HorizontalLayout {
+                        spacing: 28px;
+                        VerticalLayout { Text { text: "09"; color: Theme.text; font-size: 30px; font-weight: 500; } Text { text: "QUESTIONS"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; } }
+                        VerticalLayout { Text { text: "60s"; color: Theme.text; font-size: 30px; font-weight: 500; } Text { text: "TO FINISH"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; } }
+                        VerticalLayout { Text { text: "₹0"; color: Theme.text; font-size: 30px; font-weight: 500; } Text { text: "TO START"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; } }
+                    }
                 }
 
-                Text {
-                    text: "Build your first week.";
-                    color: Theme.text;
-                    font-size: 32px;
-                    font-weight: 600;
-                    letter-spacing: -1px;
-                    wrap: word-wrap;
+                if root.onboarding-step == 1 : VerticalLayout {
+                    spacing: 14px;
+                    SectionLabel { index: "02"; label: "SETUP"; }
+                    Text { text: "What should we call you?"; color: Theme.text; font-size: 30px; font-weight: 600; letter-spacing: -0.9px; wrap: word-wrap; }
+                    Text { text: "Just a first name. The coach will use it."; color: Theme.muted; font-size: 14px; }
+                    BigField { label: "FIRST NAME"; placeholder: "Your name"; text <=> root.form-name; }
                 }
 
-                Text {
-                    text: "Nine answers become your training split, daily targets, and meal plan.";
-                    color: Theme.muted;
-                    font-size: 13px;
-                    wrap: word-wrap;
+                if root.onboarding-step == 2 : VerticalLayout {
+                    spacing: 14px;
+                    SectionLabel { index: "03"; label: "SETUP"; }
+                    Text { text: "Tell us about your body."; color: Theme.text; font-size: 30px; font-weight: 600; letter-spacing: -0.9px; }
+                    Text { text: "We use this for calories and targets."; color: Theme.muted; font-size: 14px; }
+                    HorizontalLayout {
+                        spacing: 20px;
+                        BigField { label: "AGE"; placeholder: "22"; text <=> root.form-age; }
+                        CycleField {
+                            label: "GENDER";
+                            value: root.form-gender;
+                            horizontal-stretch: 1;
+                            clicked => {
+                                root.form-gender = root.form-gender == "male" ? "female" : root.form-gender == "female" ? "other" : "male";
+                            }
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 20px;
+                        BigField { label: "HEIGHT (CM)"; placeholder: "170"; text <=> root.form-height; }
+                        BigField { label: "WEIGHT (KG)"; placeholder: "65"; text <=> root.form-weight; }
+                    }
                 }
 
-                Field {
-                    label: "NAME";
-                    placeholder: "Your first name";
-                    text <=> root.form-name;
-                }
-
-                HorizontalLayout {
+                if root.onboarding-step == 3 : VerticalLayout {
                     spacing: 10px;
-
-                    Field {
-                        label: "AGE";
-                        text <=> root.form-age;
-                    }
-
-                    Field {
-                        label: "HEIGHT (CM)";
-                        text <=> root.form-height;
-                    }
+                    SectionLabel { index: "04"; label: "SETUP"; }
+                    Text { text: "What matters most right now?"; color: Theme.text; font-size: 30px; font-weight: 600; letter-spacing: -0.9px; wrap: word-wrap; }
+                    Text { text: "Pick one. You can change it later."; color: Theme.muted; font-size: 14px; }
+                    ChoiceCard { index: "01"; label: "Build muscle"; selected: root.form-goal == "muscle_gain"; clicked => { root.form-goal = "muscle_gain"; } }
+                    ChoiceCard { index: "02"; label: "Lose fat"; selected: root.form-goal == "fat_loss"; clicked => { root.form-goal = "fat_loss"; } }
+                    ChoiceCard { index: "03"; label: "Get stronger"; selected: root.form-goal == "strength"; clicked => { root.form-goal = "strength"; } }
+                    ChoiceCard { index: "04"; label: "Body recomposition"; selected: root.form-goal == "recomp"; clicked => { root.form-goal = "recomp"; } }
+                    ChoiceCard { index: "05"; label: "Stay fit"; selected: root.form-goal == "general"; clicked => { root.form-goal = "general"; } }
                 }
 
-                HorizontalLayout {
+                if root.onboarding-step == 4 : VerticalLayout {
                     spacing: 10px;
+                    SectionLabel { index: "05"; label: "SETUP"; }
+                    Text { text: "Where will you train?"; color: Theme.text; font-size: 30px; font-weight: 600; letter-spacing: -0.9px; }
+                    Text { text: "The plan matches your equipment."; color: Theme.muted; font-size: 14px; }
+                    ChoiceCard { index: "01"; label: "Gym — full equipment"; selected: root.form-place == "gym"; clicked => { root.form-place = "gym"; } }
+                    ChoiceCard { index: "02"; label: "Home — minimal equipment"; selected: root.form-place == "home"; clicked => { root.form-place = "home"; } }
+                }
 
-                    Field {
-                        label: "WEIGHT (KG)";
-                        text <=> root.form-weight;
+                if root.onboarding-step == 5 : VerticalLayout {
+                    spacing: 10px;
+                    SectionLabel { index: "06"; label: "SETUP"; }
+                    Text { text: "How long have you been training?"; color: Theme.text; font-size: 30px; font-weight: 600; letter-spacing: -0.9px; wrap: word-wrap; }
+                    Text { text: "Honesty makes the plan better."; color: Theme.muted; font-size: 14px; }
+                    ChoiceCard { index: "01"; label: "Beginner — under 6 months"; selected: root.form-experience == "beginner"; clicked => { root.form-experience = "beginner"; } }
+                    ChoiceCard { index: "02"; label: "Intermediate — 6 months to 2 years"; selected: root.form-experience == "intermediate"; clicked => { root.form-experience = "intermediate"; } }
+                    ChoiceCard { index: "03"; label: "Advanced — 2 years or more"; selected: root.form-experience == "advanced"; clicked => { root.form-experience = "advanced"; } }
+                }
+
+                if root.onboarding-step == 6 : VerticalLayout {
+                    spacing: 14px;
+                    SectionLabel { index: "07"; label: "SETUP"; }
+                    Text { text: "How many days a week?"; color: Theme.text; font-size: 30px; font-weight: 600; letter-spacing: -0.9px; wrap: word-wrap; }
+                    Text { text: "Two consistent days beat five imaginary ones."; color: Theme.muted; font-size: 14px; }
+                    Rectangle {
+                        border-radius: 24px;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 14px;
+                            HorizontalLayout {
+                                spacing: 6px;
+                                Text { text: "\{root.form-days-num}"; color: Theme.text; font-size: 48px; font-weight: 500; }
+                                Text { text: "days / week"; color: Theme.muted; font-size: 13px; vertical-alignment: bottom; }
+                            }
+                            SliderTrack { value: root.form-days-num; minimum: 2; maximum: 6; step: 1; changed(v) => { root.form-days-num = v; root.form-days = "\{v}"; } }
+                        }
                     }
+                }
 
-                    Field {
-                        label: "DAYS / WEEK";
-                        text <=> root.form-days;
+                if root.onboarding-step == 7 : VerticalLayout {
+                    spacing: 10px;
+                    SectionLabel { index: "08"; label: "SETUP"; }
+                    Text { text: "Anything we should work around?"; color: Theme.text; font-size: 30px; font-weight: 600; letter-spacing: -0.9px; wrap: word-wrap; }
+                    Text { text: "Select all that apply. This keeps the plan safe."; color: Theme.muted; font-size: 14px; }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        ChoiceChip { label: "None"; active: root.health-none; clicked => { root.health-none = true; root.health-diabetes = false; root.health-heart = false; root.health-bp = false; root.health-joint = false; } }
+                        ChoiceChip { label: "Diabetes"; active: root.health-diabetes; clicked => { root.health-none = false; root.health-diabetes = !root.health-diabetes; } }
+                    }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        ChoiceChip { label: "Heart"; active: root.health-heart; clicked => { root.health-none = false; root.health-heart = !root.health-heart; } }
+                        ChoiceChip { label: "BP"; active: root.health-bp; clicked => { root.health-none = false; root.health-bp = !root.health-bp; } }
+                        ChoiceChip { label: "Joint"; active: root.health-joint; clicked => { root.health-none = false; root.health-joint = !root.health-joint; } }
                     }
                 }
 
-                Field {
-                    label: "FOOD BUDGET (₹ / DAY)";
-                    text <=> root.form-budget;
+                if root.onboarding-step == 8 : VerticalLayout {
+                    spacing: 10px;
+                    SectionLabel { index: "09"; label: "SETUP"; }
+                    Text { text: "Food and budget."; color: Theme.text; font-size: 30px; font-weight: 600; letter-spacing: -0.9px; }
+                    Text { text: "Meals you can actually afford and cook."; color: Theme.muted; font-size: 14px; }
+                    ChoiceCard { index: "01"; label: "Vegetarian"; selected: root.form-diet == "veg"; clicked => { root.form-diet = "veg"; } }
+                    ChoiceCard { index: "02"; label: "Non-vegetarian"; selected: root.form-diet == "nonveg"; clicked => { root.form-diet = "nonveg"; } }
+                    ChoiceCard { index: "03"; label: "Eggetarian"; selected: root.form-diet == "egg"; clicked => { root.form-diet = "egg"; } }
+                    Rectangle {
+                        border-radius: 24px;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 10px;
+                            HorizontalLayout {
+                                alignment: space-between;
+                                Text { text: "FOOD BUDGET"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
+                                Text { text: "₹\{root.form-budget-num} / day"; color: Theme.text; font-size: 20px; font-weight: 500; }
+                            }
+                            SliderTrack { value: root.form-budget-num; minimum: 80; maximum: 400; step: 10; changed(v) => { root.form-budget-num = v; root.form-budget = "\{v}"; } }
+                        }
+                    }
                 }
 
-                Text {
-                    text: "GENDER";
-                    color: Theme.muted;
-                    font-size: 9px;
-                    font-weight: 600;
-                    letter-spacing: 1.2px;
-                }
+                if root.form-error != "" : Text { text: root.form-error; color: #E5484D; font-size: 11px; wrap: word-wrap; }
+
+                Rectangle { height: 8px; }
+            }
+        }
+
+        HorizontalLayout {
+            x: 20px;
+            y: root.height - 72px;
+            width: root.width - 40px;
+            height: 48px;
+            alignment: space-between;
+
+            BackButton {
+                label: "Back";
+                visible: root.onboarding-step > 0;
+                clicked => { root.onboarding-step -= 1; }
+            }
+
+            Text {
+                text: "Takes under a minute";
+                color: Theme.muted;
+                font-size: 12px;
+                visible: root.onboarding-step == 0;
+            }
+
+            if root.onboarding-step > 0 && root.onboarding-step < 8 : Rectangle {
+                width: 136px;
+                height: 48px;
+                border-radius: 24px;
+                background: Theme.dark ? Theme.cream : Theme.ink;
 
                 HorizontalLayout {
-                    spacing: 6px;
-
-                    ChoiceChip {
-                        label: "Male";
-                        active: root.form-gender == "male";
-                        clicked => { root.form-gender = "male"; }
-                    }
-                    ChoiceChip {
-                        label: "Female";
-                        active: root.form-gender == "female";
-                        clicked => { root.form-gender = "female"; }
-                    }
-                    ChoiceChip {
-                        label: "Other";
-                        active: root.form-gender == "other";
-                        clicked => { root.form-gender = "other"; }
-                    }
+                    padding-left: 20px;
+                    padding-right: 6px;
+                    alignment: space-between;
+                    Text { text: "Continue"; color: Theme.dark ? Theme.ink : Theme.cream; font-size: 14px; font-weight: 600; vertical-alignment: center; }
+                    Rectangle { width: 36px; height: 36px; border-radius: 18px; background: Theme.accent; Icon { x: 10px; y: 10px; size: 16px; tint: Theme.ink; source: @image-url("icons/arrow-up-right.png"); } }
                 }
+                TouchArea { width: 100%; height: 100%; clicked => { root.onboarding-step += 1; } }
+            }
 
-                Text {
-                    text: "GOAL";
-                    color: Theme.muted;
-                    font-size: 9px;
-                    font-weight: 600;
-                    letter-spacing: 1.2px;
-                }
+            if root.onboarding-step == 8 : Rectangle {
+                width: 196px;
+                height: 48px;
+                border-radius: 24px;
+                background: Theme.dark ? Theme.cream : Theme.ink;
 
                 HorizontalLayout {
-                    spacing: 6px;
-
-                    ChoiceChip {
-                        label: "Muscle";
-                        active: root.form-goal == "muscle_gain";
-                        clicked => { root.form-goal = "muscle_gain"; }
-                    }
-                    ChoiceChip {
-                        label: "Fat loss";
-                        active: root.form-goal == "fat_loss";
-                        clicked => { root.form-goal = "fat_loss"; }
-                    }
-                    ChoiceChip {
-                        label: "Strength";
-                        active: root.form-goal == "strength";
-                        clicked => { root.form-goal = "strength"; }
-                    }
+                    padding-left: 20px;
+                    padding-right: 6px;
+                    alignment: space-between;
+                    Text { text: "Start my first week"; color: Theme.dark ? Theme.ink : Theme.cream; font-size: 13px; font-weight: 600; vertical-alignment: center; }
+                    Rectangle { width: 36px; height: 36px; border-radius: 18px; background: Theme.accent; Icon { x: 10px; y: 10px; size: 16px; tint: Theme.ink; source: @image-url("icons/arrow-up-right.png"); } }
                 }
-
-                HorizontalLayout {
-                    spacing: 6px;
-
-                    ChoiceChip {
-                        label: "Recomp";
-                        active: root.form-goal == "recomp";
-                        clicked => { root.form-goal = "recomp"; }
-                    }
-                    ChoiceChip {
-                        label: "Stay fit";
-                        active: root.form-goal == "general";
-                        clicked => { root.form-goal = "general"; }
-                    }
-                }
-
-                Text {
-                    text: "WHERE DO YOU TRAIN?";
-                    color: Theme.muted;
-                    font-size: 9px;
-                    font-weight: 600;
-                    letter-spacing: 1.2px;
-                }
-
-                HorizontalLayout {
-                    spacing: 6px;
-
-                    ChoiceChip {
-                        label: "Gym";
-                        active: root.form-place == "gym";
-                        clicked => { root.form-place = "gym"; }
-                    }
-                    ChoiceChip {
-                        label: "Home";
-                        active: root.form-place == "home";
-                        clicked => { root.form-place = "home"; }
-                    }
-                }
-
-                Text {
-                    text: "EXPERIENCE";
-                    color: Theme.muted;
-                    font-size: 9px;
-                    font-weight: 600;
-                    letter-spacing: 1.2px;
-                }
-
-                HorizontalLayout {
-                    spacing: 6px;
-
-                    ChoiceChip {
-                        label: "Beginner";
-                        active: root.form-experience == "beginner";
-                        clicked => { root.form-experience = "beginner"; }
-                    }
-                    ChoiceChip {
-                        label: "Intermediate";
-                        active: root.form-experience == "intermediate";
-                        clicked => { root.form-experience = "intermediate"; }
-                    }
-                    ChoiceChip {
-                        label: "Advanced";
-                        active: root.form-experience == "advanced";
-                        clicked => { root.form-experience = "advanced"; }
-                    }
-                }
-
-                Text {
-                    text: "DIET";
-                    color: Theme.muted;
-                    font-size: 9px;
-                    font-weight: 600;
-                    letter-spacing: 1.2px;
-                }
-
-                HorizontalLayout {
-                    spacing: 6px;
-
-                    ChoiceChip {
-                        label: "Veg";
-                        active: root.form-diet == "veg";
-                        clicked => { root.form-diet = "veg"; }
-                    }
-                    ChoiceChip {
-                        label: "Non-veg";
-                        active: root.form-diet == "nonveg";
-                        clicked => { root.form-diet = "nonveg"; }
-                    }
-                    ChoiceChip {
-                        label: "Egg";
-                        active: root.form-diet == "egg";
-                        clicked => { root.form-diet = "egg"; }
-                    }
-                }
-
-                Text {
-                    text: root.form-error;
-                    color: #E5484D;
-                    font-size: 12px;
-                    wrap: word-wrap;
-                    visible: root.form-error != "";
-                }
-
-                PrimaryButton {
-                    label: "Save profile";
-                    clicked => {
-                        root.save-onboarding();
-                    }
-                }
-
-                GhostButton {
-                    label: "Skip for now";
-                    clicked => {
-                        root.skip-onboarding();
-                    }
-                }
-
-                Rectangle {
-                    height: 16px;
-                }
+                TouchArea { width: 100%; height: 100%; clicked => { root.save-onboarding(); } }
             }
         }
     }
 
-    // ----------------------------------------------------------------
+    // ================================================================
     // Community thread
-    // ----------------------------------------------------------------
+    // ================================================================
     if root.community-open-id != "" : Rectangle {
         background: Theme.bg;
 
@@ -1601,89 +2157,38 @@ export component AppWindow inherits Window {
 
             HorizontalLayout {
                 alignment: space-between;
-
-                Text {
-                    text: "Thread";
-                    color: Theme.text;
-                    font-size: 30px;
-                    font-weight: 600;
-                    letter-spacing: -0.8px;
-                    vertical-alignment: center;
-                }
-
-                GhostButton {
-                    label: "Close";
-                    width: 84px;
-                    clicked => {
-                        root.close-community-post();
-                    }
-                }
+                Text { text: "Thread"; color: Theme.text; font-size: 30px; font-weight: 600; vertical-alignment: center; }
+                GhostButton { label: "CLOSE"; stretch: false; width: 80px; clicked => { root.close-community-post(); } }
             }
 
             ScrollView {
                 vertical-stretch: 1;
-
                 VerticalLayout {
                     width: 100%;
                     spacing: 12px;
-
                     Rectangle {
-                        border-radius: 22px;
+                        border-radius: 20px;
                         background: Theme.surface;
                         border-width: 1px;
                         border-color: Theme.line;
-
                         VerticalLayout {
                             padding: 16px;
                             spacing: 8px;
-
-                            Text {
-                                text: root.community-open-author;
-                                color: Theme.accent;
-                                font-size: 10px;
-                                font-weight: 700;
-                                letter-spacing: 1px;
-                            }
-
-                            Text {
-                                text: root.community-open-text;
-                                color: Theme.text;
-                                font-size: 15px;
-                                wrap: word-wrap;
-                            }
+                            Text { text: root.community-open-author; color: Theme.accent; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
+                            Text { text: root.community-open-text; color: Theme.text; font-size: 15px; wrap: word-wrap; }
                         }
                     }
-
-                    if root.community-replies.length == 0 : Text {
-                        text: "No replies yet. Add the first one.";
-                        color: Theme.muted;
-                        font-size: 12px;
-                    }
-
+                    if root.community-replies.length == 0 : Text { text: "No replies yet. Add the first one."; color: Theme.muted; font-size: 12px; }
                     for reply in root.community-replies : Rectangle {
                         border-radius: 18px;
                         background: Theme.surface;
                         border-width: 1px;
                         border-color: Theme.line;
-
                         VerticalLayout {
                             padding: 14px;
                             spacing: 4px;
-
-                            Text {
-                                text: reply.author;
-                                color: Theme.accent;
-                                font-size: 9px;
-                                font-weight: 700;
-                                letter-spacing: 1px;
-                            }
-
-                            Text {
-                                text: reply.text;
-                                color: Theme.text;
-                                font-size: 13px;
-                                wrap: word-wrap;
-                            }
+                            Text { text: reply.author; color: Theme.accent; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
+                            Text { text: reply.text; color: Theme.text; font-size: 13px; wrap: word-wrap; }
                         }
                     }
                 }
@@ -1691,46 +2196,180 @@ export component AppWindow inherits Window {
 
             HorizontalLayout {
                 spacing: 8px;
-
                 Rectangle {
                     horizontal-stretch: 1;
-                    height: 48px;
-                    border-radius: 24px;
+                    height: 44px;
+                    border-radius: 22px;
                     background: Theme.surface;
                     border-width: 1px;
                     border-color: Theme.line;
-
                     TextInput {
-                        x: 16px;
+                        x: 14px;
                         y: 0;
-                        width: parent.width - 32px;
+                        width: parent.width - 28px;
                         height: 100%;
                         text <=> root.community-reply-input;
                         single-line: true;
                         color: Theme.text;
                         font-size: 13px;
-                        vertical-alignment: center;
-                        accepted => {
-                            root.send-community-reply();
+                        accepted => { root.send-community-reply(); }
+                    }
+                }
+                GhostButton { label: "REPLY"; stretch: false; width: 72px; clicked => { root.send-community-reply(); } }
+            }
+
+            if root.community-reply-status != "" : Text { text: root.community-reply-status; color: #E5484D; font-size: 11px; wrap: word-wrap; }
+        }
+    }
+
+    // ================================================================
+    // Progress
+    // ================================================================
+    if root.show-progress : Rectangle {
+        background: Theme.bg;
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 14px;
+            alignment: start;
+
+            HorizontalLayout {
+                alignment: space-between;
+                GhostButton { label: "BACK"; stretch: false; width: 72px; clicked => { root.close-progress(); } }
+                Text { text: "Progress"; color: Theme.text; font-size: 24px; font-weight: 600; vertical-alignment: center; }
+                GhostButton { label: "PDF"; stretch: false; width: 64px; }
+            }
+
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    width: 100%;
+                    spacing: 12px;
+                    alignment: start;
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        StatBlock { label: "STREAK"; value: "\{root.streak}"; unit: "days"; invert: true; }
+                        StatBlock { label: "WORKOUTS"; value: "\{root.week-workouts}"; unit: "this week"; }
+                    }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        StatBlock { label: "AVG PROTEIN"; value: "\{root.avg-protein}"; unit: "g / day"; }
+                        StatBlock { label: "AVG SLEEP"; value: root.avg-sleep; unit: "h / night"; }
+                    }
+
+                    Rectangle {
+                        border-radius: 28px;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 12px;
+                            SectionLabel { index: "01"; label: "WEIGHT"; }
+                            Text { text: "Log it daily, same time, same conditions."; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 40px;
+                                    border-radius: 20px;
+                                    background: Theme.bg;
+                                    border-width: 1px;
+                                    border-color: Theme.line;
+                                    TextInput {
+                                        x: 14px;
+                                        y: 0;
+                                        width: parent.width - 28px;
+                                        height: 100%;
+                                        text <=> root.weight-input;
+                                        single-line: true;
+                                        color: Theme.text;
+                                        font-size: 13px;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                GhostButton { label: "LOG"; stretch: false; width: 68px; clicked => { root.log-weight(); } }
+                            }
+                            Rectangle {
+                                height: 160px;
+                                border-radius: 16px;
+                                background: Theme.bg;
+                                border-width: 1px;
+                                border-color: Theme.line;
+                                Path {
+                                    x: 16px;
+                                    y: 12px;
+                                    width: parent.width - 32px;
+                                    height: parent.height - 24px;
+                                    commands: root.weight-path;
+                                    stroke: Theme.accent;
+                                    stroke-width: 2px;
+                                    fill: transparent;
+                                }
+                                Text {
+                                    text: "Log a weight to draw the line.";
+                                    color: Theme.muted;
+                                    font-size: 12px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                    width: 100%;
+                                    height: 100%;
+                                    visible: root.weight-path == "";
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        border-radius: 28px;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 12px;
+                            SectionLabel { index: "02"; label: "PROTEIN"; }
+                            Text { text: "Target: \{root.target-protein} g / day"; color: Theme.muted; font-size: 13px; }
+                            HorizontalLayout {
+                                height: 120px;
+                                spacing: 6px;
+                                for log in root.history : Rectangle {
+                                    width: 32px;
+                                    height: min(100, log.protein * 100 / max(1, root.target-protein)) * 1.2px;
+                                    border-radius: 6px;
+                                    background: Theme.accent;
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        border-radius: 28px;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: Theme.line;
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 12px;
+                            SectionLabel { index: "03"; label: "THE WEEK"; }
+                            Text { text: "Consistency compounds. One missed day is data, not failure."; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                            HorizontalLayout {
+                                spacing: 6px;
+                                for log in root.history : VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Rectangle {
+                                        height: 64px;
+                                        border-radius: 6px;
+                                        background: log.workout ? Theme.accent : Theme.surface-2;
+                                    }
+                                    Text { text: log.date; color: Theme.muted; font-size: 8px; horizontal-alignment: center; }
+                                }
+                            }
                         }
                     }
                 }
-
-                GhostButton {
-                    label: "Reply";
-                    width: 76px;
-                    clicked => {
-                        root.send-community-reply();
-                    }
-                }
-            }
-
-            Text {
-                text: root.community-reply-status;
-                color: #E5484D;
-                font-size: 11px;
-                wrap: word-wrap;
-                visible: root.community-reply-status != "";
             }
         }
     }
