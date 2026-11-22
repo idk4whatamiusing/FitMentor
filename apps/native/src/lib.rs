@@ -199,6 +199,11 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     {
         ui.set_show_progress(true);
     }
+    if let Ok(tab) = env::var("FITMENTOR_WORKOUT_TAB") {
+        if let Ok(tab) = tab.parse::<i32>() {
+            ui.set_workout_tab(tab.clamp(0, 1));
+        }
+    }
     if let Ok(tab) = env::var("FITMENTOR_TAB") {
         if let Ok(tab) = tab.parse::<i32>() {
             if (0..=5).contains(&tab) {

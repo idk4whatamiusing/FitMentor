@@ -25,13 +25,17 @@ viewport. Preview flags:
 
 ```bash
 FITMENTOR_TAB=0..5          # Home, Train, Food, Coach, Tools, You
+FITMENTOR_WORKOUT_TAB=1     # Train -> Exercise Library
+FITMENTOR_WIDTH=350         # window width for desktop layout testing
+FITMENTOR_HEIGHT=800        # window height for desktop layout testing
 FITMENTOR_PROGRESS=1        # open the progress screen
 FITMENTOR_ONBOARDING=1      # open onboarding
 FITMENTOR_STEP=0..8         # onboarding step
 FITMENTOR_THEME=light|dark  # force a theme
 ```
 
-The layouts, tokens, icons, photography, and copy match the web app. Slint's
+The native shell is responsive: it uses the actual window width, a full-width
+bottom navigation bar in the layout flow, and a single content column. Slint's
 text renderer differs from a browser by a small amount, so glyph edges and
 line wrapping can vary by a pixel. The progress report button opens the web
 report in the system browser.

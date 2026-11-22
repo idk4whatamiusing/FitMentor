@@ -261,10 +261,11 @@ export component AppWindow inherits Window {
     // Signed-in app
     // ================================================================
     if root.signed-in && !root.needs-onboarding : VerticalLayout {
-        width: 100%;
-        height: 100%;
+        width: root.width;
+        height: root.height;
 
         TopBar {
+            width: root.width;
             toggle-theme => {
                 root.toggle-theme();
             }
@@ -272,7 +273,7 @@ export component AppWindow inherits Window {
 
         main-scroll := ScrollView {
             vertical-stretch: 1;
-            width: 100%;
+            width: root.width;
             vertical-scrollbar-policy: always-off;
 
             content := VerticalLayout {
@@ -998,7 +999,7 @@ export component AppWindow inherits Window {
                                     Icon {
                                         size: 16px;
                                         tint: Theme.muted;
-                                        source: @image-url("icons/chevron-down.png");
+                                        source: root.open-workout == day.day_index ? @image-url("icons/chevron-up.png") : @image-url("icons/chevron-down.png");
                                     }
                                 }
 
@@ -1068,6 +1069,16 @@ export component AppWindow inherits Window {
                                             }
                                         }
                                     }
+                                }
+                            }
+
+                            TouchArea {
+                                x: 0;
+                                y: 0;
+                                width: parent.width;
+                                height: 64px;
+                                clicked => {
+                                    root.open-workout = root.open-workout == day.day_index ? -1 : day.day_index;
                                 }
                             }
                         }
@@ -1954,7 +1965,7 @@ export component AppWindow inherits Window {
         }
 
         BottomNav {
-            width: 100%;
+            width: root.width;
             active: root.tab;
             select(tab) => {
                 root.set-tab(tab);
