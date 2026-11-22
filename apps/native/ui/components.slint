@@ -2,14 +2,22 @@
 
 import { Theme } from "theme.slint";
 
-export component Icon inherits Image {
+export component Icon inherits Rectangle {
     in property <length> size: 18px;
     in property <color> tint: Theme.text;
+    in property <image> source;
 
     width: root.size;
     height: root.size;
-    colorize: root.tint;
-    image-fit: contain;
+    background: transparent;
+
+    Image {
+        width: 100%;
+        height: 100%;
+        source: root.source;
+        colorize: root.tint;
+        image-fit: contain;
+    }
 }
 
 export component Wordmark inherits Rectangle {
@@ -286,6 +294,43 @@ export component Chip inherits Rectangle {
         clicked => {
             root.clicked();
         }
+    }
+}
+
+export component ToolChip inherits Rectangle {
+    in property <string> label: "";
+    in property <int> kind: 0;
+    in property <image> icon;
+    in property <bool> active: false;
+    callback clicked();
+
+    height: 36px;
+    border-radius: 18px;
+    background: root.active ? Theme.accent-soft : Theme.surface;
+    border-width: 1px;
+    border-color: root.active ? Theme.accent : Theme.line;
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 6px;
+        alignment: center;
+
+        Icon { size: 14px; tint: root.active ? Theme.accent : Theme.muted; source: root.icon; }
+
+        Text {
+            text: root.label;
+            color: root.active ? Theme.accent : Theme.muted;
+            font-size: 12px;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
+    }
+
+    TouchArea {
+        width: 100%;
+        height: 100%;
+        clicked => { root.clicked(); }
     }
 }
 
