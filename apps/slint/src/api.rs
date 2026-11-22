@@ -210,15 +210,20 @@ pub struct DeviceAuth {
     pub interval: i64,
 }
 
+const DEFAULT_GOOGLE_CLIENT_ID: &str =
+    "102580553542-gr1sndbs9ki33jq9m3u2902gthecket2.apps.googleusercontent.com";
+
 pub fn google_client_id() -> String {
     let runtime = env::var("FITMENTOR_GOOGLE_CLIENT_ID").unwrap_or_default();
     if !runtime.trim().is_empty() {
         return runtime.trim().to_string();
     }
-    option_env!("FITMENTOR_GOOGLE_CLIENT_ID")
-        .unwrap_or("")
-        .trim()
-        .to_string()
+    let baked = option_env!("FITMENTOR_GOOGLE_CLIENT_ID").unwrap_or("");
+    if !baked.trim().is_empty() {
+        baked.trim().to_string()
+    } else {
+        DEFAULT_GOOGLE_CLIENT_ID.to_string()
+    }
 }
 
 pub fn device_start(client_id: &str) -> Result<DeviceAuth, String> {
