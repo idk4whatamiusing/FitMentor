@@ -174,16 +174,24 @@ export function MediaCard({
   children,
   className,
   overlay = true,
+  priority = false,
 }: {
   src: string;
   alt: string;
   children?: ReactNode;
   className?: string;
   overlay?: boolean;
+  priority?: boolean;
 }) {
   return (
     <div className={cn("relative overflow-hidden rounded-[2rem] bg-ink", className)}>
-      <img src={src} alt={alt} className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+      <img
+        src={src}
+        alt={alt}
+        className="absolute inset-0 h-full w-full object-cover"
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
+      />
       {overlay ? (
         <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/25 to-transparent" />
       ) : null}

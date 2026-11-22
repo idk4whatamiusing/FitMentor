@@ -183,6 +183,7 @@ function Landing() {
               src={heroImg}
               alt="Athlete lifting a barbell"
               className="aspect-[4/5] w-full lg:aspect-[5/6]"
+              priority
             >
               <div className="flex items-end justify-between gap-4 pb-8">
                 <div>
