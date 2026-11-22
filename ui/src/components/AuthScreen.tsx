@@ -82,13 +82,13 @@ export function AuthScreen({ mode }: { mode: "signin" | "signup" }) {
             <h1 className="mt-5 text-5xl font-semibold leading-[0.92] tracking-[-0.045em] sm:text-6xl">
               {isSignup ? (
                 <>
-                  Start your
+                  Start your{" "}
                   <br />
                   first <span className="text-orange">week.</span>
                 </>
               ) : (
                 <>
-                  Back to
+                  Back to{" "}
                   <br />
                   the <span className="text-orange">work.</span>
                 </>

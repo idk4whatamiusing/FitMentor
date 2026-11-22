@@ -27,22 +27,21 @@ if (typeof document !== "undefined") {
 
 function NotFoundComponent() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
-          </Link>
-        </div>
-      </div>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-5 text-center">
+      <p className="label-micro text-orange">404</p>
+      <h1 className="mt-5 text-6xl font-semibold leading-none tracking-[-0.05em] sm:text-8xl">
+        Lost rep.
+      </h1>
+      <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
+        This page doesn't exist. Reset, breathe, and head back to the plan.
+      </p>
+      <Link
+        to="/"
+        className="mt-8 inline-flex items-center gap-3 rounded-full bg-foreground py-2 pl-6 pr-2 text-sm font-semibold text-background transition-transform hover:-translate-y-0.5"
+      >
+        Back home
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-orange text-ink">↗</span>
+      </Link>
     </div>
   );
 }
@@ -55,31 +54,30 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Try again
-          </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Go home
-          </a>
-        </div>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-5 text-center">
+      <p className="label-micro text-orange">Error</p>
+      <h1 className="mt-5 text-5xl font-semibold leading-[0.95] tracking-[-0.05em] sm:text-7xl">
+        That set didn't load.
+      </h1>
+      <p className="mt-4 max-w-sm text-sm leading-relaxed text-muted-foreground">
+        Something went wrong on our end. Try again, or head back to the plan.
+      </p>
+      <div className="mt-8 flex flex-wrap justify-center gap-2">
+        <button
+          onClick={() => {
+            router.invalidate();
+            reset();
+          }}
+          className="inline-flex items-center rounded-full bg-foreground px-6 py-3 text-sm font-semibold text-background"
+        >
+          Try again
+        </button>
+        <a
+          href="/"
+          className="inline-flex items-center rounded-full border border-border px-6 py-3 text-sm font-semibold transition-colors hover:bg-secondary"
+        >
+          Go home
+        </a>
       </div>
     </div>
   );

@@ -399,7 +399,7 @@ function Welcome({ onNext }: { onNext: () => void }) {
     <div>
       <SectionLabel index="01">Welcome</SectionLabel>
       <h1 className="mt-5 text-5xl font-semibold leading-[0.9] tracking-[-0.05em] sm:text-7xl">
-        Let's build
+        Let's build{" "}
         <br />
         your first <span className="text-orange">week.</span>
       </h1>

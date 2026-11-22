@@ -142,7 +142,7 @@ function Landing() {
           <motion.div {...fadeUp}>
             <SectionLabel index="01">AI fitness coaching · India</SectionLabel>
             <h1 className="mt-6 text-[3.6rem] font-semibold leading-[0.86] tracking-[-0.055em] sm:text-[5.2rem] lg:text-[6.2rem]">
-              Train like
+              Train like{" "}
               <br />
               you <span className="text-orange">mean it.</span>
             </h1>
