@@ -37,6 +37,14 @@ and recompressed for this project.
 The same files are bundled in `ui/src/assets/photos/` (web) and
 `apps/native/ui/images/` (native app).
 
+## Icons
+
+Native UI icons in `apps/native/ui/icons/` are derived from
+[Lucide](https://lucide.dev) and are licensed under the ISC License
+(https://github.com/lucide-icons/lucide/blob/main/LICENSE). The Google "G"
+mark is used only on the Google sign-in button, per Google's branding
+guidelines.
+
 ## Brand
 
 The FitMentor monogram, wordmark, favicon, PWA icons, and Android launcher

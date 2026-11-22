@@ -17,6 +17,24 @@ token. For previews, `FITMENTOR_THEME=light|dark` overrides it and
 `FITMENTOR_TAB=0..5` opens a specific tab (Today, Food, Train, Coach, You,
 Feed).
 
+## Mobile-web parity
+
+The native screens are mirrored from the mobile web build at a 390 × 844
+viewport. Preview flags:
+
+```bash
+FITMENTOR_TAB=0..5          # Home, Train, Tools, Coach, Food, You
+FITMENTOR_PROGRESS=1        # open the progress screen
+FITMENTOR_ONBOARDING=1      # open onboarding
+FITMENTOR_STEP=0..8         # onboarding step
+FITMENTOR_THEME=light|dark  # force a theme
+```
+
+The layouts, tokens, icons, photography, and copy match the web app. Slint's
+text renderer differs from a browser by a small amount, so glyph edges and
+line wrapping can vary by a pixel. The progress report button opens the web
+report in the system browser.
+
 ## Desktop
 
 ```bash
