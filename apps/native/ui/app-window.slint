@@ -22,6 +22,7 @@ import {
     SectionLabel,
     SliderTrack,
     StatBlock,
+    SupplementRow,
     TabButton,
     ToolChip,
     TopBar,
@@ -170,6 +171,7 @@ export component AppWindow inherits Window {
     in-out property <[CoachSessionSummary]> coach-sessions: [];
     in-out property <[CommunityPost]> community-posts: [];
     in-out property <string> community-input: "";
+    in-out property <string> community-search: "";
     in-out property <string> community-status: "Load the community feed.";
     in-out property <bool> community-busy: false;
     in-out property <string> community-open-id: "";
@@ -186,6 +188,7 @@ export component AppWindow inherits Window {
     in-out property <string> tool-input: "";
     in-out property <string> injury-area: "";
     in-out property <string> form-exercise: "";
+    in-out property <string> open-supplement: "";
     in-out property <int> calorie-deficit: 400;
     in-out property <int> calorie-weeks: 12;
     in-out property <bool> show-progress: false;
@@ -218,6 +221,7 @@ export component AppWindow inherits Window {
     callback send-chat();
     callback new-chat();
     callback load-community();
+    callback search-community();
     callback post-community();
     callback like-community(string);
     callback open-community-post(string);
@@ -1204,6 +1208,29 @@ export component AppWindow inherits Window {
                             changed(v) => { root.sleep = v; }
                         }
                         GhostButton { label: "LOG SLEEP"; clicked => { root.log-sleep(root.sleep); } }
+
+                        Text { text: "LAST 7 DAYS"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            height: 90px;
+                            for log in root.history : VerticalLayout {
+                                horizontal-stretch: 1;
+                                spacing: 4px;
+                                alignment: end;
+                                Rectangle {
+                                    height: max(4px, min(70px, log.sleep * 8px));
+                                    border-radius: 5px;
+                                    background: Theme.accent;
+                                }
+                                Text { text: log.date; color: Theme.muted; font-size: 8px; horizontal-alignment: center; }
+                            }
+                        }
+
+                        GhostButton {
+                            label: root.tool-busy ? "THINKING…" : "AI SLEEP TIPS";
+                            clicked => { root.run-tool(); }
+                        }
+                        if root.tool-advice != "" : Text { text: root.tool-advice; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
                     }
 
                     if root.tool == 2 : VerticalLayout {
@@ -1218,7 +1245,9 @@ export component AppWindow inherits Window {
                             GhostButton { label: "+500"; stretch: false; width: 78px; clicked => { root.add-steps-by(500); } }
                             GhostButton { label: "+1,000"; stretch: false; width: 84px; clicked => { root.add-steps-by(1000); } }
                             GhostButton { label: "+2,000"; stretch: false; width: 84px; clicked => { root.add-steps-by(2000); } }
+                            GhostButton { label: "+5,000"; stretch: false; width: 84px; clicked => { root.add-steps-by(5000); } }
                         }
+                        Text { text: "Aim for 8,000–10,000 steps daily. Walking after meals helps digestion too."; color: Theme.muted; font-size: 11px; wrap: word-wrap; }
                     }
 
                     if root.tool == 3 : VerticalLayout {
@@ -1228,12 +1257,18 @@ export component AppWindow inherits Window {
                         Text { text: "Guidance, not a diagnosis. Sharp pain means a doctor."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
                         HorizontalLayout {
                             spacing: 8px;
-                            GhostButton { label: "KNEE"; active: root.injury-area == "knee"; clicked => { root.injury-area = "knee"; } }
-                            GhostButton { label: "BACK"; active: root.injury-area == "back"; clicked => { root.injury-area = "back"; } }
-                            GhostButton { label: "SHOULDER"; active: root.injury-area == "shoulder"; clicked => { root.injury-area = "shoulder"; } }
+                            ChoiceChip { label: "Knee"; active: root.injury-area == "knee"; clicked => { root.injury-area = "knee"; } }
+                            ChoiceChip { label: "Lower back"; active: root.injury-area == "back"; clicked => { root.injury-area = "back"; } }
+                            ChoiceChip { label: "Shoulder"; active: root.injury-area == "shoulder"; clicked => { root.injury-area = "shoulder"; } }
                         }
-                        Field { label: "DESCRIBE THE PAIN"; placeholder: "When does it hurt?"; text <=> root.tool-input; }
-                        GhostButton { label: "GET AI ADVICE"; clicked => { root.run-tool(); } }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            ChoiceChip { label: "Wrist"; active: root.injury-area == "wrist"; clicked => { root.injury-area = "wrist"; } }
+                            ChoiceChip { label: "Ankle"; active: root.injury-area == "ankle"; clicked => { root.injury-area = "ankle"; } }
+                            ChoiceChip { label: "Elbow"; active: root.injury-area == "elbow"; clicked => { root.injury-area = "elbow"; } }
+                        }
+                        Field { label: "DESCRIBE THE PAIN"; placeholder: "When does it hurt? Any swelling? How long?"; text <=> root.tool-input; }
+                        GhostButton { label: root.tool-busy ? "ANALYZING…" : "GET AI ADVICE"; clicked => { root.run-tool(); } }
                         if root.tool-advice != "" : Text { text: root.tool-advice; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
                     }
 
@@ -1242,17 +1277,12 @@ export component AppWindow inherits Window {
                         SectionLabel { index: "05"; label: "SUPPLEMENTS"; }
                         Text { text: "Supplements"; color: Theme.text; font-size: 26px; font-weight: 600; }
                         Text { text: "Optional, not required. Food first, always."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
-                        for item in ["Whey protein", "Creatine", "Vitamin D", "Omega-3", "Multivitamin", "Magnesium"] : Rectangle {
-                            height: 52px;
-                            border-radius: 0px;
-                            border-width: 0px;
-                            border-color: transparent;
-                            HorizontalLayout {
-                                alignment: space-between;
-                                Text { text: item; color: Theme.text; font-size: 14px; font-weight: 500; vertical-alignment: center; }
-                                Text { text: "+"; color: Theme.muted; font-size: 18px; vertical-alignment: center; }
-                            }
-                        }
+                        SupplementRow { name: "Whey protein"; inr: "₹1,500–2,500/kg"; when: "Post-workout or anytime"; why: "Convenient protein source"; natural: "Milk, paneer, curd"; open: root.open-supplement == "whey"; toggle => { root.open-supplement = root.open-supplement == "whey" ? "" : "whey"; } }
+                        SupplementRow { name: "Creatine"; inr: "₹600–1,200/500g"; when: "Daily, 3–5 g"; why: "Strength and power output"; natural: "Red meat (small amounts)"; open: root.open-supplement == "creatine"; toggle => { root.open-supplement = root.open-supplement == "creatine" ? "" : "creatine"; } }
+                        SupplementRow { name: "Vitamin D"; inr: "₹200–500/bottle"; when: "Morning, with food"; why: "Bone health and immunity"; natural: "Sunlight, eggs"; open: root.open-supplement == "d"; toggle => { root.open-supplement = root.open-supplement == "d" ? "" : "d"; } }
+                        SupplementRow { name: "Omega-3"; inr: "₹500–1,200/bottle"; when: "With meals"; why: "Joint health, inflammation"; natural: "Fish, flax seeds, walnuts"; open: root.open-supplement == "omega"; toggle => { root.open-supplement = root.open-supplement == "omega" ? "" : "omega"; } }
+                        SupplementRow { name: "Multivitamin"; inr: "₹300–800/bottle"; when: "After breakfast"; why: "General health coverage"; natural: "Balanced diet"; open: root.open-supplement == "multi"; toggle => { root.open-supplement = root.open-supplement == "multi" ? "" : "multi"; } }
+                        SupplementRow { name: "Magnesium"; inr: "₹400–900/bottle"; when: "Before bed"; why: "Sleep and muscle recovery"; natural: "Nuts, seeds, green veggies"; open: root.open-supplement == "mag"; toggle => { root.open-supplement = root.open-supplement == "mag" ? "" : "mag"; } }
                     }
 
                     if root.tool == 5 : VerticalLayout {
@@ -1260,12 +1290,22 @@ export component AppWindow inherits Window {
                         SectionLabel { index: "06"; label: "CALORIES"; }
                         Text { text: "Calorie timeline"; color: Theme.text; font-size: 26px; font-weight: 600; }
                         Text { text: "A projection, not a promise."; color: Theme.muted; font-size: 14px; }
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text { text: "DAILY DEFICIT / SURPLUS"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
+                            Text { text: "\{root.calorie-deficit} kcal"; color: Theme.accent; font-size: 12px; font-weight: 600; }
+                        }
                         SliderTrack { value: root.calorie-deficit; minimum: 100; maximum: 800; step: 50; changed(v) => { root.calorie-deficit = v; } }
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text { text: "TIMELINE"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
+                            Text { text: "\{root.calorie-weeks} weeks"; color: Theme.accent; font-size: 12px; font-weight: 600; }
+                        }
                         SliderTrack { value: root.calorie-weeks; minimum: 4; maximum: 12; step: 4; changed(v) => { root.calorie-weeks = v; } }
                         HorizontalLayout {
                             spacing: 12px;
-                            StatBlock { label: "FAT LOSS"; value: "\{round(root.calorie-deficit * root.calorie-weeks / 1100.0)}"; unit: "kg"; invert: true; }
-                            StatBlock { label: "MUSCLE"; value: "\{round(root.calorie-deficit * root.calorie-weeks / 785.0)}"; unit: "kg"; }
+                            StatBlock { label: "FAT LOSS"; value: "\{round(root.calorie-deficit * 7 * root.calorie-weeks / 7700.0 * 10) / 10}"; unit: "kg"; invert: true; }
+                            StatBlock { label: "MUSCLE"; value: "\{round(root.calorie-deficit * 7 * root.calorie-weeks / 5500.0 * 10) / 10}"; unit: "kg"; }
                         }
                     }
 
@@ -1275,13 +1315,21 @@ export component AppWindow inherits Window {
                         Text { text: "Form check"; color: Theme.text; font-size: 26px; font-weight: 600; }
                         Text { text: "Describe the lift the way you'd explain it to a friend."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
                         HorizontalLayout {
-                            spacing: 8px;
-                            GhostButton { label: "SQUAT"; active: root.form-exercise == "squat"; clicked => { root.form-exercise = "squat"; } }
-                            GhostButton { label: "DEADLIFT"; active: root.form-exercise == "deadlift"; clicked => { root.form-exercise = "deadlift"; } }
-                            GhostButton { label: "BENCH"; active: root.form-exercise == "bench"; clicked => { root.form-exercise = "bench"; } }
+                            spacing: 6px;
+                            ChoiceChip { label: "Bench"; active: root.form-exercise == "bench"; clicked => { root.form-exercise = "bench"; } }
+                            ChoiceChip { label: "Squat"; active: root.form-exercise == "squat"; clicked => { root.form-exercise = "squat"; } }
+                            ChoiceChip { label: "Deadlift"; active: root.form-exercise == "deadlift"; clicked => { root.form-exercise = "deadlift"; } }
+                            ChoiceChip { label: "Pull-up"; active: root.form-exercise == "pullup"; clicked => { root.form-exercise = "pullup"; } }
+                        }
+                        HorizontalLayout {
+                            spacing: 6px;
+                            ChoiceChip { label: "Push-up"; active: root.form-exercise == "pushup"; clicked => { root.form-exercise = "pushup"; } }
+                            ChoiceChip { label: "OHP"; active: root.form-exercise == "ohp"; clicked => { root.form-exercise = "ohp"; } }
+                            ChoiceChip { label: "Row"; active: root.form-exercise == "row"; clicked => { root.form-exercise = "row"; } }
+                            ChoiceChip { label: "Lunge"; active: root.form-exercise == "lunge"; clicked => { root.form-exercise = "lunge"; } }
                         }
                         Field { label: "NOTES"; placeholder: "Stance, grip, depth, pain…"; text <=> root.tool-input; }
-                        GhostButton { label: "ANALYZE FORM"; clicked => { root.run-tool(); } }
+                        GhostButton { label: root.tool-busy ? "ANALYZING…" : "ANALYZE FORM"; clicked => { root.run-tool(); } }
                         if root.tool-advice != "" : Text { text: root.tool-advice; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
                     }
 
@@ -1290,6 +1338,32 @@ export component AppWindow inherits Window {
                         SectionLabel { index: "08"; label: "COMMUNITY"; }
                         Text { text: "The floor."; color: Theme.text; font-size: 26px; font-weight: 600; }
                         Text { text: "Wins, questions, and the days nobody feels like training."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                height: 40px;
+                                border-radius: 20px;
+                                background: Theme.bg;
+                                border-width: 1px;
+                                border-color: Theme.line;
+                                TextInput {
+                                    x: 14px;
+                                    y: 0;
+                                    width: parent.width - 28px;
+                                    height: 100%;
+                                    text <=> root.community-search;
+                                    single-line: true;
+                                    color: Theme.text;
+                                    font-size: 13px;
+                                    vertical-alignment: center;
+                                    accepted => { root.search-community(); }
+                                }
+                            }
+                            GhostButton { label: "SEARCH"; stretch: false; width: 82px; clicked => { root.search-community(); } }
+                            GhostButton { label: "CLEAR"; stretch: false; width: 72px; clicked => { root.load-community(); } }
+                        }
 
                         Rectangle {
                             border-radius: 20px;

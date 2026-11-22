@@ -1014,6 +1014,20 @@ pub fn fetch_community_feed(limit: i64) -> Result<Vec<CommunityPostView>, String
         .unwrap_or_default())
 }
 
+pub fn search_community(query: &str) -> Result<Vec<CommunityPostView>, String> {
+    let value = community_graphql(serde_json::json!({
+        "query": "query search($query: String, $limit: Int)",
+        "variables": { "query": query, "limit": 20 },
+    }))?;
+    let items = value
+        .get("data")
+        .and_then(|data| data.get("search"))
+        .and_then(serde_json::Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    Ok(items.iter().map(parse_community_post).collect())
+}
+
 pub fn create_community_post(text: &str) -> Result<CommunityPostView, String> {
     let value = community_graphql(serde_json::json!({
         "query": "mutation createPost($text: String, $media: JSON)",

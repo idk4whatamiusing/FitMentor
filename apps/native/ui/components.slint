@@ -986,6 +986,46 @@ export component SliderTrack inherits Rectangle {
     }
 }
 
+export component SupplementRow inherits VerticalLayout {
+    in property <string> name: "";
+    in property <string> inr: "";
+    in property <string> when: "";
+    in property <string> why: "";
+    in property <string> natural: "";
+    in property <bool> open: false;
+    callback toggle();
+
+    spacing: 0;
+
+    Rectangle {
+        height: 56px;
+        background: transparent;
+
+        HorizontalLayout {
+            alignment: space-between;
+            VerticalLayout {
+                spacing: 2px;
+                Text { text: root.name; color: Theme.text; font-size: 14px; font-weight: 500; }
+                Text { text: root.inr; color: Theme.muted; font-size: 11px; }
+            }
+            Text { text: root.open ? "−" : "+"; color: Theme.muted; font-size: 20px; vertical-alignment: center; }
+        }
+
+        TouchArea { width: 100%; height: 100%; clicked => { root.toggle(); } }
+    }
+
+    if root.open : VerticalLayout {
+        spacing: 4px;
+        padding-bottom: 12px;
+        Text { text: "When: " + root.when; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+        Text { text: "Why: " + root.why; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+        Text { text: "Natural sources: " + root.natural; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+        Text { text: "Check the expiry before buying."; color: Theme.muted; font-size: 11px; }
+    }
+
+    Rectangle { height: 1px; background: Theme.line; }
+}
+
 export component Feature inherits HorizontalLayout {
     in property <string> label: "";
 

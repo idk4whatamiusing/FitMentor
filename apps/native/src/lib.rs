@@ -930,6 +930,49 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     });
 
     let handle = ui.as_weak();
+    ui.on_search_community(move || {
+        let Some(ui) = handle.upgrade() else {
+            return;
+        };
+        let query = ui.get_community_search().trim().to_string();
+        if query.is_empty() {
+            ui.invoke_load_community();
+            return;
+        }
+        ui.set_community_status(format!("Searching for \"{query}\"...").into());
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::search_community(&query);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    match result {
+                        Ok(posts) => {
+                            let items: Vec<CommunityPost> = posts
+                                .iter()
+                                .map(|post| CommunityPost {
+                                    id: post.id.clone().into(),
+                                    author: post.author.clone().into(),
+                                    text: post.text.clone().into(),
+                                    likes: post.likes as i32,
+                                    liked_by_me: post.liked_by_me,
+                                    reply_count: post.reply_count as i32,
+                                })
+                                .collect();
+                            ui.set_community_posts(ModelRc::new(VecModel::from(items)));
+                            ui.set_community_status(
+                                format!("Search results for \"{query}\".").into(),
+                            );
+                        }
+                        Err(error) => ui.set_community_status(error.into()),
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
     ui.on_post_community(move || {
         let Some(ui) = handle.upgrade() else {
             return;
