@@ -219,6 +219,7 @@ export component AppWindow inherits Window {
     callback toggle-theme();
     callback open-progress();
     callback close-progress();
+    callback open-report();
 
     title: "FitMentor";
     icon: @image-url("images/app-icon.png");
@@ -2312,6 +2313,10 @@ export component AppWindow inherits Window {
         background: Theme.bg;
 
         VerticalLayout {
+            x: 0;
+            y: 0;
+            width: 100%;
+            height: 100%;
             padding: 20px;
             spacing: 14px;
             alignment: start;
@@ -2323,7 +2328,7 @@ export component AppWindow inherits Window {
             }
 
             ScrollView {
-                vertical-stretch: 1;
+                height: root.height - 150px;
                 VerticalLayout {
                     width: 100%;
                     spacing: 12px;
@@ -2390,6 +2395,10 @@ export component AppWindow inherits Window {
         background: Theme.bg;
 
         VerticalLayout {
+            x: 0;
+            y: 0;
+            width: 100%;
+            height: 100%;
             padding: 20px;
             spacing: 14px;
             alignment: start;
@@ -2398,11 +2407,11 @@ export component AppWindow inherits Window {
                 alignment: space-between;
                 GhostButton { label: "BACK"; stretch: false; width: 72px; clicked => { root.close-progress(); } }
                 Text { text: "Progress"; color: Theme.text; font-size: 24px; font-weight: 600; vertical-alignment: center; }
-                GhostButton { label: "PDF"; stretch: false; width: 64px; }
+                GhostButton { label: "PDF"; stretch: false; width: 64px; clicked => { root.open-report(); } }
             }
 
             ScrollView {
-                vertical-stretch: 1;
+                height: root.height - 140px;
                 VerticalLayout {
                     width: 100%;
                     spacing: 12px;

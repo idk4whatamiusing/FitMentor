@@ -156,6 +156,12 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             }
         }
     }
+    if env::var("FITMENTOR_PROGRESS")
+        .map(|v| v == "1")
+        .unwrap_or(false)
+    {
+        ui.set_show_progress(true);
+    }
     if let Ok(tab) = env::var("FITMENTOR_TAB") {
         if let Ok(tab) = tab.parse::<i32>() {
             if (0..=5).contains(&tab) {
@@ -373,6 +379,10 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
         if let Some(ui) = handle.upgrade() {
             ui.set_show_progress(false);
         }
+    });
+
+    ui.on_open_report(move || {
+        let _ = webbrowser::open("https://fitmentor-ey9.pages.dev/progress");
     });
 
     let handle = ui.as_weak();
@@ -684,6 +694,7 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                     match result {
                         Ok(()) => {
                             ui.set_workout_status("Day marked complete".into());
+                            persist_today(&ui, None, None, None, None, Some(true), None);
                             ui.invoke_load_workout();
                         }
                         Err(error) => ui.set_workout_status(error.into()),
