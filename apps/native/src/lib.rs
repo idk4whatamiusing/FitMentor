@@ -476,6 +476,8 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                         ui.set_profile_age(profile.age as i32);
                         ui.set_profile_height(profile.height_cm as i32);
                         ui.set_profile_weight(profile.weight_kg as i32);
+                        ui.set_bmi_weight(profile.weight_kg.to_string().into());
+                        ui.set_bmi_height(profile.height_cm.to_string().into());
                         ui.set_profile_goal(profile.goal.into());
                         ui.set_profile_diet(profile.diet.into());
                         ui.set_profile_place(profile.place.into());
@@ -529,6 +531,22 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             diet: ui.get_form_diet().to_string(),
             days_per_week: ui.get_form_days().parse().unwrap_or(4),
             budget_per_day: ui.get_form_budget().parse().unwrap_or(150),
+            health_conditions: {
+                let mut conditions = Vec::new();
+                if ui.get_health_diabetes() {
+                    conditions.push("diabetes".to_string());
+                }
+                if ui.get_health_heart() {
+                    conditions.push("heart_disease".to_string());
+                }
+                if ui.get_health_bp() {
+                    conditions.push("bp".to_string());
+                }
+                if ui.get_health_joint() {
+                    conditions.push("joint".to_string());
+                }
+                conditions
+            },
         };
         if input.name.is_empty() {
             ui.set_form_error("Enter your name".into());
@@ -557,6 +575,8 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                             ui.set_profile_age(profile.age as i32);
                             ui.set_profile_height(profile.height_cm as i32);
                             ui.set_profile_weight(profile.weight_kg as i32);
+                            ui.set_bmi_weight(profile.weight_kg.to_string().into());
+                            ui.set_bmi_height(profile.height_cm.to_string().into());
                             ui.set_profile_goal(profile.goal.into());
                             ui.set_profile_diet(profile.diet.into());
                             ui.set_profile_days(profile.days_per_week as i32);
@@ -795,6 +815,59 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     });
 
     let handle = ui.as_weak();
+    ui.on_load_coach_sessions(move || {
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::fetch_coach_sessions();
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    if let Ok(sessions) = result {
+                        let items: Vec<CoachSessionSummary> = sessions
+                            .into_iter()
+                            .map(|session| CoachSessionSummary {
+                                id: session.id.into(),
+                                title: session.title.into(),
+                                message_count: session.message_count as i32,
+                            })
+                            .collect();
+                        ui.set_coach_sessions(ModelRc::new(VecModel::from(items)));
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
+    ui.on_switch_chat(move |id| {
+        let id = id.to_string();
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            let result = api::fetch_coach_messages(&id);
+            let handle = handle.clone();
+            slint::invoke_from_event_loop(move || {
+                if let Some(ui) = handle.upgrade() {
+                    if let Ok(session) = result {
+                        let items: Vec<ChatMessage> = session
+                            .messages
+                            .iter()
+                            .map(|message| ChatMessage {
+                                role: message.role.clone().into(),
+                                content: message.content.clone().into(),
+                            })
+                            .collect();
+                        ui.set_chat_session_id(session.id.into());
+                        ui.set_chat_messages(ModelRc::new(VecModel::from(items)));
+                        ui.set_chat_status("Chat loaded".into());
+                    }
+                }
+            })
+            .ok();
+        });
+    });
+
+    let handle = ui.as_weak();
     ui.on_new_chat(move || {
         let handle = handle.clone();
         std::thread::spawn(move || {
@@ -804,6 +877,7 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                 if let Some(ui) = handle.upgrade() {
                     match result {
                         Ok(id) => {
+                            ui.set_coach_recents(false);
                             ui.set_chat_session_id(id.into());
                             ui.set_chat_messages(ModelRc::new(VecModel::from(
                                 Vec::<ChatMessage>::new(),

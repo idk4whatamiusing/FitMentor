@@ -412,6 +412,7 @@ pub struct ProfileInput {
     pub diet: String,
     pub days_per_week: i64,
     pub budget_per_day: i64,
+    pub health_conditions: Vec<String>,
 }
 
 pub fn save_profile(input: &ProfileInput) -> Result<Profile, String> {
@@ -427,7 +428,7 @@ pub fn save_profile(input: &ProfileInput) -> Result<Profile, String> {
         "diet": input.diet,
         "daysPerWeek": input.days_per_week,
         "budgetPerDay": input.budget_per_day,
-        "healthConditions": [],
+        "healthConditions": input.health_conditions,
     });
     let response = authorized_request("PUT", "/v1/user/profile", Some(body))?;
     let value: serde_json::Value = response
@@ -820,22 +821,48 @@ pub struct CoachSession {
     pub messages: Vec<CoachMessage>,
 }
 
-pub fn fetch_coach_session() -> Result<CoachSession, String> {
+#[derive(Debug, Clone)]
+pub struct CoachSessionSummaryView {
+    pub id: String,
+    pub title: String,
+    pub message_count: i64,
+}
+
+pub fn fetch_coach_sessions() -> Result<Vec<CoachSessionSummaryView>, String> {
     let response = authorized_get("/v1/coach/sessions")?;
     let list: serde_json::Value = response
         .into_json()
         .map_err(|error| format!("Could not parse chat sessions: {error}"))?;
-    let sessions = list.as_array().cloned().unwrap_or_default();
-    let existing_id = sessions
-        .first()
-        .and_then(|session| session.get("id"))
-        .and_then(serde_json::Value::as_str)
-        .unwrap_or("")
-        .to_string();
-    let id = if existing_id.is_empty() {
-        create_coach_session()?
+    Ok(list
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|session| CoachSessionSummaryView {
+            id: session
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("")
+                .to_string(),
+            title: session
+                .get("title")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("Chat")
+                .to_string(),
+            message_count: session
+                .get("message_count")
+                .and_then(serde_json::Value::as_i64)
+                .unwrap_or(0),
+        })
+        .collect())
+}
+
+pub fn fetch_coach_session() -> Result<CoachSession, String> {
+    let sessions = fetch_coach_sessions()?;
+    let id = if let Some(existing) = sessions.first() {
+        existing.id.clone()
     } else {
-        existing_id
+        create_coach_session()?
     };
     fetch_coach_messages(&id)
 }

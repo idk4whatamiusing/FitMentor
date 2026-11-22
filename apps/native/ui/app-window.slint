@@ -69,6 +69,12 @@ export struct CommunityPost {
     reply_count: int,
 }
 
+export struct CoachSessionSummary {
+    id: string,
+    title: string,
+    message_count: int,
+}
+
 export struct DayLog {
     date: string,
     water: int,
@@ -160,6 +166,8 @@ export component AppWindow inherits Window {
     in-out property <string> chat-status: "Ask about training, food, or recovery.";
     in-out property <string> chat-session-id: "";
     in-out property <bool> chat-busy: false;
+    in-out property <bool> coach-recents: false;
+    in-out property <[CoachSessionSummary]> coach-sessions: [];
     in-out property <[CommunityPost]> community-posts: [];
     in-out property <string> community-input: "";
     in-out property <string> community-status: "Load the community feed.";
@@ -171,6 +179,8 @@ export component AppWindow inherits Window {
     in-out property <string> community-reply-input: "";
     in-out property <string> community-reply-status: "";
     in-out property <int> tool: 0;
+    in-out property <string> bmi-weight: "";
+    in-out property <string> bmi-height: "";
     in-out property <string> tool-advice: "";
     in-out property <bool> tool-busy: false;
     in-out property <string> tool-input: "";
@@ -185,6 +195,10 @@ export component AppWindow inherits Window {
     in-out property <int> avg-protein: 0;
     in-out property <string> avg-sleep: "0";
     in-out property <string> weight-input: "";
+    in-out property <bool> payment-open: false;
+    in-out property <string> payment-tier: "pro";
+    in-out property <string> payment-name: "Basic";
+    in-out property <string> payment-price: "₹99 / month";
     in-out property <[QuickFood]> quick-foods: [];
 
     callback refresh();
@@ -199,6 +213,8 @@ export component AppWindow inherits Window {
     callback load-workout();
     callback complete-workout(int, string);
     callback load-chat();
+    callback load-coach-sessions();
+    callback switch-chat(string);
     callback send-chat();
     callback new-chat();
     callback load-community();
@@ -1127,14 +1143,14 @@ export component AppWindow inherits Window {
                                 width: 660px;
                                 spacing: 8px;
 
-                            Chip { label: "BMI"; active: root.tool == 0; clicked => { root.tool = 0; } }
-                            Chip { label: "Sleep"; active: root.tool == 1; clicked => { root.tool = 1; } }
-                            Chip { label: "Steps"; active: root.tool == 2; clicked => { root.tool = 2; } }
-                            Chip { label: "Injury"; active: root.tool == 3; clicked => { root.tool = 3; } }
-                            Chip { label: "Supplements"; active: root.tool == 4; clicked => { root.tool = 4; } }
-                            Chip { label: "Calories"; active: root.tool == 5; clicked => { root.tool = 5; } }
-                            Chip { label: "Form"; active: root.tool == 6; clicked => { root.tool = 6; } }
-                                Chip { label: "Community"; active: root.tool == 7; clicked => { root.tool = 7; } }
+                            ToolChip { label: "BMI"; kind: 0; icon: @image-url("icons/scale.png"); active: root.tool == 0; clicked => { root.tool = 0; } }
+                            ToolChip { label: "Sleep"; kind: 1; icon: @image-url("icons/moon.png"); active: root.tool == 1; clicked => { root.tool = 1; } }
+                            ToolChip { label: "Steps"; kind: 2; icon: @image-url("icons/footprints.png"); active: root.tool == 2; clicked => { root.tool = 2; } }
+                            ToolChip { label: "Injury"; kind: 3; icon: @image-url("icons/heart-pulse.png"); active: root.tool == 3; clicked => { root.tool = 3; } }
+                            ToolChip { label: "Supplements"; kind: 4; icon: @image-url("icons/pill.png"); active: root.tool == 4; clicked => { root.tool = 4; } }
+                            ToolChip { label: "Calories"; kind: 5; icon: @image-url("icons/calendar-days.png"); active: root.tool == 5; clicked => { root.tool = 5; } }
+                            ToolChip { label: "Form"; kind: 6; icon: @image-url("icons/shapes.png"); active: root.tool == 6; clicked => { root.tool = 6; } }
+                                ToolChip { label: "Community"; kind: 7; icon: @image-url("icons/users.png"); active: root.tool == 7; clicked => { root.tool = 7; } }
                             }
                         }
                     }
@@ -1156,20 +1172,12 @@ export component AppWindow inherits Window {
                         Text { text: "BMI analyzer"; color: Theme.text; font-size: 26px; font-weight: 600; letter-spacing: -0.8px; }
                         Text { text: "Body mass index is a rough screen, not a verdict."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
                         HorizontalLayout {
-                            spacing: 24px;
-                            VerticalLayout {
-                                spacing: 6px;
-                                Text { text: "WEIGHT"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
-                                Text { text: "\{root.profile-weight}"; color: Theme.text; font-size: 30px; font-weight: 500; }
-                            }
-                            VerticalLayout {
-                                spacing: 6px;
-                                Text { text: "HEIGHT"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.4px; }
-                                Text { text: "\{root.profile-height}"; color: Theme.text; font-size: 30px; font-weight: 500; }
-                            }
+                            spacing: 20px;
+                            BigField { label: "WEIGHT (KG)"; placeholder: "70"; text <=> root.bmi-weight; }
+                            BigField { label: "HEIGHT (CM)"; placeholder: "175"; text <=> root.bmi-height; }
                         }
                         Text {
-                            text: "Your BMI: " + round(root.profile-weight * 10000 / max(1, root.profile-height * root.profile-height) * 10) / 10;
+                            text: "Your BMI: \{round(root.bmi-weight.to-float() * 10000 / max(1, root.bmi-height.to-float() * root.bmi-height.to-float()) * 10) / 10}";
                             color: Theme.text;
                             font-size: 18px;
                             font-weight: 500;
@@ -1316,14 +1324,20 @@ export component AppWindow inherits Window {
                                 Text { text: post.author; color: Theme.accent; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
                                 Text { text: post.text; color: Theme.text; font-size: 14px; wrap: word-wrap; }
                                 HorizontalLayout {
-                                    spacing: 14px;
-                                    Text { text: post.liked_by_me ? "♥ \{post.likes}" : "♡ \{post.likes}"; color: post.liked_by_me ? Theme.accent : Theme.muted; font-size: 12px; }
-                                    Text { text: "\{post.reply_count} replies"; color: Theme.muted; font-size: 12px; }
-                                }
-                                TouchArea {
-                                    width: 100%;
-                                    height: 100%;
-                                    clicked => { root.open-community-post(post.id); }
+                                    spacing: 8px;
+                                    GhostButton {
+                                        label: post.liked_by_me ? "LIKED \{post.likes}" : "LIKE \{post.likes}";
+                                        active: post.liked_by_me;
+                                        stretch: false;
+                                        width: 96px;
+                                        clicked => { root.like-community(post.id); }
+                                    }
+                                    GhostButton {
+                                        label: "\{post.reply_count} REPLIES";
+                                        stretch: false;
+                                        width: 104px;
+                                        clicked => { root.open-community-post(post.id); }
+                                    }
                                 }
                             }
                         }
@@ -1347,7 +1361,15 @@ export component AppWindow inherits Window {
                         Text { text: "Your profile, targets, and training history are already in the room."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
                         HorizontalLayout {
                             spacing: 8px;
-                            GhostButton { label: "RECENTS"; stretch: false; width: 102px; }
+                            GhostButton {
+                                label: "RECENTS";
+                                stretch: false;
+                                width: 102px;
+                                clicked => {
+                                    root.coach-recents = true;
+                                    root.load-coach-sessions();
+                                }
+                            }
                             GhostButton { label: "NEW CHAT"; stretch: false; width: 106px; clicked => { root.new-chat(); } }
                         }
                     }
@@ -1711,7 +1733,7 @@ export component AppWindow inherits Window {
                                         Feature { label: "Custom meal plans"; }
                                         Feature { label: "Advanced analytics"; }
                                     }
-                                    TouchArea { width: 100%; height: 100%; clicked => { root.checkout("pro"); } }
+                                    TouchArea { width: 100%; height: 100%; clicked => { root.payment-tier = "pro"; root.payment-name = "Basic"; root.payment-price = "₹99 / month"; root.payment-open = true; } }
                                 }
 
                                 Rectangle {
@@ -1739,7 +1761,7 @@ export component AppWindow inherits Window {
                                         Feature { label: "Photo macros"; }
                                         Feature { label: "Progress reports"; }
                                     }
-                                    TouchArea { width: 100%; height: 100%; clicked => { root.checkout("premium"); } }
+                                    TouchArea { width: 100%; height: 100%; clicked => { root.payment-tier = "premium"; root.payment-name = "Elite"; root.payment-price = "₹299 / month"; root.payment-open = true; } }
                                 }
                             }
                         }
@@ -2388,6 +2410,116 @@ export component AppWindow inherits Window {
             }
 
             if root.community-reply-status != "" : Text { text: root.community-reply-status; color: #E5484D; font-size: 11px; wrap: word-wrap; }
+        }
+    }
+
+    // ================================================================
+    // Checkout
+    // ================================================================
+    if root.payment-open : Rectangle {
+        background: rgba(0, 0, 0, 0.65);
+
+        Rectangle {
+            x: (root.width - 340px) / 2;
+            y: root.height - 360px;
+            width: 340px;
+            height: 240px;
+            border-radius: 28px;
+            background: Theme.surface;
+            border-width: 1px;
+            border-color: Theme.line;
+
+            VerticalLayout {
+                padding: 24px;
+                spacing: 10px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    SectionLabel { label: "CHECKOUT"; }
+                    Rectangle {
+                        width: 32px;
+                        height: 32px;
+                        border-radius: 16px;
+                        background: Theme.surface-2;
+                        Text { width: 100%; height: 100%; text: "×"; color: Theme.muted; font-size: 18px; horizontal-alignment: center; vertical-alignment: center; }
+                        TouchArea { width: 100%; height: 100%; clicked => { root.payment-open = false; } }
+                    }
+                }
+
+                Text { text: root.payment-name; color: Theme.text; font-size: 24px; font-weight: 600; }
+                Text { text: root.payment-price; color: Theme.accent; font-size: 18px; font-weight: 500; }
+                Text { text: "You'll be redirected to Polar to finish the payment."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+
+                GhostButton {
+                    label: "CONTINUE TO CHECKOUT";
+                    clicked => {
+                        root.payment-open = false;
+                        root.checkout(root.payment-tier);
+                    }
+                }
+            }
+        }
+    }
+
+    // ================================================================
+    // Coach recents
+    // ================================================================
+    if root.coach-recents : Rectangle {
+        background: Theme.bg;
+
+        VerticalLayout {
+            x: 0;
+            y: 0;
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            spacing: 14px;
+            alignment: start;
+
+            HorizontalLayout {
+                alignment: space-between;
+                Text { text: "Recents"; color: Theme.text; font-size: 28px; font-weight: 600; vertical-alignment: center; }
+                GhostButton { label: "CLOSE"; stretch: false; width: 78px; clicked => { root.coach-recents = false; } }
+            }
+
+            ScrollView {
+                height: root.height - 120px;
+                VerticalLayout {
+                    width: 100%;
+                    spacing: 8px;
+
+                    if root.coach-sessions.length == 0 : Text {
+                        text: "No conversations yet.";
+                        color: Theme.muted;
+                        font-size: 13px;
+                    }
+
+                    for session in root.coach-sessions : Rectangle {
+                        height: 64px;
+                        border-radius: 18px;
+                        background: Theme.surface;
+                        border-width: 1px;
+                        border-color: session.id == root.chat-session-id ? Theme.accent : Theme.line;
+
+                        VerticalLayout {
+                            padding-left: 16px;
+                            padding-right: 16px;
+                            spacing: 2px;
+                            Text { text: session.title; color: Theme.text; font-size: 14px; font-weight: 600; }
+                            Text { text: "\{session.message_count} messages"; color: Theme.muted; font-size: 11px; }
+                        }
+
+                        TouchArea {
+                            width: 100%;
+                            height: 100%;
+                            clicked => {
+                                root.coach-recents = false;
+                                root.switch-chat(session.id);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
