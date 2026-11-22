@@ -203,6 +203,8 @@ export component GhostButton inherits Rectangle {
     in property <string> label: "";
     in property <bool> active: false;
     in property <bool> stretch: true;
+    in property <bool> show-icon: false;
+    in property <image> icon;
     callback clicked();
 
     horizontal-stretch: root.stretch ? 1 : 0;
@@ -215,7 +217,15 @@ export component GhostButton inherits Rectangle {
     HorizontalLayout {
         padding-left: 14px;
         padding-right: 14px;
+        spacing: 6px;
         alignment: center;
+
+        Icon {
+            size: 14px;
+            tint: root.active ? Theme.accent : Theme.muted;
+            source: root.icon;
+            visible: root.show-icon;
+        }
 
         Text {
             text: root.label;
@@ -489,6 +499,7 @@ export component Field inherits VerticalLayout {
 }
 
 export component BigField inherits VerticalLayout {
+    horizontal-stretch: 1;
     in property <string> label: "";
     in property <string> placeholder: "";
     in-out property <string> text;
@@ -541,6 +552,7 @@ export component BigField inherits VerticalLayout {
 }
 
 export component CycleField inherits VerticalLayout {
+    horizontal-stretch: 1;
     in property <string> label: "";
     in property <string> value: "";
     callback clicked();
@@ -600,6 +612,7 @@ export component BackButton inherits Rectangle {
 
     HorizontalLayout {
         spacing: 6px;
+        cross-axis-alignment: center;
         Icon { size: 16px; tint: Theme.muted; source: @image-url("icons/arrow-left.png"); }
         Text {
             text: root.label;
@@ -925,6 +938,22 @@ export component SliderTrack inherits Rectangle {
             root.value = round(stepped);
             root.changed(root.value);
         }
+    }
+}
+
+export component Feature inherits HorizontalLayout {
+    in property <string> label: "";
+
+    spacing: 8px;
+    alignment: start;
+
+    Icon { size: 13px; tint: Theme.accent; source: @image-url("icons/check.png"); }
+    Text {
+        text: root.label;
+        color: Theme.muted;
+        font-size: 11px;
+        vertical-alignment: center;
+        horizontal-stretch: 1;
     }
 }
 

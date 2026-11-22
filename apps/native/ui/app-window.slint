@@ -10,6 +10,7 @@ import {
     ChoiceChip,
     CycleField,
     Divider,
+    Feature,
     Field,
     GhostButton,
     Icon,
@@ -522,7 +523,7 @@ export component AppWindow inherits Window {
                                     label: "DAILY HABITS";
                                 }
                                 Text {
-                                    text: "HABITS";
+                                    text: "\{round((min(100, root.water * 100 / 8) + (root.custom-protein > 0 ? min(100, root.protein * 100 / max(1, root.custom-protein)) : min(100, root.protein * 100 / max(1, root.target-protein)))) / 2)}%";
                                     color: Theme.muted;
                                     font-size: 10px;
                                     font-weight: 600;
@@ -598,13 +599,17 @@ export component AppWindow inherits Window {
                                 padding-top: 14px;
 
                                 GhostButton {
-                                    label: "+ ONE GLASS";
+                                    label: "ONE GLASS";
+                                    show-icon: true;
+                                    icon: @image-url("icons/plus.png");
                                     stretch: false;
-                                    width: 124px;
+                                    width: 122px;
                                     clicked => { root.add-water(); }
                                 }
                                 GhostButton {
-                                    label: "+ 20 G PROTEIN";
+                                    label: "20 G PROTEIN";
+                                    show-icon: true;
+                                    icon: @image-url("icons/plus.png");
                                     stretch: false;
                                     width: 140px;
                                     clicked => { root.add-protein(); }
@@ -758,6 +763,15 @@ export component AppWindow inherits Window {
                                         width: 126px;
                                         clicked => {
                                             root.chat-input = "I missed three days. What now?";
+                                            root.send-chat();
+                                        }
+                                    }
+                                    GhostButton {
+                                        label: "MY PLAN?";
+                                        stretch: false;
+                                        width: 104px;
+                                        clicked => {
+                                            root.chat-input = "Is my workout plan good?";
                                             root.send-chat();
                                         }
                                     }
@@ -1537,32 +1551,37 @@ export component AppWindow inherits Window {
 
                     if root.nutrition-tab == 0 : VerticalLayout {
                         spacing: 12px;
+
                         if root.nutrition-meals.length > 0 : Rectangle {
-                            border-radius: 20px;
+                            border-radius: Theme.radius-card;
                             background: Theme.surface;
                             border-width: 1px;
                             border-color: Theme.line;
+
                             VerticalLayout {
-                                padding: 18px;
-                                spacing: 4px;
-                                SectionLabel { label: "MEAL PLAN"; }
-                                Text { text: root.nutrition-title; color: Theme.text; font-size: 18px; font-weight: 600; }
-                            }
-                        }
-                        for meal in root.nutrition-meals : Rectangle {
-                            border-radius: 20px;
-                            background: Theme.surface;
-                            border-width: 1px;
-                            border-color: Theme.line;
-                            VerticalLayout {
-                                padding: 16px;
-                                spacing: 6px;
-                                HorizontalLayout {
-                                    Text { text: meal.name; color: Theme.text; font-size: 15px; font-weight: 600; horizontal-stretch: 1; }
-                                    Text { text: "\{meal.kcal} kcal"; color: Theme.accent; font-size: 11px; vertical-alignment: center; }
+                                padding: 0;
+                                spacing: 0;
+
+                                VerticalLayout {
+                                    padding: 20px;
+                                    spacing: 4px;
+                                    SectionLabel { label: "MEAL PLAN"; }
+                                    Text { text: root.nutrition-title; color: Theme.text; font-size: 18px; font-weight: 600; }
                                 }
-                                Text { text: meal.items; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
-                                Text { text: "\{meal.protein} g protein"; color: Theme.text; font-size: 10px; font-weight: 600; }
+
+                                for meal in root.nutrition-meals : VerticalLayout {
+                                    padding: 16px;
+                                    spacing: 6px;
+
+                                    Rectangle { height: 1px; background: Theme.line; }
+
+                                    HorizontalLayout {
+                                        Text { text: meal.name; color: Theme.text; font-size: 15px; font-weight: 600; horizontal-stretch: 1; }
+                                        Text { text: "\{meal.kcal} kcal"; color: Theme.accent; font-size: 11px; vertical-alignment: center; }
+                                    }
+                                    Text { text: meal.items; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                                    Text { text: "\{meal.protein} g protein"; color: Theme.text; font-size: 10px; font-weight: 600; }
+                                }
                             }
                         }
                     }
@@ -1611,30 +1630,132 @@ export component AppWindow inherits Window {
                             horizontal-stretch: 1;
                             SectionLabel { index: "You"; label: "PROFILE"; }
                             Text { text: root.profile-name; color: Theme.text; font-size: 36px; font-weight: 600; letter-spacing: -1.2px; }
-                            Text { text: root.profile-email; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                            Text {
+                                text: root.profile-goal + " · " + root.profile-experience + " · " + root.profile-place;
+                                color: Theme.muted;
+                                font-size: 13px;
+                                wrap: word-wrap;
+                            }
                         }
                     }
 
-                    Rectangle {
+                    GhostButton {
+                        label: "EDIT PROFILE";
+                        show-icon: true;
+                        icon: @image-url("icons/sparkles.png");
+                        stretch: false;
+                        width: 152px;
+                        clicked => { root.edit-profile(); }
+                    }
+
+                    if root.profile-tier == "Free" : Rectangle {
                         border-radius: Theme.radius-card;
                         background: Theme.surface;
                         border-width: 1px;
                         border-color: Theme.line;
+
                         VerticalLayout {
                             padding: 24px;
-                            spacing: 12px;
-                            SectionLabel { label: "CURRENT PLAN"; }
+                            spacing: 16px;
+
+                            SectionLabel { label: "MEMBERSHIP"; }
+
+                            HorizontalLayout {
+                                spacing: 12px;
+                                VerticalLayout {
+                                    spacing: 6px;
+                                    horizontal-stretch: 1;
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        Icon { size: 18px; tint: Theme.accent; source: @image-url("icons/crown.png"); }
+                                        Text { text: "Go premium"; color: Theme.text; font-size: 24px; font-weight: 600; }
+                                    }
+                                    Text {
+                                        text: "Unlock the full coach, custom meal plans, and form feedback. Cancel any time.";
+                                        color: Theme.muted;
+                                        font-size: 13px;
+                                        wrap: word-wrap;
+                                    }
+                                }
+                                Rectangle {
+                                    width: 40px;
+                                    height: 40px;
+                                    border-radius: 20px;
+                                    background: Theme.accent;
+                                    Icon { x: 12px; y: 12px; size: 16px; tint: Theme.ink; source: @image-url("icons/arrow-up-right.png"); }
+                                }
+                            }
+
+                            VerticalLayout {
+                                spacing: 12px;
+
+                                Rectangle {
+                                    width: 100%;
+                                    border-radius: 20px;
+                                    background: Theme.bg;
+                                    border-width: 1px;
+                                    border-color: Theme.line;
+                                    VerticalLayout {
+                                        padding: 20px;
+                                        spacing: 8px;
+                                        Text { text: "BASIC"; color: Theme.text; font-family: Theme.font-wordmark; font-size: 11px; letter-spacing: 1.6px; }
+                                        HorizontalLayout {
+                                            spacing: 3px;
+                                            Text { text: "₹99"; color: Theme.text; font-size: 30px; font-weight: 500; }
+                                            Text { text: "/month"; color: Theme.muted; font-size: 11px; vertical-alignment: bottom; }
+                                        }
+                                        Feature { label: "Unlimited AI coach"; }
+                                        Feature { label: "Custom meal plans"; }
+                                        Feature { label: "Advanced analytics"; }
+                                    }
+                                    TouchArea { width: 100%; height: 100%; clicked => { root.checkout("pro"); } }
+                                }
+
+                                Rectangle {
+                                    width: 100%;
+                                    border-radius: 20px;
+                                    background: Theme.accent-soft;
+                                    border-width: 1px;
+                                    border-color: Theme.accent;
+                                    VerticalLayout {
+                                        padding: 20px;
+                                        spacing: 8px;
+                                        HorizontalLayout {
+                                            alignment: space-between;
+                                            Text { text: "ELITE"; color: Theme.text; font-family: Theme.font-wordmark; font-size: 11px; letter-spacing: 1.6px; }
+                                            Pill { label: "BEST"; accent: true; }
+                                        }
+                                        HorizontalLayout {
+                                            spacing: 3px;
+                                            Text { text: "₹299"; color: Theme.text; font-size: 30px; font-weight: 500; }
+                                            Text { text: "/month"; color: Theme.muted; font-size: 11px; vertical-alignment: bottom; }
+                                        }
+                                        Feature { label: "Everything in Basic"; }
+                                        Feature { label: "Form analyzer"; }
+                                        Feature { label: "Photo macros"; }
+                                        Feature { label: "Progress reports"; }
+                                    }
+                                    TouchArea { width: 100%; height: 100%; clicked => { root.checkout("premium"); } }
+                                }
+                            }
+                        }
+                    }
+
+                    if root.profile-tier != "Free" : Rectangle {
+                        border-radius: Theme.radius-card;
+                        background: Theme.ink;
+                        border-width: 1px;
+                        border-color: rgba(247, 243, 237, 0.14);
+                        VerticalLayout {
+                            padding: 24px;
+                            spacing: 8px;
+                            SectionLabel { label: "ACTIVE PLAN"; on-dark: true; }
                             Text { text: root.profile-tier; color: Theme.accent; font-size: 30px; font-weight: 600; }
                             Text {
                                 text: "Goal: " + root.profile-goal + "  ·  " + root.profile-diet + "  ·  " + root.profile-days + "× / week";
-                                color: Theme.muted;
+                                color: Theme.muted-on-ink;
                                 font-size: 12px;
                                 wrap: word-wrap;
-                            }
-                            HorizontalLayout {
-                                spacing: 8px;
-                                GhostButton { label: "BASIC ₹99"; clicked => { root.checkout("pro"); } }
-                                GhostButton { label: "ELITE ₹299"; clicked => { root.checkout("premium"); } }
                             }
                         }
                     }
@@ -1655,21 +1776,61 @@ export component AppWindow inherits Window {
                         background: Theme.surface;
                         border-width: 1px;
                         border-color: Theme.line;
+
                         VerticalLayout {
-                            padding: 20px;
-                            spacing: 14px;
+                            padding: 24px;
+                            spacing: 0;
+
+                            SectionLabel { label: "SETTINGS"; }
+
                             HorizontalLayout {
+                                padding-top: 14px;
+                                padding-bottom: 14px;
                                 alignment: space-between;
-                                Text { text: "Theme"; color: Theme.text; font-size: 14px; font-weight: 500; vertical-alignment: center; horizontal-stretch: 1; }
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    Text { text: "Theme"; color: Theme.text; font-size: 14px; font-weight: 500; }
+                                    Text { text: "Light or dark"; color: Theme.muted; font-size: 11px; }
+                                }
                                 IconButton {
                                     icon: Theme.dark ? @image-url("icons/sun.png") : @image-url("icons/moon.png");
                                     clicked => { root.toggle-theme(); }
                                 }
                             }
+
                             Rectangle { height: 1px; background: Theme.line; }
-                            GhostButton { label: "EDIT PROFILE"; clicked => { root.edit-profile(); } }
-                            GhostButton { label: "REFRESH PROFILE"; clicked => { root.load-profile(); } }
-                            GhostButton { label: "SIGN OUT"; clicked => { root.sign-out(); } }
+
+                            HorizontalLayout {
+                                padding-top: 14px;
+                                padding-bottom: 14px;
+                                alignment: space-between;
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    Text { text: "Edit profile"; color: Theme.text; font-size: 14px; font-weight: 500; }
+                                    Text { text: "Goal, body, food budget"; color: Theme.muted; font-size: 11px; }
+                                }
+                                IconButton {
+                                    icon: @image-url("icons/arrow-up-right.png");
+                                    clicked => { root.edit-profile(); }
+                                }
+                            }
+
+                            Rectangle { height: 1px; background: Theme.line; }
+
+                            HorizontalLayout {
+                                padding-top: 14px;
+                                padding-bottom: 14px;
+                                alignment: space-between;
+                                VerticalLayout {
+                                    spacing: 2px;
+                                    Text { text: "Sign out"; color: Theme.text; font-size: 14px; font-weight: 500; }
+                                    Text { text: "Clear your session"; color: Theme.muted; font-size: 11px; }
+                                }
+                                IconButton {
+                                    icon: @image-url("icons/log-out.png");
+                                    clicked => { root.sign-out(); }
+                                }
+                            }
                         }
                     }
 
