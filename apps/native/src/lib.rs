@@ -163,6 +163,18 @@ fn finish_google_error(handle: &slint::Weak<AppWindow>, message: &str) {
 
 pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
     let ui = AppWindow::new()?;
+    #[cfg(not(target_os = "android"))]
+    {
+        let width = env::var("FITMENTOR_WIDTH")
+            .ok()
+            .and_then(|value| value.parse::<f32>().ok())
+            .unwrap_or(390.0);
+        let height = env::var("FITMENTOR_HEIGHT")
+            .ok()
+            .and_then(|value| value.parse::<f32>().ok())
+            .unwrap_or(844.0);
+        ui.window().set_size(slint::LogicalSize::new(width, height));
+    }
     if let Some(dark) = api::load_theme_dark() {
         ui.set_dark_mode(dark);
     }

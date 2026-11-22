@@ -246,8 +246,6 @@ export component AppWindow inherits Window {
 
     title: "FitMentor";
     icon: @image-url("images/app-icon.png");
-    width: 390px;
-    height: 844px;
     background: Theme.bg;
     default-font-family: Theme.font-body;
 
@@ -262,43 +260,43 @@ export component AppWindow inherits Window {
     // ================================================================
     // Signed-in app
     // ================================================================
-    if root.signed-in && !root.needs-onboarding : Rectangle {
-        background: Theme.bg;
+    if root.signed-in && !root.needs-onboarding : VerticalLayout {
+        width: 100%;
+        height: 100%;
 
         TopBar {
-            y: 0;
-            width: 100%;
             toggle-theme => {
                 root.toggle-theme();
             }
         }
 
-        ScrollView {
-            x: 0;
-            y: Theme.header-h;
+        main-scroll := ScrollView {
+            vertical-stretch: 1;
             width: 100%;
-            height: root.height - Theme.header-h;
+            vertical-scrollbar-policy: always-off;
 
-            VerticalLayout {
-                width: 100%;
-                padding-left: Theme.page-pad;
-                padding-right: Theme.page-pad;
-                padding-top: 32px;
-                padding-bottom: 112px;
+            content := VerticalLayout {
+                x: Theme.page-pad;
+                width: main-scroll.width - 2 * Theme.page-pad;
+                padding-top: 24px;
+                padding-bottom: 24px;
                 spacing: 16px;
-                alignment: start;
+                alignment: stretch;
+                cross-axis-alignment: stretch;
+
 
                 // --------------------------------------------------------
                 // HOME
                 // --------------------------------------------------------
                 if root.tab == 0 : VerticalLayout {
+                    width: main-scroll.width - 2 * Theme.page-pad;
                     spacing: 16px;
-                    alignment: start;
+                    alignment: stretch;
 
                     VerticalLayout {
                         spacing: 12px;
                         horizontal-stretch: 1;
-                        alignment: start;
+                        alignment: stretch;
 
                         SectionLabel {
                             index: root.today-day;
@@ -312,18 +310,18 @@ export component AppWindow inherits Window {
                             Text {
                                 text: "Hey,";
                                 color: Theme.text;
-                                font-size: 36px;
+                                font-size: 32px;
                                 font-weight: 600;
-                                letter-spacing: -1.4px;
+                                letter-spacing: -1.2px;
                                 vertical-alignment: bottom;
                             }
 
                             Text {
                                 text: root.first-name + ".";
                                 color: Theme.accent;
-                                font-size: 36px;
+                                font-size: 32px;
                                 font-weight: 600;
-                                letter-spacing: -1.4px;
+                                letter-spacing: -1.2px;
                                 vertical-alignment: bottom;
                             }
                         }
@@ -342,11 +340,10 @@ export component AppWindow inherits Window {
                         }
                     }
 
-                    Rectangle { height: 16px; }
-
                     // Session hero
                     Rectangle {
-                        height: 300px;
+                        width: 100%;
+                        height: 240px;
                         border-radius: Theme.radius-hero;
                         clip: true;
                         background: Theme.ink;
@@ -366,12 +363,12 @@ export component AppWindow inherits Window {
                         }
 
                         VerticalLayout {
-                            padding: 28px;
+                            padding: 20px;
                             spacing: 0;
                             alignment: space-between;
 
                             VerticalLayout {
-                                spacing: 12px;
+                                spacing: 8px;
 
                                 Pill {
                                     label: "TODAY'S SESSION";
@@ -381,16 +378,16 @@ export component AppWindow inherits Window {
                                 Text {
                                     text: root.session-title;
                                     color: Theme.cream;
-                                    font-size: 30px;
+                                    font-size: 26px;
                                     font-weight: 600;
-                                    letter-spacing: -1px;
+                                    letter-spacing: -0.8px;
                                     wrap: word-wrap;
                                 }
 
                                 Text {
                                     text: root.session-focus + (root.session-meta != "" ? " · " + root.session-meta : "");
                                     color: rgba(247, 243, 237, 0.6);
-                                    font-size: 14px;
+                                    font-size: 13px;
                                     wrap: word-wrap;
                                 }
                             }
@@ -880,6 +877,7 @@ export component AppWindow inherits Window {
                 // TRAIN
                 // --------------------------------------------------------
                 if root.tab == 1 : VerticalLayout {
+                    width: main-scroll.width - 2 * Theme.page-pad;
                     spacing: 16px;
                     alignment: start;
 
@@ -1053,7 +1051,7 @@ export component AppWindow inherits Window {
                                             width: 100%;
                                             height: 100%;
                                             text: day.completed ? "COMPLETED" : "MARK SESSION COMPLETE";
-                                            color: day.completed ? Theme.muted : Theme.cream;
+                                            color: day.completed ? Theme.muted : (Theme.dark ? Theme.ink : Theme.cream);
                                             font-size: 13px;
                                             font-weight: 600;
                                             horizontal-alignment: center;
@@ -1112,6 +1110,7 @@ export component AppWindow inherits Window {
                 // TOOLS
                 // --------------------------------------------------------
                 if root.tab == 4 : VerticalLayout {
+                    width: main-scroll.width - 2 * Theme.page-pad;
                     spacing: 16px;
                     alignment: start;
 
@@ -1426,6 +1425,7 @@ export component AppWindow inherits Window {
                 // COACH
                 // --------------------------------------------------------
                 if root.tab == 3 : VerticalLayout {
+                    width: main-scroll.width - 2 * Theme.page-pad;
                     spacing: 16px;
                     alignment: start;
 
@@ -1547,6 +1547,7 @@ export component AppWindow inherits Window {
                 // FOOD
                 // --------------------------------------------------------
                 if root.tab == 2 : VerticalLayout {
+                    width: main-scroll.width - 2 * Theme.page-pad;
                     spacing: 16px;
                     alignment: start;
 
@@ -1719,6 +1720,7 @@ export component AppWindow inherits Window {
                 // YOU
                 // --------------------------------------------------------
                 if root.tab == 5 : VerticalLayout {
+                    width: main-scroll.width - 2 * Theme.page-pad;
                     spacing: 16px;
                     alignment: start;
 
@@ -1952,9 +1954,7 @@ export component AppWindow inherits Window {
         }
 
         BottomNav {
-            x: 16px;
-            y: root.height - 88px;
-            width: root.width - 32px;
+            width: 100%;
             active: root.tab;
             select(tab) => {
                 root.set-tab(tab);
