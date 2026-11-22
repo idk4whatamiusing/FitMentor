@@ -467,6 +467,11 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                             "premium" => "Elite",
                             _ => "Free",
                         };
+                        let targets = api::calc_targets(&profile);
+                        ui.set_target_calories(targets.calories as i32);
+                        ui.set_target_protein(targets.protein as i32);
+                        ui.set_target_carbs(targets.carbs as i32);
+                        ui.set_target_fat(targets.fat as i32);
                         let needs_onboarding = profile.name == "Friend";
                         if env::var("FITMENTOR_ONBOARDING")
                             .map(|v| v == "1")
@@ -594,6 +599,11 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                                 "premium" => "Elite",
                                 _ => "Free",
                             };
+                            let targets = api::calc_targets(&profile);
+                            ui.set_target_calories(targets.calories as i32);
+                            ui.set_target_protein(targets.protein as i32);
+                            ui.set_target_carbs(targets.carbs as i32);
+                            ui.set_target_fat(targets.fat as i32);
                             ui.set_needs_onboarding(false);
                             ui.set_form_error("".into());
                             ui.set_first_name(first_word(&profile.name).into());
