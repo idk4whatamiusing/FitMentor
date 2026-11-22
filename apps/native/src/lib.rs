@@ -25,16 +25,25 @@ fn first_word(name: &str) -> String {
         .to_string()
 }
 
-fn friendly_session_title(title: &str, focus: &str) -> String {
-    let focus = focus.to_lowercase();
-    if focus.contains("chest") || focus.contains("shoulder") || focus.contains("tricep") {
-        "Push Day".into()
-    } else if focus.contains("back") || focus.contains("bicep") {
-        "Pull Day".into()
-    } else if focus.contains("quad") || focus.contains("hamstring") || focus.contains("glute") {
-        "Leg Day".into()
-    } else {
-        title.to_string()
+fn balance_title(title: &str) -> String {
+    let chars: Vec<char> = title.chars().collect();
+    if chars.len() <= 18 {
+        return title.to_string();
+    }
+    let midpoint = chars.len() / 2;
+    let split = chars
+        .iter()
+        .enumerate()
+        .filter(|(_, value)| **value == ' ')
+        .min_by_key(|(index, _)| (*index as isize - midpoint as isize).abs())
+        .map(|(index, _)| index);
+    match split {
+        Some(index) => format!(
+            "{}\n{}",
+            chars[..index].iter().collect::<String>(),
+            chars[index + 1..].iter().collect::<String>()
+        ),
+        None => title.to_string(),
     }
 }
 
@@ -458,6 +467,12 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
         let handle = handle.clone();
         std::thread::spawn(move || {
             let result = api::fetch_profile();
+            let fallback_name = match &result {
+                Ok(profile) if profile.name == "Friend" => api::load_token()
+                    .and_then(|token| api::fetch_me(&token).ok())
+                    .map(|user| user.name),
+                _ => None,
+            };
             let handle = handle.clone();
             slint::invoke_from_event_loop(move || {
                 if let Some(ui) = handle.upgrade() {
@@ -498,7 +513,15 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                         ui.set_form_budget(profile.budget_per_day.to_string().into());
                         ui.set_form_days_num(profile.days_per_week as i32);
                         ui.set_form_budget_num(profile.budget_per_day as i32);
-                        let name = profile.name;
+                        let profile_name = profile.name.clone();
+                        let name = if profile_name.trim().is_empty() || profile_name == "Friend" {
+                            fallback_name
+                                .clone()
+                                .filter(|name| !name.trim().is_empty() && name != "Friend")
+                                .unwrap_or(profile_name)
+                        } else {
+                            profile_name
+                        };
                         ui.set_first_name(first_word(&name).into());
                         ui.set_user_name(name.clone().into());
                         ui.set_profile_name(name.into());
@@ -725,7 +748,7 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                                     .num_days_from_sunday()
                                     as usize;
                                 let day = &items[weekday % items.len()];
-                                ui.set_session_title(day.title.clone().into());
+                                ui.set_session_title(balance_title(&day.title).into());
                                 ui.set_session_focus(day.focus.clone().into());
                                 ui.set_session_meta(
                                     format!("{} moves · ~45 min", day.exercises.row_count()).into(),
