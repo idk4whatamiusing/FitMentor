@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { loadProfile, saveProfile, calcTargets, type Profile } from "@/utils/profile";
 import {
@@ -30,6 +30,7 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function DashboardPage() {
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [log, setLog] = useState<DailyLog | null>(null);
   const [streak, setStreak] = useState(0);
@@ -63,11 +64,11 @@ function DashboardPage() {
             saveProfile(profile);
             p = profile;
           } else {
-            window.location.href = "/onboarding";
+            navigate({ to: "/onboarding", replace: true });
             return;
           }
         } catch {
-          window.location.href = "/onboarding";
+          navigate({ to: "/onboarding", replace: true });
           return;
         }
       }

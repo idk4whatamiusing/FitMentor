@@ -6,14 +6,21 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+// The native shell ships the app as static assets, so the mobile build skips
+// Nitro entirely and emits a client-only SPA into dist-mobile.
+const mobile = process.env.FITMENTOR_TARGET === "mobile";
+
 export default defineConfig({
-  nitro: { preset: "cloudflare-pages" },
-  tanstackStart: {
-    // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
-    // nitro/vite builds from this
-    server: { entry: "server" },
-  },
+  nitro: mobile ? false : { preset: "cloudflare-pages" },
+  tanstackStart: mobile
+    ? { spa: { enabled: true } }
+    : {
+        // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
+        // nitro/vite builds from this
+        server: { entry: "server" },
+      },
   vite: {
     server: { allowedHosts: true },
+    ...(mobile ? { build: { outDir: "dist-mobile", emptyOutDir: true } } : {}),
   },
 });

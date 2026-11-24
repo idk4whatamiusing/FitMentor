@@ -18,6 +18,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-mobile
 .output
 .vinxi
 .tanstack/**
@@ -41,12 +42,8 @@ dist-ssr
 .vercel
 
 # Capacitor (generated in CI)
-android/
+/ui/android/
 capacitor.config.*
-
-# Native app Android resources are source, not generated.
-!apps/native/android/
-!apps/native/android/**
 
 # Rust / Workers
 api/target/
@@ -76,6 +73,3 @@ crash.log
 # Python
 __pycache__/
 *.pyc
-
-# Slint app build
-apps/native/target/

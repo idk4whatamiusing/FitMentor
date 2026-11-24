@@ -1,0 +1,43 @@
+{
+  "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "FitMentor",
+  "version": "0.1.0",
+  "identifier": "ai.fitmentor.app",
+  "build": {
+    "frontendDist": "../dist-mobile/client",
+    "devUrl": "http://localhost:8080",
+    "beforeDevCommand": "npm run dev:mobile",
+    "beforeBuildCommand": "npm run build:mobile"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "FitMentor",
+        "width": 390,
+        "height": 844,
+        "minWidth": 320,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false,
+        "backgroundColor": "#ECECF2"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    }
+  }
+}

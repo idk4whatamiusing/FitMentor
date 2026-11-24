@@ -1,9 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import Lenis from "lenis";
 import { motion } from "framer-motion";
 import { ArrowDown, ArrowRight, Check, Dumbbell, Flame, Sparkles } from "lucide-react";
 import { checkSession } from "@/utils/oauth";
+import { isTauri } from "@/utils/platform";
 import {
   MediaCard,
   Pill,
@@ -22,6 +23,10 @@ import progressImg from "@/assets/photos/progress-track.jpg";
 import runImg from "@/assets/photos/run-dusk.jpg";
 
 export const Route = createFileRoute("/")({
+  // The native shell opens the web app, not the marketing page.
+  beforeLoad: () => {
+    if (isTauri()) throw redirect({ to: "/dashboard" });
+  },
   head: () => ({
     meta: [
       { title: "FitMentor — Train like you mean it" },

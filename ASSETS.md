@@ -7,10 +7,9 @@ below; keep this file up to date when adding or replacing assets.
 
 | File | Family | License |
 | --- | --- | --- |
-| `ui/src/assets/fonts/Onest.ttf`, `apps/native/ui/fonts/Onest.ttf` | Onest (variable) | SIL Open Font License 1.1 — `OFL-Onest.txt` |
-| `ui/src/assets/fonts/Michroma-Regular.ttf`, `apps/native/ui/fonts/Michroma-Regular.ttf` | Michroma | SIL Open Font License 1.1 — `OFL-Michroma.txt` |
-| `ui/src/assets/fonts/Doto.ttf`, `apps/native/ui/fonts/Doto.ttf` | Doto (variable) | SIL Open Font License 1.1 — `OFL-Doto.txt` |
-| `apps/native/ui/fonts/Doto-Round.ttf` | Doto static instance (ROND 100, wght 600) | SIL Open Font License 1.1 — `OFL-Doto.txt` |
+| `ui/src/assets/fonts/Onest.ttf` | Onest (variable) | SIL Open Font License 1.1 — `OFL-Onest.txt` |
+| `ui/src/assets/fonts/Michroma-Regular.ttf` | Michroma | SIL Open Font License 1.1 — `OFL-Michroma.txt` |
+| `ui/src/assets/fonts/Doto.ttf` | Doto (variable) | SIL Open Font License 1.1 — `OFL-Doto.txt` |
 
 Sources:
 
@@ -37,13 +36,13 @@ and recompressed for this project.
 | `run-dusk.jpg` | https://unsplash.com/photos/1552674605-db6ffd4facb5 |
 | `gym-rack.jpg` | https://unsplash.com/photos/1534438327276-14e5300c3a48 |
 
-The same files are bundled in `ui/src/assets/photos/` (web) and
-`apps/native/ui/images/` (native app).
+Photos are bundled in `ui/src/assets/photos/` and ship inside the native
+shell as part of the same web bundle.
 
 ## Icons
 
-Native UI icons in `apps/native/ui/icons/` are derived from
-[Lucide](https://lucide.dev) and are licensed under the ISC License
+Icons come from [Lucide](https://lucide.dev) via `lucide-react` and are
+licensed under the ISC License
 (https://github.com/lucide-icons/lucide/blob/main/LICENSE). The Google "G"
 mark is used only on the Google sign-in button, per Google's branding
 guidelines.
