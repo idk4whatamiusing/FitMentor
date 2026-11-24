@@ -6,11 +6,18 @@ client, auth flow, and persistence.
 
 ## Design system
 
-The native UI and the web app share one editorial system: cream paper by
-default, ink in dark mode, and a single signal-orange accent. Tokens live in
-`ui/theme.slint`, shared components in `ui/components.slint`, photography in
-`ui/images/`, and the Onest/Michroma fonts in `ui/fonts/` (SIL OFL). Sources
-and licenses are listed in [`ASSETS.md`](../../ASSETS.md).
+The native UI and the web app share one token source: `design/tokens.json`.
+Run `node scripts/gen-design-tokens.mjs` after editing it; the generator writes
+`ui/src/generated/tokens.css` (web) and `ui/generated-tokens.slint` (native).
+Do not edit the generated files by hand. Shared components live in
+`ui/components.slint`, photography in `ui/images/`, and the Onest, Michroma,
+and Doto fonts in `ui/fonts/` (SIL OFL). Sources and licenses are listed in
+[`ASSETS.md`](../../ASSETS.md).
+
+The system is a cool-mist canvas with white bento cards, signal orange, lime
+actions, green readiness, and dot-matrix metrics in Doto. Michroma is reserved
+for the wordmark. Shadows are used instead of borders on the redesigned
+surfaces.
 
 The theme follows the system on first launch and is persisted next to the
 token. For previews, `FITMENTOR_THEME=light|dark` overrides it and
@@ -25,6 +32,7 @@ viewport. Preview flags:
 
 ```bash
 FITMENTOR_TAB=0..5          # Home, Train, Food, Coach, Tools, You
+FITMENTOR_PREVIEW=1         # seed Home with design-review data, skip API
 FITMENTOR_WORKOUT_TAB=1     # Train -> Exercise Library
 FITMENTOR_WIDTH=350         # window width for desktop layout testing
 FITMENTOR_HEIGHT=800        # window height for desktop layout testing
@@ -34,9 +42,10 @@ FITMENTOR_STEP=0..8         # onboarding step
 FITMENTOR_THEME=light|dark  # force a theme
 ```
 
-The native shell is responsive: it uses the actual window width, a full-width
-bottom navigation bar in the layout flow, and a single content column. Slint's
-text renderer differs from a browser by a small amount, so glyph edges and
+The native shell is responsive: it uses the actual window width, a floating
+bottom navigation bar in the layout flow, safe-area padding, and a single
+content column. Slint's text renderer differs from a browser by a small amount,
+so glyph edges and
 line wrapping can vary by a pixel. The progress report button opens the web
 report in the system browser.
 

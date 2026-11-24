@@ -16,6 +16,7 @@ fn apply_log(ui: &AppWindow, log: &api::TodayLog) {
     ui.set_sleep(log.sleep as i32);
     ui.set_steps(log.steps as i32);
     ui.set_protein(log.protein_g as i32);
+    ui.set_workout_done(log.workout_done);
 }
 
 fn first_word(name: &str) -> String {
@@ -25,32 +26,61 @@ fn first_word(name: &str) -> String {
         .to_string()
 }
 
-fn balance_title(title: &str) -> String {
-    let chars: Vec<char> = title.chars().collect();
-    if chars.len() <= 18 {
-        return title.to_string();
+fn first_initial(name: &str) -> String {
+    name.chars()
+        .next()
+        .map(|value| value.to_uppercase().to_string())
+        .unwrap_or_else(|| "F".to_string())
+}
+
+fn readiness_for(
+    water: i64,
+    sleep: i64,
+    steps: i64,
+    protein: i64,
+    trained_yesterday: Option<bool>,
+    protein_target: i64,
+) -> Option<i32> {
+    let mut earned = 0.0;
+    let mut available = 0.0;
+    let mut has_metric = false;
+
+    if sleep > 0 {
+        earned += 35.0 * (sleep as f64 / 8.0).min(1.0);
+        available += 35.0;
+        has_metric = true;
     }
-    let midpoint = chars.len() / 2;
-    let split = chars
-        .iter()
-        .enumerate()
-        .filter(|(_, value)| **value == ' ')
-        .min_by_key(|(index, _)| (*index as isize - midpoint as isize).abs())
-        .map(|(index, _)| index);
-    match split {
-        Some(index) => format!(
-            "{}\n{}",
-            chars[..index].iter().collect::<String>(),
-            chars[index + 1..].iter().collect::<String>()
-        ),
-        None => title.to_string(),
+    if water > 0 {
+        earned += 20.0 * (water as f64 / 8.0).min(1.0);
+        available += 20.0;
+        has_metric = true;
+    }
+    if protein > 0 && protein_target > 0 {
+        earned += 20.0 * (protein as f64 / protein_target as f64).min(1.0);
+        available += 20.0;
+        has_metric = true;
+    }
+    if steps > 0 {
+        earned += 15.0 * (steps as f64 / 8000.0).min(1.0);
+        available += 15.0;
+        has_metric = true;
+    }
+    if let Some(trained) = trained_yesterday {
+        earned += if trained { 5.0 } else { 10.0 };
+        available += 10.0;
+    }
+
+    if !has_metric || available == 0.0 {
+        None
+    } else {
+        Some((earned / available * 100.0).round() as i32)
     }
 }
 
 fn apply_today_label(ui: &AppWindow) {
     let now = chrono::Local::now();
     ui.set_today_day(now.format("%-d").to_string().into());
-    ui.set_today_label(now.format("%A, %-d %B").to_string().to_uppercase().into());
+    ui.set_today_label(now.format("%a, %-d %b").to_string().to_uppercase().into());
 }
 
 fn refresh_history(ui: &AppWindow) {
@@ -111,12 +141,156 @@ fn refresh_history(ui: &AppWindow) {
         commands
     };
 
+    let protein_target = if ui.get_custom_protein() > 0 {
+        ui.get_custom_protein() as i64
+    } else {
+        ui.get_target_protein() as i64
+    };
+    let mut readiness_scores = Vec::new();
+    let mut sleep_values = Vec::new();
+    for (index, entry) in entries.iter().enumerate() {
+        let is_today = index + 1 == entries.len();
+        let (water, sleep, steps, protein) = if is_today {
+            (
+                ui.get_water() as i64,
+                ui.get_sleep() as i64,
+                ui.get_steps() as i64,
+                ui.get_protein() as i64,
+            )
+        } else {
+            (
+                entry.water as i64,
+                entry.sleep as i64,
+                entry.steps as i64,
+                entry.protein as i64,
+            )
+        };
+        let previous = if index == 0 {
+            None
+        } else {
+            entries.get(index - 1)
+        };
+        let has_previous = previous
+            .map(|entry| {
+                entry.water > 0
+                    || entry.sleep > 0
+                    || entry.steps > 0
+                    || entry.protein > 0
+                    || entry.workout
+            })
+            .unwrap_or(false);
+        let trained_yesterday = previous.map(|entry| entry.workout).filter(|_| has_previous);
+        readiness_scores.push(
+            readiness_for(
+                water,
+                sleep,
+                steps,
+                protein,
+                trained_yesterday,
+                protein_target,
+            )
+            .unwrap_or(-1),
+        );
+        sleep_values.push(entry.sleep);
+    }
+
+    let today_score = readiness_scores.last().copied().unwrap_or(-1);
+    ui.set_readiness_score(today_score);
+    ui.set_readiness_band(
+        if today_score < 0 {
+            "STEADY"
+        } else if today_score >= 80 {
+            "PRIME"
+        } else if today_score >= 60 {
+            "STEADY"
+        } else {
+            "RECOVER"
+        }
+        .into(),
+    );
+    ui.set_readiness_verdict(
+        if today_score < 0 {
+            "Train"
+        } else if today_score >= 80 {
+            "Push"
+        } else if today_score >= 60 {
+            "Train"
+        } else {
+            "Recover"
+        }
+        .into(),
+    );
+    ui.set_readiness_history(ModelRc::new(VecModel::from(readiness_scores)));
+    ui.set_sleep_history(ModelRc::new(VecModel::from(sleep_values)));
+    let labels = entries
+        .iter()
+        .map(|entry| {
+            chrono::NaiveDate::parse_from_str(&entry.date, "%Y-%m-%d")
+                .ok()
+                .and_then(|date| date.format("%a").to_string().chars().next())
+                .map(|value| value.to_string())
+                .unwrap_or_default()
+        })
+        .map(slint::SharedString::from)
+        .collect::<Vec<_>>();
+    ui.set_week_labels(ModelRc::new(VecModel::from(labels)));
+
     ui.set_history(ModelRc::new(VecModel::from(entries)));
     ui.set_streak(api::compute_streak() as i32);
     ui.set_week_workouts(week_workouts);
     ui.set_avg_protein(avg_protein);
     ui.set_avg_sleep(format!("{avg_sleep:.1}").into());
     ui.set_weight_path(weight_path.into());
+}
+
+fn seed_preview(ui: &AppWindow) {
+    let now = chrono::Local::now();
+    let mut entries = Vec::new();
+    let mut readiness = Vec::new();
+    let mut sleep_history = Vec::new();
+    for index in 0..7 {
+        let date = (now - chrono::Duration::days(6 - index))
+            .format("%Y-%m-%d")
+            .to_string();
+        let workout = index < 6;
+        entries.push(DayLog {
+            date: date.into(),
+            water: if index == 6 { 5 } else { 7 },
+            sleep: 7,
+            steps: if index == 6 { 6420 } else { 8800 },
+            protein: if index == 6 { 95 } else { 128 },
+            workout,
+            weight: 72,
+        });
+        readiness.push([70, 72, 75, 74, 78, 76, 77][index as usize]);
+        sleep_history.push(7);
+    }
+    ui.set_signed_in(true);
+    ui.set_needs_onboarding(false);
+    ui.set_user_name("Debopam".into());
+    ui.set_first_name("Debopam".into());
+    ui.set_first_initial("D".into());
+    ui.set_history(ModelRc::new(VecModel::from(entries)));
+    ui.set_readiness_score(77);
+    ui.set_readiness_band("STEADY".into());
+    ui.set_readiness_verdict("Train".into());
+    ui.set_readiness_history(ModelRc::new(VecModel::from(readiness)));
+    ui.set_sleep_history(ModelRc::new(VecModel::from(sleep_history)));
+    ui.set_water(5);
+    ui.set_sleep(7);
+    ui.set_steps(6420);
+    ui.set_protein(95);
+    ui.set_streak(7);
+    ui.set_week_workouts(6);
+    ui.set_profile_days(6);
+    ui.set_target_protein(115);
+    ui.set_target_calories(2602);
+    ui.set_target_carbs(200);
+    ui.set_target_fat(72);
+    ui.set_session_title("Chest and Triceps".into());
+    ui.set_session_focus("Chest • Triceps".into());
+    ui.set_session_meta("3 moves".into());
+    ui.set_workout_done(false);
 }
 
 fn log_has_activity(log: &api::LogRecord) -> bool {
@@ -217,8 +391,16 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             .into(),
     );
     ui.set_first_name(first_word(&ui.get_user_name()).into());
+    ui.set_first_initial(first_initial(&ui.get_user_name()).into());
     apply_today_label(&ui);
     refresh_history(&ui);
+
+    let preview = env::var("FITMENTOR_PREVIEW")
+        .map(|value| value == "1")
+        .unwrap_or(false);
+    if preview {
+        seed_preview(&ui);
+    }
 
     let foods = vec![
         ("Roti (1)", 100, 3),
@@ -294,7 +476,8 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                         Ok(user) => {
                             api::set_token(Some(token));
                             ui.set_signed_in(true);
-                            ui.set_user_name(user.name.into());
+                            ui.set_user_name(user.name.clone().into());
+                            ui.set_first_initial(first_initial(&user.name).into());
                             ui.set_status_text("Signed in".into());
                             ui.invoke_refresh();
                             ui.invoke_load_profile();
@@ -540,6 +723,7 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                             profile_name
                         };
                         ui.set_first_name(first_word(&name).into());
+                        ui.set_first_initial(first_initial(&name).into());
                         ui.set_user_name(name.clone().into());
                         ui.set_profile_name(name.into());
                         ui.set_profile_email(profile.email.into());
@@ -555,6 +739,7 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                         ui.set_profile_days(profile.days_per_week as i32);
                         ui.set_profile_budget(profile.budget_per_day as i32);
                         ui.set_profile_tier(tier.into());
+                        refresh_history(&ui);
                     }
                 }
             })
@@ -571,6 +756,7 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
             ui.set_auth_error("".into());
             ui.set_user_name("Friend".into());
             ui.set_first_name("Friend".into());
+            ui.set_first_initial("F".into());
             ui.set_profile_name("Friend".into());
             ui.set_profile_email("".into());
             ui.set_profile_tier("Free".into());
@@ -647,6 +833,7 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                             ui.set_needs_onboarding(false);
                             ui.set_form_error("".into());
                             ui.set_first_name(first_word(&profile.name).into());
+                            ui.set_first_initial(first_initial(&profile.name).into());
                             ui.set_user_name(profile.name.clone().into());
                             ui.set_profile_name(profile.name.into());
                             ui.set_profile_email(profile.email.into());
@@ -765,10 +952,10 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                                     .num_days_from_sunday()
                                     as usize;
                                 let day = &items[weekday % items.len()];
-                                ui.set_session_title(balance_title(&day.title).into());
+                                ui.set_session_title(day.title.clone().into());
                                 ui.set_session_focus(day.focus.clone().into());
                                 ui.set_session_meta(
-                                    format!("{} moves · ~45 min", day.exercises.row_count()).into(),
+                                    format!("{} moves", day.exercises.row_count()).into(),
                                 );
                             }
                             ui.set_workout_days(ModelRc::new(VecModel::from(items)));
@@ -1328,6 +1515,8 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
                         slint::invoke_from_event_loop(move || {
                             if let Some(ui) = ui_handle.upgrade() {
                                 ui.set_signed_in(true);
+                                ui.set_first_name(first_word(&name).into());
+                                ui.set_first_initial(first_initial(&name).into());
                                 ui.set_user_name(name.into());
                                 ui.set_status_text("Signed in with Google".into());
                                 ui.set_google_busy(false);
@@ -1362,12 +1551,14 @@ pub fn create_window() -> Result<AppWindow, slint::PlatformError> {
         });
     });
 
-    ui.invoke_refresh();
-    if ui.get_signed_in() {
-        ui.invoke_load_profile();
-        ui.invoke_load_workout();
-        ui.invoke_load_nutrition();
-        ui.invoke_load_community();
+    if !preview {
+        ui.invoke_refresh();
+        if ui.get_signed_in() {
+            ui.invoke_load_profile();
+            ui.invoke_load_workout();
+            ui.invoke_load_nutrition();
+            ui.invoke_load_community();
+        }
     }
     Ok(ui)
 }

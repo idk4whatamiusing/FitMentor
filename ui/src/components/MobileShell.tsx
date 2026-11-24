@@ -58,8 +58,8 @@ export function MobileShell({ children, wide }: { children: ReactNode; wide?: bo
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-5 lg:px-8">
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-6 px-5 lg:h-16 lg:px-8">
           <Wordmark href="/dashboard" />
 
           <nav className="hidden items-center gap-7 md:flex" aria-label="Primary">
@@ -90,15 +90,15 @@ export function MobileShell({ children, wide }: { children: ReactNode; wide?: bo
         </div>
       </header>
 
-      <main className={cn("mx-auto w-full", wide ? "max-w-7xl" : "max-w-6xl", "pb-32 md:pb-16")}>
+      <main className={cn("mx-auto w-full", wide ? "max-w-7xl" : "max-w-6xl", "pb-28 md:pb-16")}>
         {children}
       </main>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 px-4 pb-[max(0.9rem,env(safe-area-inset-bottom))] md:hidden"
         aria-label="Primary"
       >
-        <div className="mx-auto flex max-w-md items-center justify-between rounded-[1.75rem] border border-border bg-card/95 px-1.5 py-2 shadow-card backdrop-blur-xl">
+        <div className="mx-auto flex max-w-md items-center justify-between rounded-[1.9rem] bg-card/95 px-1.5 py-2 shadow-dock ring-1 ring-black/[0.04] backdrop-blur-xl dark:ring-white/[0.06]">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const active = isActive(pathname, tab.to);
@@ -112,7 +112,7 @@ export function MobileShell({ children, wide }: { children: ReactNode; wide?: bo
               >
                 <span
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
+                    "flex h-9 w-9 items-center justify-center rounded-full transition-all",
                     active
                       ? accent
                         ? "bg-orange text-ink"
@@ -125,7 +125,7 @@ export function MobileShell({ children, wide }: { children: ReactNode; wide?: bo
                 <span
                   className={cn(
                     "text-[9px] font-semibold uppercase tracking-[0.12em]",
-                    active ? "text-foreground" : "text-muted-foreground",
+                    active ? "text-foreground" : "text-muted-foreground/70",
                   )}
                 >
                   {tab.label}

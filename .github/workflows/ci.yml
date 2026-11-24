@@ -25,6 +25,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci
+      - name: Design tokens are up to date
+        run: node scripts/gen-design-tokens.mjs && git diff --exit-code -- ui/src/generated/tokens.css apps/native/ui/generated-tokens.slint
       - run: npm run build --workspaces --if-present
 
   web:

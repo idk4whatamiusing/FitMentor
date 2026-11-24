@@ -1,8 +1,10 @@
 import { ScrollView, Palette } from "std-widgets.slint";
 import { Theme } from "theme.slint";
+import { Tokens } from "generated-tokens.slint";
 import {
     Avatar,
     BackButton,
+    BentoCard,
     BigField,
     BottomNav,
     Chip,
@@ -10,20 +12,26 @@ import {
     ChoiceChip,
     CycleField,
     Divider,
+    DotNumber,
     Feature,
     Field,
     GhostButton,
     Icon,
     IconButton,
+    LimeButton,
+    MacroBar,
+    MiniBars,
     Pill,
     PrimaryButton,
     SmallPrimary,
     ProgressBar,
     SectionLabel,
     SliderTrack,
+    SoftButton,
     StatBlock,
     SupplementRow,
     TabButton,
+    TagPill,
     ToolChip,
     TopBar,
     Wordmark,
@@ -101,9 +109,17 @@ export component AppWindow inherits Window {
     in-out property <int> protein: 0;
     in-out property <string> user-name: "Friend";
     in-out property <string> first-name: "Friend";
+    in-out property <string> first-initial: "F";
     in-out property <string> today-day: "22";
     in-out property <string> today-label: "SUNDAY, 22 NOVEMBER";
     in-out property <int> streak: 0;
+    in-out property <int> readiness-score: -1;
+    in-out property <string> readiness-band: "STEADY";
+    in-out property <string> readiness-verdict: "Train";
+    in-out property <[int]> readiness-history: [];
+    in-out property <[int]> sleep-history: [];
+    in-out property <[string]> week-labels: ["M", "T", "W", "T", "F", "S", "S"];
+    in-out property <bool> workout-done: false;
     in-out property <bool> loading: false;
     in-out property <string> status-text: "Connect your account to sync today's log.";
     in-out property <bool> signed-in: false;
@@ -121,7 +137,7 @@ export component AppWindow inherits Window {
     in-out property <string> profile-diet: "";
     in-out property <string> profile-place: "";
     in-out property <string> profile-experience: "";
-    in-out property <int> profile-days: 0;
+    in-out property <int> profile-days: 4;
     in-out property <int> profile-budget: 0;
     in-out property <string> profile-tier: "Free";
     in-out property <bool> needs-onboarding: false;
@@ -149,10 +165,10 @@ export component AppWindow inherits Window {
     in-out property <[MealItem]> nutrition-meals: [];
     in-out property <string> nutrition-title: "";
     in-out property <string> nutrition-status: "Load today's meal plan.";
-    in-out property <int> target-calories: 0;
-    in-out property <int> target-protein: 0;
-    in-out property <int> target-carbs: 0;
-    in-out property <int> target-fat: 0;
+    in-out property <int> target-calories: 2200;
+    in-out property <int> target-protein: 100;
+    in-out property <int> target-carbs: 220;
+    in-out property <int> target-fat: 70;
     in-out property <int> custom-protein: 0;
     in-out property <bool> protein-editing: false;
     in-out property <int> nutrition-tab: 0;
@@ -279,7 +295,7 @@ export component AppWindow inherits Window {
             content := VerticalLayout {
                 x: Theme.page-pad;
                 width: main-scroll.width - 2 * Theme.page-pad;
-                padding-top: 24px;
+                padding-top: 20px;
                 padding-bottom: 24px;
                 spacing: 16px;
                 alignment: stretch;
@@ -291,218 +307,832 @@ export component AppWindow inherits Window {
                 // --------------------------------------------------------
                 if root.tab == 0 : VerticalLayout {
                     width: main-scroll.width - 2 * Theme.page-pad;
-                    spacing: 16px;
-                    alignment: stretch;
+                    spacing: 14px;
+                    alignment: start;
 
-                    VerticalLayout {
+                    // Header -------------------------------------------------
+                    HorizontalLayout {
+                        width: 100%;
                         spacing: 12px;
-                        horizontal-stretch: 1;
-                        alignment: stretch;
 
-                        SectionLabel {
-                            index: root.today-day;
-                            label: root.today-label;
-                        }
-
-                        HorizontalLayout {
+                        VerticalLayout {
+                            horizontal-stretch: 1;
                             spacing: 6px;
                             alignment: start;
 
                             Text {
-                                text: "Hey,";
-                                color: Theme.text;
-                                font-size: 32px;
-                                font-weight: 600;
-                                letter-spacing: -1.2px;
-                                vertical-alignment: bottom;
+                                text: root.today-label;
+                                color: Theme.dark ? Theme.orange : Theme.burnt;
+                                font-size: 10px;
+                                font-weight: 700;
+                                letter-spacing: 1.4px;
                             }
+                            HorizontalLayout {
+                                spacing: 0;
+                                alignment: start;
 
+                                Text {
+                                    text: "Today";
+                                    color: Theme.text;
+                                    font-size: 42px;
+                                    font-weight: 600;
+                                    letter-spacing: -2px;
+                                    height: 44px;
+                                    vertical-alignment: bottom;
+                                }
+                                Text {
+                                    text: ".";
+                                    color: Theme.accent;
+                                    font-size: 42px;
+                                    font-weight: 600;
+                                    letter-spacing: -2px;
+                                    height: 44px;
+                                    vertical-alignment: bottom;
+                                }
+                            }
                             Text {
-                                text: root.first-name + ".";
-                                color: Theme.accent;
-                                font-size: 32px;
-                                font-weight: 600;
-                                letter-spacing: -1.2px;
-                                vertical-alignment: bottom;
+                                text: "Good morning, " + root.first-name + ".";
+                                color: Theme.muted;
+                                font-size: 14px;
+                                overflow: elide;
                             }
-                        }
-
-                        Text {
-                            text: "One session, one plate, one glass at a time. Here's where today stands.";
-                            color: Theme.muted;
-                            font-size: 14px;
-                            wrap: word-wrap;
-                            width: 100%;
-                        }
-
-                        Pill {
-                            label: "\{root.streak} DAY STREAK";
-                            dot: true;
-                        }
-                    }
-
-                    // Session hero
-                    Rectangle {
-                        width: 100%;
-                        height: 240px;
-                        border-radius: Theme.radius-hero;
-                        clip: true;
-                        background: Theme.ink;
-
-                        Image {
-                            width: 100%;
-                            height: 100%;
-                            source: @image-url("images/train-ropes.jpg");
-                            image-fit: cover;
-                            opacity: 0.45;
-                        }
-
-                        Rectangle {
-                            width: 100%;
-                            height: 100%;
-                            background: @linear-gradient(90deg, #0B0B0B 0%, rgba(11, 11, 11, 0.86) 50%, rgba(11, 11, 11, 0.18) 100%);
                         }
 
                         VerticalLayout {
-                            padding: 20px;
+                            width: 64px;
+                            spacing: 8px;
+                            alignment: start;
+
+                            Rectangle {
+                                width: 44px;
+                                height: 44px;
+                                border-radius: 16px;
+                                background: Theme.ink;
+
+                                Text {
+                                    width: 100%;
+                                    height: 100%;
+                                    text: root.first-initial;
+                                    color: Theme.cream;
+                                    font-family: Theme.font-wordmark;
+                                    font-size: 11px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle {
+                                height: 28px;
+                                width: self.preferred-width;
+                                border-radius: 14px;
+                                background: Theme.surface;
+                                drop-shadow-blur: 12px;
+                                drop-shadow-color: Theme.shadow;
+                                drop-shadow-offset-y: 4px;
+
+                                HorizontalLayout {
+                                    padding-left: 9px;
+                                    padding-right: 9px;
+                                    spacing: 4px;
+                                    alignment: center;
+
+                                    Icon {
+                                        size: 12px;
+                                        tint: Theme.accent;
+                                        source: @image-url("icons/flame.png");
+                                    }
+                                    Text {
+                                        text: root.streak == 1 ? "\{root.streak} DAY" : "\{root.streak} DAYS";
+                                        color: Theme.text;
+                                        font-size: 9px;
+                                        font-weight: 700;
+                                        letter-spacing: 0.8px;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Verdict hero -------------------------------------------
+                    Rectangle {
+                        width: 100%;
+                        height: 316px;
+                        border-radius: 34px;
+                        clip: true;
+                        background: @linear-gradient(140deg, Tokens.verdict-0 0%, Tokens.verdict-1 55%, Tokens.verdict-2 100%);
+                        drop-shadow-blur: 24px;
+                        drop-shadow-color: Theme.shadow;
+                        drop-shadow-offset-y: 10px;
+
+                        VerticalLayout {
+                            padding: 22px;
                             spacing: 0;
                             alignment: space-between;
 
                             VerticalLayout {
                                 spacing: 8px;
 
-                                Pill {
-                                    label: "TODAY'S SESSION";
-                                    accent: true;
+                                HorizontalLayout {
+                                    width: 100%;
+                                    alignment: space-between;
+
+                                    TagPill {
+                                        show-icon: true;
+                                        label: root.workout-done
+                                            ? "DONE"
+                                            : root.readiness-verdict == "Push"
+                                                ? "PUSH"
+                                                : root.readiness-verdict == "Recover"
+                                                    ? "RECOVER"
+                                                    : "TRAIN";
+                                    }
+                                    Text {
+                                        text: "~45 MIN";
+                                        color: rgba(255, 255, 255, 0.55);
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        letter-spacing: 1.4px;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 0;
+                                    alignment: start;
+
+                                    Text {
+                                        text: root.workout-done ? "Done" : root.readiness-verdict;
+                                        color: #FFFFFF;
+                                        font-size: 54px;
+                                        font-weight: 600;
+                                        letter-spacing: -2.6px;
+                                        vertical-alignment: bottom;
+                                    }
+                                    Text {
+                                        text: ".";
+                                        color: rgba(255, 255, 255, 0.4);
+                                        font-size: 54px;
+                                        font-weight: 600;
+                                        letter-spacing: -2.6px;
+                                        vertical-alignment: bottom;
+                                    }
                                 }
 
                                 Text {
-                                    text: root.session-title;
-                                    color: Theme.cream;
-                                    font-size: 26px;
-                                    font-weight: 600;
-                                    letter-spacing: -0.8px;
+                                    text: root.workout-done
+                                        ? "Session complete. Let the adaptation begin."
+                                        : root.readiness-verdict == "Push"
+                                            ? "Go hard — the plan is built for today."
+                                            : root.readiness-verdict == "Recover"
+                                                ? "Keep it easy. Recovery is the session."
+                                                : "Steady work. Hit the plan, not the wall.";
+                                    color: rgba(255, 255, 255, 0.8);
+                                    font-size: 14px;
                                     wrap: word-wrap;
+                                    width: 100%;
                                 }
 
-                                Text {
-                                    text: root.session-focus + (root.session-meta != "" ? " · " + root.session-meta : "");
-                                    color: rgba(247, 243, 237, 0.6);
-                                    font-size: 13px;
-                                    wrap: word-wrap;
+                                HorizontalLayout {
+                                    width: 100%;
+                                    spacing: 8px;
+                                    padding-top: 2px;
+
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 46px;
+                                        border-radius: 14px;
+                                        background: rgba(255, 255, 255, 0.12);
+
+                                        VerticalLayout {
+                                            padding: 8px;
+                                            spacing: 1px;
+                                            Text {
+                                                text: "SLEEP";
+                                                color: rgba(255, 255, 255, 0.5);
+                                                font-size: 8px;
+                                                font-weight: 700;
+                                                letter-spacing: 1px;
+                                            }
+                                            Text {
+                                                text: root.sleep <= 0 ? "—" : "\{root.sleep}h";
+                                                color: #FFFFFF;
+                                                font-size: 12px;
+                                                font-weight: 600;
+                                            }
+                                        }
+                                    }
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 46px;
+                                        border-radius: 14px;
+                                        background: rgba(255, 255, 255, 0.12);
+
+                                        VerticalLayout {
+                                            padding: 8px;
+                                            spacing: 1px;
+                                            Text {
+                                                text: "PROTEIN";
+                                                color: rgba(255, 255, 255, 0.5);
+                                                font-size: 8px;
+                                                font-weight: 700;
+                                                letter-spacing: 1px;
+                                            }
+                                            Text {
+                                                text: "\{root.protein}g";
+                                                color: #FFFFFF;
+                                                font-size: 12px;
+                                                font-weight: 600;
+                                            }
+                                        }
+                                    }
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 46px;
+                                        border-radius: 14px;
+                                        background: rgba(255, 255, 255, 0.12);
+
+                                        VerticalLayout {
+                                            padding: 8px;
+                                            spacing: 1px;
+                                            Text {
+                                                text: "WATER";
+                                                color: rgba(255, 255, 255, 0.5);
+                                                font-size: 8px;
+                                                font-weight: 700;
+                                                letter-spacing: 1px;
+                                            }
+                                            Text {
+                                                text: "\{root.water}/8";
+                                                color: #FFFFFF;
+                                                font-size: 12px;
+                                                font-weight: 600;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                height: 68px;
+                                border-radius: 18px;
+                                background: #FFFFFF;
+
+                                HorizontalLayout {
+                                    padding: 8px;
+                                    spacing: 10px;
+                                    cross-axis-alignment: center;
+
+                                    Rectangle {
+                                        width: root.width >= 360px ? 36px : 0px;
+                                        height: 36px;
+                                        border-radius: 18px;
+                                        background: rgba(255, 108, 4, 0.12);
+                                        visible: root.width >= 360px;
+
+                                        Icon {
+                                            x: 9px;
+                                            y: 9px;
+                                            size: 18px;
+                                            tint: Theme.accent;
+                                            source: @image-url("icons/flame.png");
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 2px;
+
+                                        Text {
+                                            text: root.session-title;
+                                            color: Theme.ink;
+                                            font-size: root.width < 340px ? 11px : 14px;
+                                            font-weight: 600;
+                                            overflow: elide;
+                                        }
+                                        Text {
+                                            text: root.session-focus + (root.session-meta != "" ? " · " + root.session-meta : "");
+                                            color: rgba(11, 11, 11, 0.52);
+                                            font-size: root.width < 340px ? 10px : 11px;
+                                            wrap: word-wrap;
+                                        }
+                                    }
+
+                                    LimeButton {
+                                        label: root.workout-done ? "View" : "Start";
+                                        arrow: root.width >= 380px;
+                                        clicked => { root.set-tab(1); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Readiness + load ---------------------------------------
+                    HorizontalLayout {
+                        width: 100%;
+                        spacing: 14px;
+
+                        Rectangle {
+                            width: (root.width - 2 * Theme.page-pad - 14px) * 0.6;
+                            height: 190px;
+                            border-radius: 28px;
+                            clip: true;
+                            background: @linear-gradient(140deg, Tokens.recovery-0 0%, Tokens.recovery-1 55%, Tokens.recovery-2 100%);
+                            drop-shadow-blur: 20px;
+                            drop-shadow-color: Theme.shadow;
+                            drop-shadow-offset-y: 8px;
+
+                            VerticalLayout {
+                                padding: root.width < 340px ? 16px : 20px;
+                                spacing: 0;
+                                alignment: space-between;
+
+                                HorizontalLayout {
+                                    width: 100%;
+                                    alignment: space-between;
+
+                                    Text {
+                                        text: "READINESS";
+                                        color: rgba(255, 255, 255, 0.66);
+                                        font-size: root.width < 340px ? 9px : 10px;
+                                        font-weight: 700;
+                                        letter-spacing: 1.5px;
+                                    }
+                                    TagPill { label: root.readiness-band; }
+                                }
+
+                                VerticalLayout {
+                                    spacing: 0;
+
+                                    DotNumber {
+                                        value: root.readiness-score < 0 ? "—" : "\{root.readiness-score}";
+                                        unit: root.readiness-score < 0 ? "" : "%";
+                                        size: root.width < 340px ? 56px : 68px;
+                                        color: #FFFFFF;
+                                        unit-color: rgba(255, 255, 255, 0.6);
+                                    }
+                                    Text {
+                                        text: root.readiness-score < 0
+                                            ? "Log sleep, water or protein to see it."
+                                            : "From today's logs";
+                                        color: rgba(255, 255, 255, 0.55);
+                                        font-size: 11px;
+                                    }
+                                }
+
+                                MiniBars {
+                                    values: root.readiness-history;
+                                    maximum: 100;
+                                    bar-max: 30px;
+                                    active: #FFFFFF;
+                                    rest: rgba(255, 255, 255, 0.3);
+                                }
+                            }
+                        }
+
+                        BentoCard {
+                            width: (root.width - 2 * Theme.page-pad - 14px) * 0.4;
+                            height: 190px;
+
+                            VerticalLayout {
+                                padding: 20px;
+                                spacing: 0;
+                                alignment: space-between;
+
+                                HorizontalLayout {
+                                    width: 100%;
+                                    alignment: space-between;
+
+                                    Text {
+                                        text: "LOAD";
+                                        color: Theme.muted;
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        letter-spacing: 1.5px;
+                                    }
+                                    Icon {
+                                        size: 15px;
+                                        tint: Theme.accent;
+                                        source: @image-url("icons/flame.png");
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    spacing: 0;
+
+                                    DotNumber {
+                                        value: "\{root.week-workouts}";
+                                        unit: "/ \{root.profile-days}";
+                                        size: 56px;
+                                    }
+                                    Text {
+                                        text: "Sessions this week";
+                                        color: Theme.muted;
+                                        font-size: 11px;
+                                        wrap: word-wrap;
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    width: 100%;
+                                    height: 6px;
+                                    spacing: 4px;
+
+                                    for entry in root.history : Rectangle {
+                                        horizontal-stretch: 1;
+                                        height: 6px;
+                                        border-radius: 3px;
+                                        background: entry.workout ? Theme.text : Theme.surface-2;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Fuel ---------------------------------------------------
+                    BentoCard {
+                        width: 100%;
+
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 14px;
+
+                            HorizontalLayout {
+                                width: 100%;
+                                alignment: space-between;
+
+                                VerticalLayout {
+                                    spacing: 3px;
+                                    Text {
+                                        text: "FUEL";
+                                        color: Theme.muted;
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        letter-spacing: 1.5px;
+                                    }
+                                    Text {
+                                        text: "Today's targets";
+                                        color: Theme.text;
+                                        font-size: 14px;
+                                        font-weight: 600;
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 26px;
+                                    width: self.preferred-width;
+                                    border-radius: 13px;
+                                    background: Theme.accent-soft;
+
+                                    Text {
+                                        x: 10px;
+                                        width: parent.width - 20px;
+                                        height: 100%;
+                                        text: "\{root.target-calories} KCAL";
+                                        color: Theme.dark ? Theme.orange : #B93400;
+                                        font-size: 9px;
+                                        font-weight: 700;
+                                        letter-spacing: 1px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
                                 }
                             }
 
                             HorizontalLayout {
-                                height: 48px;
-                                alignment: start;
+                                width: 100%;
+                                spacing: 16px;
 
-                                Rectangle {
-                                    height: 48px;
-                                    border-radius: 24px;
-                                    background: Theme.cream;
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
 
                                     HorizontalLayout {
-                                        padding-left: 20px;
-                                        padding-right: 6px;
-                                        spacing: 12px;
-
+                                        spacing: 4px;
+                                        Icon { size: 13px; tint: Theme.accent; source: @image-url("icons/flame.png"); }
                                         Text {
-                                            text: "Start session";
-                                            color: Theme.ink;
-                                            font-size: 14px;
-                                            font-weight: 600;
-                                        }
-
-                                        Rectangle {
-                                            width: 36px;
-                                            height: 36px;
-                                            border-radius: 18px;
-                                            background: Theme.accent;
-
-                                            Icon {
-                                                x: 10px;
-                                                y: 10px;
-                                                size: 16px;
-                                                tint: Theme.ink;
-                                                source: @image-url("icons/arrow-up-right.png");
-                                            }
+                                            text: "PROTEIN";
+                                            color: Theme.muted;
+                                            font-size: 10px;
+                                            font-weight: 700;
+                                            letter-spacing: 1.2px;
+                                            vertical-alignment: center;
                                         }
                                     }
+                                    DotNumber {
+                                        value: "\{root.protein}";
+                                        unit: "/ \{root.custom-protein > 0 ? root.custom-protein : root.target-protein} g";
+                                        size: 46px;
+                                    }
+                                }
 
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Icon { size: 13px; tint: Theme.lilac-deep; source: @image-url("icons/droplet.png"); }
+                                        Text {
+                                            text: "WATER";
+                                            color: Theme.muted;
+                                            font-size: 10px;
+                                            font-weight: 700;
+                                            letter-spacing: 1.2px;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    DotNumber {
+                                        value: "\{root.water}";
+                                        unit: "/ 8";
+                                        size: 46px;
+                                    }
+                                }
+                            }
+
+                            HorizontalLayout {
+                                width: 100%;
+                                spacing: 16px;
+
+                                MacroBar {
+                                    horizontal-stretch: 1;
+                                    label: "Protein";
+                                    value-label: "\{root.protein} / \{root.custom-protein > 0 ? root.custom-protein : root.target-protein}";
+                                    percent: root.custom-protein > 0
+                                        ? min(100, root.protein * 100 / max(1, root.custom-protein))
+                                        : min(100, root.protein * 100 / max(1, root.target-protein));
+                                    fill: Theme.accent;
+                                }
+                                MacroBar {
+                                    horizontal-stretch: 1;
+                                    label: "Water";
+                                    value-label: "\{root.water} / 8";
+                                    percent: min(100, root.water * 100 / 8);
+                                    fill: Theme.lilac-deep;
+                                }
+                            }
+
+                            HorizontalLayout {
+                                width: 100%;
+                                spacing: 8px;
+
+                                LimeButton {
+                                    label: "Glass";
+                                    arrow: false;
+                                    clicked => { root.add-water(); }
+                                }
+                                SoftButton {
+                                    width: 132px;
+                                    label: "20 g protein";
+                                    show-icon: true;
+                                    icon: @image-url("icons/plus.png");
+                                    clicked => { root.add-protein-by(20); }
+                                }
+
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    height: 36px;
+                                    background: transparent;
+
+                                    Text {
+                                        width: 100%;
+                                        height: 100%;
+                                        text: "Food  ›";
+                                        color: Theme.muted;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        horizontal-alignment: right;
+                                        vertical-alignment: center;
+                                    }
                                     TouchArea {
                                         width: 100%;
                                         height: 100%;
-                                        clicked => {
-                                            root.set-tab(1);
-                                        }
+                                        clicked => { root.set-tab(2); }
                                     }
                                 }
                             }
                         }
                     }
 
-                    // Stats 2x2
-                    HorizontalLayout {
-                        spacing: 16px;
+                    // Sleep --------------------------------------------------
+                    BentoCard {
+                        width: 100%;
 
-                        StatBlock {
-                            label: "STREAK";
-                            value: "\{root.streak}";
-                            unit: "days";
-                            hint: "Keep the chain alive";
-                            invert: true;
-                        }
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 12px;
 
-                        StatBlock {
-                            label: "PROTEIN";
-                            value: "\{root.protein}";
-                            unit: "/ \{root.custom-protein > 0 ? root.custom-protein : root.target-protein} g";
-                            progress: root.custom-protein > 0
-                                ? min(100, root.protein * 100 / max(1, root.custom-protein))
-                                : min(100, root.protein * 100 / max(1, root.target-protein));
+                            HorizontalLayout {
+                                width: 100%;
+                                alignment: space-between;
+
+                                VerticalLayout {
+                                    spacing: 3px;
+                                    Text {
+                                        text: "SLEEP";
+                                        color: Theme.muted;
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        letter-spacing: 1.5px;
+                                    }
+                                    Text {
+                                        text: "Last night";
+                                        color: Theme.text;
+                                        font-size: 14px;
+                                        font-weight: 600;
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 26px;
+                                    width: self.preferred-width;
+                                    border-radius: 13px;
+                                    background: Theme.dark ? rgba(201, 198, 255, 0.15) : rgba(201, 198, 255, 0.45);
+
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        spacing: 4px;
+                                        alignment: center;
+
+                                        Icon { size: 12px; tint: Theme.lilac-deep; source: @image-url("icons/moon.png"); }
+                                        Text {
+                                            text: "AIM 8 H";
+                                            color: Theme.lilac-deep;
+                                            font-size: 9px;
+                                            font-weight: 700;
+                                            letter-spacing: 1px;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            HorizontalLayout {
+                                width: 100%;
+                                alignment: space-between;
+
+                                DotNumber {
+                                    value: root.sleep <= 0 ? "—" : "\{root.sleep}";
+                                    unit: root.sleep <= 0 ? "" : "h";
+                                    size: 54px;
+                                }
+                                Text {
+                                    text: "7-night rhythm";
+                                    color: Theme.muted;
+                                    font-size: 11px;
+                                    vertical-alignment: bottom;
+                                }
+                            }
+
+                            HorizontalLayout {
+                                width: 100%;
+                                height: 62px;
+                                spacing: 8px;
+
+                                for value[index] in root.sleep-history : VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    height: 62px;
+                                    spacing: 3px;
+
+                                    HorizontalLayout {
+                                        width: 100%;
+                                        alignment: center;
+
+                                        Rectangle {
+                                            width: 10px;
+                                            height: max(8px, 40px * min(9, value) / 9);
+                                            border-radius: 5px;
+                                            background: index == root.sleep-history.length - 1
+                                                ? Theme.lilac-deep
+                                                : (Theme.dark ? rgba(201, 198, 255, 0.3) : rgba(201, 198, 255, 0.65));
+                                        }
+                                    }
+                                    Text {
+                                        text: index < root.week-labels.length ? root.week-labels[index] : "";
+                                        color: Theme.muted;
+                                        font-size: 8px;
+                                        horizontal-alignment: center;
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    HorizontalLayout {
-                        spacing: 16px;
+                    // Coach --------------------------------------------------
+                    BentoCard {
+                        width: 100%;
 
-                        StatBlock {
-                            label: "CALORIES";
-                            value: "\{root.target-calories}";
-                            unit: "kcal target";
-                            hint: "\{root.target-carbs} g carbs · \{root.target-fat} g fat";
-                        }
+                        VerticalLayout {
+                            padding: 20px;
+                            spacing: 12px;
 
-                        StatBlock {
-                            label: "WATER";
-                            value: "\{root.water}";
-                            unit: "/ 8 glasses";
-                            progress: min(100, root.water * 100 / 8);
+                            HorizontalLayout {
+                                width: 100%;
+                                spacing: 12px;
+
+                                Rectangle {
+                                    width: 44px;
+                                    height: 44px;
+                                    border-radius: 16px;
+                                    background: Theme.dark ? rgba(201, 198, 255, 0.15) : rgba(201, 198, 255, 0.5);
+
+                                    Icon {
+                                        x: 12px;
+                                        y: 12px;
+                                        size: 20px;
+                                        tint: Theme.lilac-deep;
+                                        source: @image-url("icons/sparkles.png");
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 2px;
+
+                                    Text {
+                                        text: "COACH";
+                                        color: Theme.muted;
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        letter-spacing: 1.5px;
+                                    }
+                                    Text {
+                                        text: "Ask about your plan";
+                                        color: Theme.text;
+                                        font-size: 14px;
+                                        font-weight: 600;
+                                    }
+                                    Text {
+                                        text: "Training, food, recovery, or the week you just missed.";
+                                        color: Theme.muted;
+                                        font-size: 12px;
+                                        wrap: word-wrap;
+                                    }
+                                }
+
+                                Rectangle {
+                                    width: 36px;
+                                    height: 36px;
+                                    border-radius: 18px;
+                                    background: Theme.dark ? Theme.cream : Theme.ink;
+
+                                    Icon {
+                                        x: 10px;
+                                        y: 10px;
+                                        size: 16px;
+                                        tint: Theme.dark ? Theme.ink : Theme.cream;
+                                        source: @image-url("icons/arrow-up-right.png");
+                                    }
+                                    TouchArea {
+                                        width: 100%;
+                                        height: 100%;
+                                        clicked => { root.set-tab(3); }
+                                    }
+                                }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 8px;
+                                SoftButton {
+                                    label: "How much protein?";
+                                    clicked => { root.set-tab(3); }
+                                }
+                                SoftButton {
+                                    label: "I missed 3 days";
+                                    clicked => { root.set-tab(3); }
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                SoftButton {
+                                    label: "Review my plan";
+                                    clicked => { root.set-tab(3); }
+                                }
+                            }
                         }
                     }
 
-                    // Progress shortcut
-                    Rectangle {
-                        height: 56px;
-                        border-radius: 20px;
-                        background: Theme.surface;
-                        border-width: 1px;
-                        border-color: Theme.line;
+                    // Progress ----------------------------------------------
+                    BentoCard {
+                        width: 100%;
+                        height: 68px;
 
                         HorizontalLayout {
                             padding-left: 20px;
-                            padding-right: 16px;
+                            padding-right: 14px;
                             alignment: space-between;
+                            cross-axis-alignment: center;
 
                             VerticalLayout {
                                 spacing: 2px;
                                 Text {
                                     text: "PROGRESS";
                                     color: Theme.muted;
-                                    font-size: 10px;
-                                    font-weight: 600;
-                                    letter-spacing: 1.6px;
+                                    font-size: 9px;
+                                    font-weight: 700;
+                                    letter-spacing: 1.5px;
                                 }
                                 Text {
                                     text: "Last 7 days";
@@ -512,364 +1142,26 @@ export component AppWindow inherits Window {
                                 }
                             }
 
-                            Icon {
-                                size: 18px;
-                                tint: Theme.muted;
-                                source: @image-url("icons/arrow-up-right.png");
+                            Rectangle {
+                                width: 36px;
+                                height: 36px;
+                                border-radius: 18px;
+                                background: Theme.surface-2;
+
+                                Icon {
+                                    x: 10px;
+                                    y: 10px;
+                                    size: 16px;
+                                    tint: Theme.muted;
+                                    source: @image-url("icons/arrow-up-right.png");
+                                }
                             }
                         }
 
                         TouchArea {
                             width: 100%;
                             height: 100%;
-                            clicked => {
-                                root.open-progress();
-                            }
-                        }
-                    }
-
-                    // Habits
-                    Rectangle {
-                        border-radius: Theme.radius-card;
-                        background: Theme.surface;
-                        border-width: 1px;
-                        border-color: Theme.line;
-
-                        VerticalLayout {
-                            padding: 24px;
-                            spacing: 0;
-
-                            HorizontalLayout {
-                                alignment: space-between;
-                                SectionLabel {
-                                    label: "DAILY HABITS";
-                                }
-                                Text {
-                                    text: "\{round((min(100, root.water * 100 / 8) + (root.custom-protein > 0 ? min(100, root.protein * 100 / max(1, root.custom-protein)) : min(100, root.protein * 100 / max(1, root.target-protein)))) / 2)}%";
-                                    color: Theme.muted;
-                                    font-size: 10px;
-                                    font-weight: 600;
-                                    letter-spacing: 1.4px;
-                                }
-                            }
-
-                            VerticalLayout {
-                                spacing: 0;
-                                height: 72px;
-                                alignment: space-between;
-
-                                HorizontalLayout {
-                                    alignment: space-between;
-                                    Text {
-                                        text: "Water";
-                                        color: Theme.text;
-                                        font-size: 14px;
-                                        font-weight: 500;
-                                    }
-                                    Text {
-                                        text: "\{root.water} / 8";
-                                        color: Theme.muted;
-                                        font-size: 14px;
-                                    }
-                                }
-
-                                ProgressBar {
-                                    value: min(100, root.water * 100 / 8);
-                                }
-                            }
-
-                            Rectangle {
-                                height: 33px;
-                                background: transparent;
-                                Rectangle {
-                                    y: 16px;
-                                    height: 1px;
-                                    background: Theme.line;
-                                }
-                            }
-
-                            VerticalLayout {
-                                spacing: 0;
-                                height: 72px;
-                                alignment: space-between;
-
-                                HorizontalLayout {
-                                    alignment: space-between;
-                                    Text {
-                                        text: "Protein";
-                                        color: Theme.text;
-                                        font-size: 14px;
-                                        font-weight: 500;
-                                    }
-                                    Text {
-                                        text: "\{root.protein} / \{root.custom-protein > 0 ? root.custom-protein : root.target-protein} g";
-                                        color: Theme.muted;
-                                        font-size: 14px;
-                                    }
-                                }
-
-                                ProgressBar {
-                                    ink: true;
-                                    value: root.custom-protein > 0
-                                        ? min(100, root.protein * 100 / max(1, root.custom-protein))
-                                        : min(100, root.protein * 100 / max(1, root.target-protein));
-                                }
-                            }
-
-                            HorizontalLayout {
-                                spacing: 8px;
-                                padding-top: 14px;
-
-                                GhostButton {
-                                    label: "ONE GLASS";
-                                    show-icon: true;
-                                    icon: @image-url("icons/plus.png");
-                                    stretch: false;
-                                    width: 122px;
-                                    clicked => { root.add-water(); }
-                                }
-                                GhostButton {
-                                    label: "20 G PROTEIN";
-                                    show-icon: true;
-                                    icon: @image-url("icons/plus.png");
-                                    stretch: false;
-                                    width: 140px;
-                                    clicked => { root.add-protein(); }
-                                }
-                            }
-                        }
-                    }
-
-                    // Profile summary
-                    Rectangle {
-                        border-radius: Theme.radius-card;
-                        background: Theme.surface;
-                        border-width: 1px;
-                        border-color: Theme.line;
-
-                        VerticalLayout {
-                            padding: 24px;
-                            spacing: 20px;
-
-                            HorizontalLayout {
-                                spacing: 12px;
-
-                                Rectangle {
-                                    width: 48px;
-                                    height: 48px;
-                                    border-radius: 16px;
-                                    background: Theme.ink;
-
-                                    Text {
-                                        width: 100%;
-                                        height: 100%;
-                                        text: "FM";
-                                        color: Theme.accent;
-                                        font-family: Theme.font-wordmark;
-                                        font-size: 12px;
-                                        horizontal-alignment: center;
-                                    }
-                                }
-
-                                VerticalLayout {
-                                    spacing: 3px;
-                                    horizontal-stretch: 1;
-                                    Text {
-                                        text: root.profile-name;
-                                        color: Theme.text;
-                                        font-size: 14px;
-                                        font-weight: 600;
-                                    }
-                                    Text {
-                                        text: root.profile-goal + " · " + root.profile-experience;
-                                        color: Theme.muted;
-                                        font-size: 12px;
-                                    }
-                                }
-
-                                IconButton {
-                                    icon: @image-url("icons/arrow-up-right.png");
-                                    clicked => { root.edit-profile(); }
-                                }
-                            }
-
-                            Rectangle {
-                                height: 1px;
-                                background: Theme.line;
-                            }
-
-                            HorizontalLayout {
-                                spacing: 8px;
-
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text { text: "CAL"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
-                                    Text { text: "\{root.target-calories}"; color: Theme.text; font-size: 18px; font-weight: 500; }
-                                }
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text { text: "PROT"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
-                                    Text { text: "\{root.target-protein}"; color: Theme.accent; font-size: 18px; font-weight: 500; }
-                                }
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text { text: "CARBS"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
-                                    Text { text: "\{root.target-carbs}"; color: Theme.text; font-size: 18px; font-weight: 500; }
-                                }
-                                VerticalLayout {
-                                    horizontal-stretch: 1;
-                                    spacing: 4px;
-                                    Text { text: "FAT"; color: Theme.muted; font-size: 10px; font-weight: 600; letter-spacing: 1.3px; }
-                                    Text { text: "\{root.target-fat}"; color: Theme.text; font-size: 18px; font-weight: 500; }
-                                }
-                            }
-                        }
-                    }
-
-                    // Coach preview
-                    Rectangle {
-                        border-radius: Theme.radius-card;
-                        background: Theme.surface;
-                        border-width: 1px;
-                        border-color: Theme.line;
-
-                        VerticalLayout {
-                            padding: 24px;
-                            spacing: 18px;
-
-                            HorizontalLayout {
-                                alignment: space-between;
-
-                                VerticalLayout {
-                                    spacing: 4px;
-                                    SectionLabel { label: "COACH"; }
-                                    Text {
-                                        text: "Ask about your plan";
-                                        color: Theme.text;
-                                        font-size: 18px;
-                                        font-weight: 600;
-                                    }
-                                }
-
-                                IconButton {
-                                    icon: @image-url("icons/arrow-up-right.png");
-                                    clicked => { root.set-tab(3); }
-                                }
-                            }
-
-                            if root.chat-messages.length == 0 : VerticalLayout {
-                                spacing: 14px;
-                                Text {
-                                    text: "Training, food, recovery, or the week you just missed. The coach already knows your targets.";
-                                    color: Theme.muted;
-                                    font-size: 14px;
-                                    wrap: word-wrap;
-                                }
-                                HorizontalLayout {
-                                    spacing: 8px;
-                                    GhostButton {
-                                        label: "PROTEIN?";
-                                        stretch: false;
-                                        width: 118px;
-                                        clicked => {
-                                            root.chat-input = "How much protein do I need?";
-                                            root.send-chat();
-                                        }
-                                    }
-                                    GhostButton {
-                                        label: "MISSED DAYS";
-                                        stretch: false;
-                                        width: 126px;
-                                        clicked => {
-                                            root.chat-input = "I missed three days. What now?";
-                                            root.send-chat();
-                                        }
-                                    }
-                                    GhostButton {
-                                        label: "MY PLAN?";
-                                        stretch: false;
-                                        width: 104px;
-                                        clicked => {
-                                            root.chat-input = "Is my workout plan good?";
-                                            root.send-chat();
-                                        }
-                                    }
-                                }
-                            }
-
-                            if root.chat-messages.length > 0 : VerticalLayout {
-                                spacing: 10px;
-                                for message in root.chat-messages : Rectangle {
-                                    border-radius: 16px;
-                                    background: message.role == "assistant" ? Theme.surface-2 : Theme.text;
-                                    VerticalLayout {
-                                        padding: 12px;
-                                        spacing: 4px;
-                                        if message.role == "assistant" : Text {
-                                            text: "COACH";
-                                            color: Theme.accent;
-                                            font-size: 9px;
-                                            font-weight: 700;
-                                            letter-spacing: 1.4px;
-                                        }
-                                        Text {
-                                            text: message.content;
-                                            color: message.role == "assistant" ? Theme.text : Theme.cream;
-                                            font-size: 13px;
-                                            wrap: word-wrap;
-                                        }
-                                    }
-                                }
-                            }
-
-                            HorizontalLayout {
-                                spacing: 8px;
-
-                                Rectangle {
-                                    horizontal-stretch: 1;
-                                    height: 40px;
-                                    border-radius: 20px;
-                                    background: Theme.bg;
-                                    border-width: 1px;
-                                    border-color: Theme.line;
-
-                                    TextInput {
-                                        x: 14px;
-                                        y: 0;
-                                        width: parent.width - 28px;
-                                        height: 100%;
-                                        text <=> root.chat-input;
-                                        single-line: true;
-                                        color: Theme.text;
-                                        font-size: 13px;
-                                        accepted => { root.send-chat(); }
-                                    }
-                                }
-
-                                Rectangle {
-                                    width: 40px;
-                                    height: 40px;
-                                    border-radius: 20px;
-                                    background: Theme.accent;
-
-                                    Icon {
-                                        x: 11px;
-                                        y: 11px;
-                                        size: 18px;
-                                        tint: Theme.ink;
-                                        source: @image-url("icons/arrow-up.png");
-                                    }
-
-                                    TouchArea {
-                                        width: 100%;
-                                        height: 100%;
-                                        clicked => { root.send-chat(); }
-                                    }
-                                }
-                            }
+                            clicked => { root.open-progress(); }
                         }
                     }
                 }
@@ -1966,6 +2258,7 @@ export component AppWindow inherits Window {
 
         BottomNav {
             width: root.width;
+            safe-bottom: root.safe-area-insets.bottom;
             active: root.tab;
             select(tab) => {
                 root.set-tab(tab);

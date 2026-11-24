@@ -1,15 +1,16 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "./generated/tokens.css";
 
 @custom-variant dark (&:is(.dark *));
 
 /* ------------------------------------------------------------------
- * FitMentor design system — editorial performance.
+ * FitMentor design system — soft clinical, warm signal.
  *
- * Cream paper and ink by default, deep black in dark mode. One accent:
- * signal orange. Michroma is reserved for the wordmark; everything else
- * is set in Onest.
+ * Cool mist canvas, white bento cards, signal orange, lime actions and
+ * dot-matrix metrics. Michroma is reserved for the wordmark; Doto is
+ * reserved for numbers; everything else is set in Onest.
  * ------------------------------------------------------------------ */
 
 @font-face {
@@ -28,10 +29,19 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: "Doto";
+  src: url("./assets/fonts/Doto.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
   --font-display: "Onest", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Onest", ui-sans-serif, system-ui, sans-serif;
   --font-wordmark: "Michroma", ui-sans-serif, system-ui, sans-serif;
+  --font-dot: "Doto", ui-sans-serif, system-ui, sans-serif;
 
   --radius-sm: calc(var(--radius) - 6px);
   --radius-md: calc(var(--radius) - 3px);
@@ -61,7 +71,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  --color-paper: var(--paper);
+  --color-paper: var(--background);
   --color-cream: var(--cream);
   --color-peach: var(--peach);
   --color-orange: var(--orange);
@@ -69,6 +79,17 @@
   --color-ink: var(--ink);
   --color-graphite: var(--graphite);
   --color-silver: var(--silver);
+  --color-lime: var(--lime);
+  --color-lime-ink: var(--lime-ink);
+  --color-green: var(--green);
+  --color-green-deep: var(--green-deep);
+  --color-green-light: var(--green-light);
+  --color-coral: var(--coral);
+  --color-coral-light: var(--coral-light);
+  --color-lilac: var(--lilac);
+  --color-lilac-deep: var(--lilac-deep);
+  --color-surface-2: var(--surface-2);
+  --color-text-soft: var(--text-soft);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -78,78 +99,28 @@
 }
 
 :root {
-  --radius: 1.5rem;
+  --radius: 1.75rem;
+  --shadow-card: 0 1px 0 rgba(11, 11, 11, 0.03), 0 24px 60px -36px rgba(11, 11, 11, 0.35);
+  --shadow-dock: 0 18px 50px -18px rgba(11, 11, 11, 0.38);
+  --gradient-warm: var(--gradient-paper);
 
-  --paper: oklch(0.966 0.009 78.3);
-  --cream: oklch(0.926 0.029 72.5);
-  --peach: oklch(0.878 0.068 60.2);
-  --orange: oklch(0.704 0.199 45.2);
-  --burnt: oklch(0.589 0.147 43.2);
-  --ink: oklch(0.15 0 0);
-  --graphite: oklch(0.205 0 0);
-  --silver: oklch(0.748 0 0);
-
-  --background: oklch(0.966 0.009 78.3);
-  --foreground: oklch(0.15 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0 0);
-  --primary: oklch(0.704 0.199 45.2);
-  --primary-foreground: oklch(0.15 0 0);
-  --secondary: oklch(0.926 0.029 72.5);
-  --secondary-foreground: oklch(0.15 0 0);
-  --muted: oklch(0.94 0 0);
-  --muted-foreground: oklch(0.528 0 0);
-  --accent: oklch(0.704 0.199 45.2);
-  --accent-foreground: oklch(0.15 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.15 0 0 / 12%);
-  --input: oklch(0.15 0 0 / 8%);
-  --ring: oklch(0.704 0.199 45.2);
-
-  --chart-1: oklch(0.704 0.199 45.2);
-  --chart-2: oklch(0.589 0.147 43.2);
-  --chart-3: oklch(0.15 0 0);
-  --chart-4: oklch(0.748 0 0);
-  --chart-5: oklch(0.878 0.068 60.2);
-
-  --shadow-card: 0 1px 0 oklch(0.15 0 0 / 4%), 0 24px 60px -32px oklch(0.15 0 0 / 18%);
-  --gradient-ink: linear-gradient(180deg, oklch(0.19 0 0) 0%, oklch(0.11 0 0) 100%);
-  --gradient-warm: linear-gradient(160deg, oklch(0.926 0.029 72.5) 0%, oklch(0.878 0.068 60.2) 100%);
+  --chart-1: var(--accent);
+  --chart-2: var(--green);
+  --chart-3: var(--ink);
+  --chart-4: var(--silver);
+  --chart-5: var(--peach);
 }
 
 .dark {
-  --background: oklch(0.15 0 0);
-  --foreground: oklch(0.966 0.009 78.3);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.966 0.009 78.3);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.966 0.009 78.3);
-  --primary: oklch(0.704 0.199 45.2);
-  --primary-foreground: oklch(0.15 0 0);
-  --secondary: oklch(0.245 0 0);
-  --secondary-foreground: oklch(0.966 0.009 78.3);
-  --muted: oklch(0.225 0 0);
-  --muted-foreground: oklch(0.748 0 0);
-  --accent: oklch(0.704 0.199 45.2);
-  --accent-foreground: oklch(0.15 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.966 0.009 78.3 / 14%);
-  --input: oklch(0.966 0.009 78.3 / 10%);
-  --ring: oklch(0.704 0.199 45.2);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03), 0 30px 70px -40px rgba(0, 0, 0, 0.85);
+  --shadow-dock: 0 22px 60px -20px rgba(0, 0, 0, 0.9);
+  --gradient-warm: var(--gradient-ink);
 
-  --chart-1: oklch(0.704 0.199 45.2);
-  --chart-2: oklch(0.878 0.068 60.2);
-  --chart-3: oklch(0.966 0.009 78.3);
-  --chart-4: oklch(0.748 0 0);
-  --chart-5: oklch(0.589 0.147 43.2);
-
-  --shadow-card: 0 1px 0 oklch(1 0 0 / 4%), 0 30px 70px -40px oklch(0 0 0 / 80%);
-  --gradient-ink: linear-gradient(180deg, oklch(0.205 0 0) 0%, oklch(0.13 0 0) 100%);
-  --gradient-warm: linear-gradient(160deg, oklch(0.245 0 0) 0%, oklch(0.19 0 0) 100%);
+  --chart-1: var(--accent);
+  --chart-2: var(--green-light);
+  --chart-3: var(--cream);
+  --chart-4: var(--silver);
+  --chart-5: var(--coral);
 }
 
 @layer base {
@@ -220,6 +191,13 @@
   letter-spacing: 0.08em;
 }
 
+@utility font-dot {
+  font-family: var(--font-dot);
+  font-variation-settings: "ROND" 100;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
 @utility label-micro {
   font-size: 0.6875rem;
   line-height: 1;
@@ -234,6 +212,10 @@
 
 @utility shadow-card {
   box-shadow: var(--shadow-card);
+}
+
+@utility shadow-dock {
+  box-shadow: var(--shadow-dock);
 }
 
 @utility bg-ink-gradient {

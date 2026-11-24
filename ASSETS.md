@@ -9,11 +9,14 @@ below; keep this file up to date when adding or replacing assets.
 | --- | --- | --- |
 | `ui/src/assets/fonts/Onest.ttf`, `apps/native/ui/fonts/Onest.ttf` | Onest (variable) | SIL Open Font License 1.1 — `OFL-Onest.txt` |
 | `ui/src/assets/fonts/Michroma-Regular.ttf`, `apps/native/ui/fonts/Michroma-Regular.ttf` | Michroma | SIL Open Font License 1.1 — `OFL-Michroma.txt` |
+| `ui/src/assets/fonts/Doto.ttf`, `apps/native/ui/fonts/Doto.ttf` | Doto (variable) | SIL Open Font License 1.1 — `OFL-Doto.txt` |
+| `apps/native/ui/fonts/Doto-Round.ttf` | Doto static instance (ROND 100, wght 600) | SIL Open Font License 1.1 — `OFL-Doto.txt` |
 
 Sources:
 
 - https://github.com/google/fonts/tree/main/ofl/onest
 - https://github.com/google/fonts/tree/main/ofl/michroma
+- https://github.com/google/fonts/tree/main/ofl/doto
 
 ## Photography
 

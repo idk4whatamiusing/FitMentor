@@ -1,5 +1,9 @@
 {
   "name": "fitmentor",
   "private": true,
-  "workspaces": ["apps/*", "ui", "packages/*"]
+  "workspaces": ["apps/*", "ui", "packages/*"],
+  "scripts": {
+    "design:tokens": "node scripts/gen-design-tokens.mjs",
+    "design:check": "node scripts/gen-design-tokens.mjs && git diff --exit-code -- ui/src/generated/tokens.css apps/native/ui/generated-tokens.slint"
+  }
 }

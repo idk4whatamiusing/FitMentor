@@ -1,33 +1,51 @@
-// FitMentor native design tokens — mirrored from the mobile web build.
+// FitMentor native design tokens — generated from design/tokens.json.
 
+import { Tokens } from "generated-tokens.slint";
 import "fonts/Onest.ttf";
 import "fonts/Michroma-Regular.ttf";
+import "fonts/Doto-Round.ttf";
 
 import { Palette } from "std-widgets.slint";
 
 export global Theme {
     in-out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
 
-    out property <color> bg: dark ? #0B0B0B : #F7F3ED;
-    out property <color> surface: dark ? #171717 : #FFFFFF;
-    out property <color> surface-2: dark ? #262626 : #F3E4D2;
-    out property <color> text: dark ? #F7F3ED : #0B0B0B;
-    out property <color> muted: dark ? #ADADAD : #6B6B6B;
-    out property <color> line: dark ? rgba(247, 243, 237, 0.14) : rgba(11, 11, 11, 0.12);
-    out property <color> line-strong: dark ? rgba(247, 243, 237, 0.25) : rgba(11, 11, 11, 0.25);
-    out property <color> accent: #FF6C04;
-    out property <color> accent-soft: dark ? rgba(255, 108, 4, 0.16) : rgba(255, 108, 4, 0.10);
-    out property <color> ink: #0B0B0B;
-    out property <color> cream: #F7F3ED;
-    out property <color> muted-on-ink: rgba(247, 243, 237, 0.60);
+    out property <color> bg: dark ? Tokens.background-dark : Tokens.background-light;
+    out property <color> surface: dark ? Tokens.card-dark : Tokens.card-light;
+    out property <color> surface-2: dark ? Tokens.surface-2-dark : Tokens.surface-2-light;
+    out property <color> nav: dark ? Tokens.nav-dark : Tokens.nav-light;
+    out property <color> text: dark ? Tokens.foreground-dark : Tokens.foreground-light;
+    out property <color> text-soft: dark ? Tokens.text-soft-dark : Tokens.text-soft-light;
+    out property <color> muted: dark ? Tokens.muted-foreground-dark : Tokens.muted-foreground-light;
+    out property <color> line: dark ? Tokens.border-dark : Tokens.border-light;
+    out property <color> line-strong: dark ? #3A3A42 : #C2C2CC;
+    out property <color> accent: Tokens.accent;
+    out property <color> orange: Tokens.orange;
+    out property <color> burnt: Tokens.burnt;
+    out property <color> accent-soft: dark ? rgba(255, 108, 4, 0.18) : rgba(255, 108, 4, 0.12);
+    out property <color> ink: Tokens.ink;
+    out property <color> cream: Tokens.cream;
+    out property <color> lime: Tokens.lime;
+    out property <color> lime-ink: Tokens.lime-ink;
+    out property <color> green: Tokens.green;
+    out property <color> green-deep: Tokens.green-deep;
+    out property <color> green-light: Tokens.green-light;
+    out property <color> coral: Tokens.coral;
+    out property <color> lilac: Tokens.lilac;
+    out property <color> lilac-deep: Tokens.lilac-deep;
+    out property <color> white: Tokens.white;
+    out property <color> shadow: dark ? rgba(0, 0, 0, 0.55) : rgba(11, 11, 11, 0.12);
+    out property <color> muted-on-ink: rgba(247, 243, 237, 0.62);
     out property <color> faint-on-ink: rgba(247, 243, 237, 0.38);
 
-    out property <length> page-pad: 20px;
-    out property <length> header-h: 64px;
-    out property <length> nav-h: 72px;
-    out property <length> radius-card: 28px;
-    out property <length> radius-hero: 32px;
+    out property <length> page-pad: Tokens.space-page;
+    out property <length> header-h: 56px;
+    out property <length> nav-h: 84px;
+    out property <length> radius-card: Tokens.radius-card;
+    out property <length> radius-hero: Tokens.radius-hero;
+    out property <length> radius-row: Tokens.radius-row;
 
-    out property <string> font-body: "Onest";
-    out property <string> font-wordmark: "Michroma";
+    out property <string> font-body: Tokens.font-body;
+    out property <string> font-wordmark: Tokens.font-wordmark;
+    out property <string> font-dot: Tokens.font-dot;
 }
