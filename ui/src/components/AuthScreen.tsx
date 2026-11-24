@@ -43,8 +43,12 @@ export function AuthScreen({ mode }: { mode: "signin" | "signup" }) {
 
   const continueWithGoogle = async () => {
     setLoading(true);
-    const url = await getGoogleAuthUrl({ data: { mode: isSignup ? "signup" : "signin" } });
-    window.location.href = url;
+    try {
+      const url = await getGoogleAuthUrl({ data: { mode: isSignup ? "signup" : "signin" } });
+      window.location.href = url;
+    } catch {
+      setLoading(false);
+    }
   };
 
   if (checking) {

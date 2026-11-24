@@ -87,7 +87,7 @@ export function MobileShell({ children, wide }: { children: ReactNode; wide?: bo
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-6 px-5 lg:h-16 lg:px-8">
           <Wordmark href="/dashboard" />
 

@@ -312,3 +312,16 @@
 @utility animate-rise {
   animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* Capacitor draws the WebView edge to edge on Android 15+. Keep page content
+   clear of the status bar and the background continuous behind it. */
+html[data-platform="android"] {
+  background: var(--background);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Backdrop blur is expensive on mid-range Android WebViews. */
+html[data-platform="android"] * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}

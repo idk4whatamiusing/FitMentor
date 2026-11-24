@@ -1,5 +1,5 @@
 // TanStack Start's SPA mode emits the boot document as `_shell.html`.
-// Tauri serves `frontendDist` from its root and always opens `index.html`,
+// Capacitor copies `webDir` and always opens `index.html`,
 // so the shell is copied into place after the mobile build.
 import { copyFileSync, existsSync } from "node:fs";
 

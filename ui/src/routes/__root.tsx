@@ -11,6 +11,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { reportLovableError } from "../utils/lovable-error-reporting";
 import { Toaster } from "../components/ui/sonner";
 import { loadTheme } from "../utils/theme";
+import { NativeApp } from "../components/NativeApp";
 import appCss from "../styles.css?url";
 
 function initTheme() {
@@ -144,6 +145,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <NativeApp />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <ClientOnlyToaster />
