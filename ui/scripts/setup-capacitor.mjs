@@ -3,7 +3,7 @@
 // The config is committed at ui/capacitor.config.json and points at
 // dist-mobile/client, so the APK ships the app's own assets instead of
 // loading the deployed site over the network.
-import { appendFileSync, existsSync, realpathSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -57,6 +57,15 @@ try {
     run([capBin, "add", "android"]);
   }
   run([capBin, "sync", "android"]);
+
+  // Brand icons and splash art. The Android project is generated in CI, so the
+  // committed resources are copied over the template's defaults each time.
+  const resSource = join(uiDir, "resources/android/res");
+  const resTarget = join(uiDir, "android/app/src/main/res");
+  if (existsSync(resSource)) {
+    cpSync(resSource, resTarget, { recursive: true });
+    log("Android icons copied");
+  }
 
   log("SUCCESS");
 } catch (e) {

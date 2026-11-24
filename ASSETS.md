@@ -51,3 +51,6 @@ guidelines.
 
 The FitMentor monogram, wordmark, favicon, PWA icons, and Android launcher
 icons are original work created for this project.
+
+Android launcher and splash assets in `ui/resources/android/` are generated
+from `ui/src/assets/brand/fm-icon.png` by `ui/scripts/gen-android-icons.mjs`.
