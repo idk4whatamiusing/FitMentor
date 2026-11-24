@@ -8,6 +8,7 @@
     "dev:mobile": "vite dev --host",
     "build": "vite build",
     "build:mobile": "FITMENTOR_TARGET=mobile vite build && node scripts/prepare-mobile.mjs",
+    "build:mobile:play": "FITMENTOR_TARGET=mobile VITE_DISTRIBUTION=play vite build && node scripts/prepare-mobile.mjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",

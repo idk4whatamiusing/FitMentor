@@ -15,6 +15,7 @@ import {
 import { fetchSubscription } from "@/services/sync";
 import { proxyCheckout } from "@/services/api-proxy";
 import { openExternal } from "@/utils/platform";
+import { isPlayBuild } from "@/utils/distribution";
 import { Button } from "@/components/ui/button";
 import { Crown, LogOut, Sparkles, ShieldCheck, X, Check, Loader, ArrowUpRight } from "lucide-react";
 import { cn } from "@/utils/cn";
@@ -66,6 +67,25 @@ function ProfilePage() {
     const handler = () => setSub(loadSubscription());
     window.addEventListener("fitmentor:subscription", handler);
 
+    const applyServerSubscription = (json: any) => {
+      const srv = json?.data?.subscription;
+      if (!srv || !srv.tier || srv.tier === "free") return false;
+      const now = new Date();
+      const expiry = new Date(srv.currentPeriodEnd || now);
+      saveSubscription({
+        tier: srv.tier as PlanTier,
+        startDate: now.toISOString(),
+        expiryDate: expiry.toISOString(),
+        paymentMethod: "polar",
+      });
+      setSub(loadSubscription());
+      return true;
+    };
+
+    getSub()
+      .then(applyServerSubscription)
+      .catch(() => undefined);
+
     const params = new URLSearchParams(window.location.search);
     if (params.get("checkout") === "success") {
       window.history.replaceState({}, "", "/profile");
@@ -73,18 +93,8 @@ function ProfilePage() {
       const poll = () => {
         getSub()
           .then((json: any) => {
-            const srv = json?.data?.subscription;
-            if (srv && srv.tier !== "free") {
-              const now = new Date();
-              const expiry = new Date(srv.currentPeriodEnd || now);
-              saveSubscription({
-                tier: srv.tier as PlanTier,
-                startDate: now.toISOString(),
-                expiryDate: expiry.toISOString(),
-                paymentMethod: "polar",
-              });
-              setSub(loadSubscription());
-              toast.success(`${getPlanName(srv.tier)} plan activated`);
+            if (applyServerSubscription(json)) {
+              toast.success(`${getPlanName(json?.data?.subscription?.tier)} plan activated`);
             } else if (attempts > 0) {
               attempts -= 1;
               setTimeout(poll, 2000);
@@ -200,16 +210,23 @@ function ProfilePage() {
                   <div>
                     <p className="label-micro text-muted-foreground">Membership</p>
                     <h2 className="mt-3 flex items-center gap-2 text-2xl font-semibold">
-                      <Crown className="h-5 w-5 text-orange" /> Go premium
+                      <Crown className="h-5 w-5 text-orange" />{" "}
+                      {isPlayBuild ? "FitMentor Pro" : "Go premium"}
                     </h2>
                     <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
-                      Unlock the full coach, custom meal plans, and form feedback. Cancel any time.
+                      {isPlayBuild
+                        ? "Pro plans arrive on Google Play soon. Training, logging and your daily coach stay free."
+                        : "Unlock the full coach, custom meal plans, and form feedback. Cancel any time."}
                     </p>
                   </div>
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-orange text-ink">
-                    <ArrowUpRight className="h-4 w-4" />
-                  </span>
+                  {isPlayBuild ? null : (
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-orange text-ink">
+                      <ArrowUpRight className="h-4 w-4" />
+                    </span>
+                  )}
                 </div>
+
+                {isPlayBuild ? null : (
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-2">
                   {PLANS.map((plan) => (
@@ -252,6 +269,7 @@ function ProfilePage() {
                     </button>
                   ))}
                 </div>
+                )}
               </div>
             )}
 
