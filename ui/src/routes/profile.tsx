@@ -14,6 +14,7 @@ import {
 } from "@/utils/subscription";
 import { fetchSubscription } from "@/services/sync";
 import { proxyCheckout } from "@/services/api-proxy";
+import { openExternal } from "@/utils/platform";
 import { Button } from "@/components/ui/button";
 import { Crown, LogOut, Sparkles, ShieldCheck, X, Check, Loader, ArrowUpRight } from "lucide-react";
 import { cn } from "@/utils/cn";
@@ -375,7 +376,7 @@ function PolarCheckout({ tier, onClose }: { tier: PlanTier; onClose: () => void 
     checkout({ data: { tier } })
       .then((data) => {
         if (data.checkout_url) {
-          window.location.href = data.checkout_url;
+          void openExternal(data.checkout_url);
         } else {
           setError(data.error || "Failed to create checkout session");
           setLoading(false);

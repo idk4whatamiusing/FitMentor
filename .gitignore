@@ -41,9 +41,8 @@ dist-mobile
 *.sw?
 .vercel
 
-# Capacitor (generated in CI)
+# Capacitor Android project is generated in CI
 /ui/android/
-capacitor.config.*
 
 # Rust / Workers
 api/target/

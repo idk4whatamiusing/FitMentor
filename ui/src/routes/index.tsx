@@ -4,7 +4,7 @@ import Lenis from "lenis";
 import { motion } from "framer-motion";
 import { ArrowDown, ArrowRight, Check, Dumbbell, Flame, Sparkles } from "lucide-react";
 import { checkSession } from "@/utils/oauth";
-import { isTauri } from "@/utils/platform";
+import { isNative } from "@/utils/platform";
 import {
   MediaCard,
   Pill,
@@ -23,9 +23,9 @@ import progressImg from "@/assets/photos/progress-track.jpg";
 import runImg from "@/assets/photos/run-dusk.jpg";
 
 export const Route = createFileRoute("/")({
-  // The native shell opens the web app, not the marketing page.
+  // The native shell opens the app, not the marketing page.
   beforeLoad: () => {
-    if (isTauri()) throw redirect({ to: "/dashboard" });
+    if (isNative()) throw redirect({ to: "/dashboard" });
   },
   head: () => ({
     meta: [

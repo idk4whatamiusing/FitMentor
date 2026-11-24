@@ -1,12 +1,14 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { Home, Dumbbell, Sparkles, Apple, User, Wrench } from "lucide-react";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { cn } from "@/utils/cn";
 import { Wordmark } from "@/components/editorial";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { fetchLogRange, syncLocalLogs, upsertTodayLog } from "@/services/sync";
 import { allLogs, ensureToday, mergeServerLogs, todayKey } from "@/utils/habits";
+import { checkSession } from "@/utils/oauth";
+import { isNative } from "@/utils/platform";
 
 const TABS = [
   { to: "/dashboard", label: "Home", icon: Home },
@@ -31,11 +33,30 @@ function daysAgo(days: number) {
 
 export function MobileShell({ children, wide }: { children: ReactNode; wide?: boolean }) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  // The web relies on the cookie being checked by the server before render.
+  // The native shell has no server, so it verifies the token before showing
+  // any private screen and sends signed-out users to sign-in.
+  const [ready, setReady] = useState(() => !isNative());
   const fetchRange = useServerFn(fetchLogRange);
   const syncLogs = useServerFn(syncLocalLogs);
   const upsertLog = useServerFn(upsertTodayLog);
 
   useEffect(() => {
+    if (!isNative()) return;
+    let alive = true;
+    checkSession().then(({ ok }) => {
+      if (!alive) return;
+      if (ok) setReady(true);
+      else navigate({ to: "/signin", replace: true });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!ready) return;
     if (logsHydrated) return;
     logsHydrated = true;
     const local = allLogs();
@@ -55,6 +76,14 @@ export function MobileShell({ children, wide }: { children: ReactNode; wide?: bo
     window.addEventListener("fitmentor:logs", syncToday);
     return () => window.removeEventListener("fitmentor:logs", syncToday);
   }, [upsertLog]);
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <span className="h-5 w-5 animate-spin rounded-full border-2 border-foreground border-t-transparent" />
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen bg-background text-foreground">

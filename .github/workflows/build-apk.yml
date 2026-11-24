@@ -4,62 +4,89 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - "ui/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/build-apk.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    name: Android (arm64 + armv7)
     runs-on: ubuntu-latest
+    env:
+      HAS_RELEASE_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: zulu
           java-version: 21
 
       - uses: android-actions/setup-android@v4
 
-      - name: Accept licenses & install SDK 36
+      - name: Install SDK 36
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;36.0.0" || true
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install JS dependencies
+        run: npm ci
 
-      - name: Verify setup
-        run: |
-          set +e
-          echo "node: $(node --version)"
-          echo "npm: $(npm --version)"
-          echo "pwd: $(pwd)"
-          ls node_modules/.bin/ 2>&1 || true
-          echo "---"
-          test -f node_modules/.bin/cap && echo "cap: YES" || echo "cap: NO"
-          test -f ui/scripts/setup-capacitor.mjs && echo "script: YES" || echo "script: NO"
-          npm ls @capacitor/cli 2>&1 || true
+      - name: Build mobile SPA
+        run: npm --workspace ui run build:mobile
 
-      - name: Setup Capacitor & add Android platform
-        working-directory: ui
-        run: node scripts/setup-capacitor.mjs
+      - name: Generate Android project and copy assets
+        run: node ui/scripts/setup-capacitor.mjs
 
-      - name: Upload debug log
+      - name: Upload setup log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: debug-log
+          name: capacitor-setup-log
           path: /tmp/capacitor-setup.log
+          if-no-files-found: ignore
 
-      - name: Build APK
+      - name: Build release APK
+        working-directory: ui/android
+        run: ./gradlew assembleRelease --no-daemon --console=plain
+
+      - name: Zipalign and sign
+        if: env.HAS_RELEASE_KEYSTORE == 'true'
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
-          cd ui/android
-          ./gradlew assembleDebug --no-daemon --console=plain
+          set -euo pipefail
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/fitmentor-release.p12"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/36.0.0"
+          UNSIGNED=$(find ui/android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          test -n "$UNSIGNED"
+          "$BUILD_TOOLS/zipalign" -p -f 4 "$UNSIGNED" "$RUNNER_TEMP/aligned.apk"
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$RUNNER_TEMP/fitmentor-release.p12" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --out "$RUNNER_TEMP/FitMentor.apk" \
+            "$RUNNER_TEMP/aligned.apk"
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$RUNNER_TEMP/FitMentor.apk"
+          ls -lh "$RUNNER_TEMP/FitMentor.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: FitMentor-APK
-          path: ui/android/app/build/outputs/apk/debug/*.apk
+          path: |
+            ${{ runner.temp }}/FitMentor.apk
+            ui/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

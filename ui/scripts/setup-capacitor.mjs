@@ -1,13 +1,12 @@
-import {
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  rmSync,
-  writeFileSync,
-} from "fs";
-import { execFileSync } from "child_process";
-import { dirname, join, resolve } from "path";
-import { fileURLToPath } from "url";
+// Generates the Capacitor Android project from the mobile SPA build.
+//
+// The config is committed at ui/capacitor.config.json and points at
+// dist-mobile/client, so the APK ships the app's own assets instead of
+// loading the deployed site over the network.
+import { appendFileSync, existsSync, realpathSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const uiDir = resolve(scriptDir, "..");
@@ -18,10 +17,10 @@ const log = (msg) => {
   appendFileSync("/tmp/capacitor-setup.log", msg + "\n");
 };
 
-const run = (args) => {
+const run = (args, cwd = uiDir) => {
   log("RUN: node " + args.join(" "));
-  const output = execFileSync("node", args, {
-    cwd: uiDir,
+  const output = execFileSync(process.execPath, args, {
+    cwd,
     encoding: "utf8",
     stdio: "pipe",
   });
@@ -33,35 +32,20 @@ try {
   log("UI: " + uiDir);
   log("Node: " + process.version);
 
-  const config = {
-    appId: "ai.fitmentor.app",
-    appName: "FitMentor",
-    webDir: "dist",
-    server: {
-      url: "https://fitmentor-ey9.pages.dev",
-      cleartext: false,
-      androidScheme: "https",
-    },
-  };
+  const shell = join(uiDir, "dist-mobile/client/index.html");
+  if (!existsSync(shell)) {
+    throw new Error(
+      "dist-mobile/client/index.html is missing — run `npm run build:mobile` first",
+    );
+  }
+  log("SPA shell: " + shell);
 
-  mkdirSync(join(uiDir, "dist"), { recursive: true });
-  writeFileSync(
-    join(uiDir, "dist/index.html"),
-    "<html><body>FitMentor</body></html>",
-  );
-  rmSync(join(uiDir, "capacitor.config.ts"), { force: true });
-  writeFileSync(
-    join(uiDir, "capacitor.config.json"),
-    JSON.stringify(config, null, 2),
-  );
-  log("Config files written");
-
-  // Capacitor may be hoisted to the workspace root or installed in ui/.
+  // The CLI may be hoisted to the workspace root or live in ui/.
   const candidates = [
     join(uiDir, "node_modules/@capacitor/cli/bin/capacitor"),
     join(rootDir, "node_modules/@capacitor/cli/bin/capacitor"),
   ];
-  const capBin = candidates.find(existsSync);
+  const capBin = candidates.map((p) => (existsSync(p) ? realpathSync(p) : null)).find(Boolean);
   if (!capBin) {
     throw new Error(
       "Capacitor CLI not found in ui/node_modules or the workspace root",
@@ -69,8 +53,10 @@ try {
   }
   log("CLI: " + capBin);
 
-  run([capBin, "add", "android"]);
-  run([capBin, "copy", "android"]);
+  if (!existsSync(join(uiDir, "android"))) {
+    run([capBin, "add", "android"]);
+  }
+  run([capBin, "sync", "android"]);
 
   log("SUCCESS");
 } catch (e) {
