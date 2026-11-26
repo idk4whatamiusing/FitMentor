@@ -1,8 +1,13 @@
 import { Capacitor } from "@capacitor/core";
 
-/** True when running inside the Capacitor shell on Android or iOS. */
+/**
+ * True when running inside the Capacitor shell on Android or iOS.
+ *
+ * `VITE_FORCE_NATIVE=1` exercises the same branches in a browser, which is how
+ * `npm run preview:mobile` previews the shipped bundle on a laptop.
+ */
 export function isNative(): boolean {
-  return Capacitor.isNativePlatform();
+  return Capacitor.isNativePlatform() || import.meta.env.VITE_FORCE_NATIVE === "1";
 }
 
 /** "android" | "ios" | "web" */

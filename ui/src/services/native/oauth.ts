@@ -5,7 +5,14 @@
 // system browser and polls the API until the token lands — no deep link
 // and no extra OAuth client.
 import { useEffect, useState } from "react";
-import { decodeToken, getToken, request, setToken } from "./http";
+import {
+  decodeToken,
+  getToken,
+  markSessionVerified,
+  request,
+  sessionWasVerified,
+  setToken,
+} from "./http";
 
 type SessionUser = { sub: string; email: string };
 
@@ -102,6 +109,14 @@ export async function getGoogleAuthUrl(_opts?: {
   const token = await pollForToken(start.state);
   await setToken(token);
   return "/dashboard";
+}
+
+/** Verifies the token once per app run; used by route guards. */
+export async function ensureSession(): Promise<boolean> {
+  if (sessionWasVerified()) return true;
+  const { ok } = await checkSession();
+  if (ok) markSessionVerified(true);
+  return ok;
 }
 
 /** Unused on native: the start/poll flow replaces the code exchange. */

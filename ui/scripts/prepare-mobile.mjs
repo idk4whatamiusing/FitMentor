@@ -1,7 +1,7 @@
-// TanStack Start's SPA mode emits the boot document as `_shell.html`.
-// Capacitor copies `webDir` and always opens `index.html`,
-// so the shell is copied into place after the mobile build.
-import { copyFileSync, existsSync } from "node:fs";
+// Capacitor always opens index.html at `/`, but the native app starts on Home
+// (the marketing page is web-only). Rewriting the path in the shell before the
+// router boots avoids a redirect during hydration.
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const dir = new URL("../dist-mobile/client/", import.meta.url);
 const shell = new URL("_shell.html", dir);
@@ -12,5 +12,14 @@ if (!existsSync(shell)) {
   process.exit(1);
 }
 
-copyFileSync(shell, index);
+const boot = `<script>(function(){var p=location.pathname;if(p==="/"||p==="/index.html"){history.replaceState(null,"","/dashboard")}})()</script>`;
+
+let html = readFileSync(shell, "utf8");
+if (html.includes("</head>")) {
+  html = html.replace("</head>", `${boot}</head>`);
+} else {
+  html = boot + html;
+}
+
+writeFileSync(index, html);
 console.log("mobile SPA ready: dist-mobile/client/index.html");

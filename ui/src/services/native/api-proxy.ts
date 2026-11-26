@@ -1,5 +1,5 @@
 // Native replacement for `@/services/api-proxy`.
-import { request, requestOrNull } from "./http";
+import { ApiError, request, requestOrNull } from "./http";
 
 export type CoachSessionRow = {
   id: string;
@@ -20,11 +20,22 @@ export async function proxyToolAdvice(opts: {
   return { tips: Array.isArray(plan) ? plan : [] };
 }
 
-export async function proxyMe(): Promise<{ user: unknown; profile: unknown }> {
-  const body = await requestOrNull<{ data?: { user: unknown; profile: unknown } }>(
-    "/v1/user/me",
-  );
-  return body?.data ?? { user: null, profile: null };
+export async function proxyMe(): Promise<{
+  user?: unknown;
+  profile?: unknown;
+  error?: string;
+}> {
+  try {
+    const body = await request<{ data?: { user: unknown; profile: unknown } }>(
+      "/v1/user/me",
+    );
+    return body?.data ?? { user: null, profile: null };
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      return { error: "not authenticated" };
+    }
+    throw error;
+  }
 }
 
 export async function proxyUpdateProfile(opts: {

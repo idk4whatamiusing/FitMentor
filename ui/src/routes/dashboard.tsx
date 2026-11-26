@@ -58,7 +58,11 @@ function DashboardPage() {
       let p = loadProfile();
       if (!p) {
         try {
-          const data = (await meFn()) as { profile?: Profile | null };
+          const data = (await meFn()) as { profile?: Profile | null; error?: string };
+          if (data?.error) {
+            navigate({ to: "/signin", replace: true });
+            return;
+          }
           const profile = data?.profile;
           if (profile && profile.name) {
             saveProfile(profile);
@@ -68,7 +72,7 @@ function DashboardPage() {
             return;
           }
         } catch {
-          navigate({ to: "/onboarding", replace: true });
+          navigate({ to: "/signin", replace: true });
           return;
         }
       }

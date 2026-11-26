@@ -3,6 +3,7 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
+  redirect,
   useRouter,
   HeadContent,
   Scripts,
@@ -11,7 +12,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import { reportLovableError } from "../utils/lovable-error-reporting";
 import { Toaster } from "../components/ui/sonner";
 import { loadTheme } from "../utils/theme";
-import { NativeApp } from "../components/NativeApp";
+import { isNative } from "../utils/platform";
+import { ensureSession } from "../services/native/oauth";
+
+const PUBLIC_PATHS = new Set(["/", "/signin", "/signup"]);
+import { NativeApp, NativeAuthGate } from "../components/NativeApp";
 import appCss from "../styles.css?url";
 
 function initTheme() {
@@ -85,6 +90,13 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // Native builds have no cookie check on a server, so verify the stored token
+  // before any private route loads. Cached for the app run.
+  beforeLoad: async ({ location }) => {
+    if (!isNative() || PUBLIC_PATHS.has(location.pathname)) return;
+    if (await ensureSession()) return;
+    throw redirect({ to: "/signin", replace: true });
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -146,8 +158,10 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <NativeApp />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <NativeAuthGate>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+      </NativeAuthGate>
       <ClientOnlyToaster />
     </QueryClientProvider>
   );

@@ -16,6 +16,15 @@ export const API_URL = (
 const TOKEN_KEY = "fitmentor.token.v1";
 
 let cached: string | null | undefined;
+let sessionVerified = false;
+
+export function sessionWasVerified(): boolean {
+  return sessionVerified;
+}
+
+export function markSessionVerified(verified: boolean): void {
+  sessionVerified = verified;
+}
 
 // Capacitor plugins are proxies: awaiting one directly calls `.then()` on the
 // proxy and throws. Wrap it so the promise resolves to an object instead.
@@ -38,6 +47,7 @@ export async function getToken(): Promise<string | null> {
 
 export async function setToken(token: string | null): Promise<void> {
   cached = token;
+  sessionVerified = false;
   try {
     const { store } = await secureStorage();
     if (token) await store.set(TOKEN_KEY, token);

@@ -12,7 +12,8 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "preview:mobile": "VITE_API_URL=/ VITE_FORCE_NATIVE=1 FITMENTOR_TARGET=mobile vite build && node scripts/prepare-mobile.mjs && node scripts/serve-mobile.mjs"
   },
   "dependencies": {
     "@aparajita/capacitor-secure-storage": "^8.0.1",
