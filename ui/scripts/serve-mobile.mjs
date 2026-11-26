@@ -73,7 +73,7 @@ async function proxy(req, res, url) {
   }
 }
 
-const server = createServer(async (req, res) => {
+async function handleRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
   if (url.pathname.startsWith("/v1/")) {
@@ -89,15 +89,31 @@ const server = createServer(async (req, res) => {
   }
   // SPA fallback: the app owns routing.
   sendFile(res, join(root, "index.html"));
-});
+}
 
-server.listen(port, "0.0.0.0", () => {
+function announce(boundPort) {
   const lan = Object.values(networkInterfaces())
     .flat()
     .find((entry) => entry && entry.family === "IPv4" && !entry.internal);
 
   console.log(`\n  FitMentor native bundle`);
-  console.log(`  local:   http://localhost:${port}`);
-  if (lan) console.log(`  network: http://${lan.address}:${port}`);
+  console.log(`  local:   http://localhost:${boundPort}`);
+  if (lan) console.log(`  network: http://${lan.address}:${boundPort}`);
   console.log(`  api:     ${upstream}\n`);
-});
+}
+
+// Pick the next free port instead of failing when another preview is open.
+function start(candidate, attempt = 0) {
+  const server = createServer(handleRequest);
+  server.once("error", (error) => {
+    if (error.code === "EADDRINUSE" && attempt < 10) {
+      start(candidate + 1, attempt + 1);
+      return;
+    }
+    console.error(`Could not start on port ${candidate}: ${error.message}`);
+    process.exit(1);
+  });
+  server.listen(candidate, "0.0.0.0", () => announce(candidate));
+}
+
+start(port);
