@@ -15,7 +15,7 @@
 6. [REST API Specification](#6-rest-api-specification)
 7. [WebSocket Protocol](#7-websocket-protocol)
 8. [Payment Flow (Polar.sh)](#8-payment-flow-polarsh)
-9. [AI Coach Flow (Supermemory)](#9-ai-coach-flow-supermemory)
+9. [AI Coach Memory](#9-ai-coach-memory)
 10. [Service Communication](#10-service-communication)
 11. [Deployment Architecture](#11-deployment-architecture)
 12. [Environment Variables](#12-environment-variables)
@@ -68,10 +68,10 @@ FitMentor is a fitness app with a Discord-style multi-database architecture. Eac
                                   │
                            ┌──────┴──────┐
                            ▼             ▼
-                     ┌──────────┐  ┌───────────┐
-                     │Supermemory│  │ LLM API   │
-                     │ (RAG)     │  │ (OpenAI)  │
-                     └──────────┘  └───────────┘
+                     ┌────────────┐  ┌────────────┐
+                     │ CockroachDB│  │ Workers AI │
+                     │ (vectors)  │  │ (LLM)      │
+                     └────────────┘  └────────────┘
 ```
 
 ### Service Responsibilities
@@ -83,10 +83,10 @@ FitMentor is a fitness app with a Discord-style multi-database architecture. Eac
 | **TigerBeetle** | — | 3001 | Payment ledger (double-entry accounting for Polar.sh events) |
 | **Redis** | — | 6379 | Cache, Pub/Sub (Rust ↔ Gleam), session store, rate limits |
 | **PostgreSQL** | — | 5432 | Relational data: users, profiles, subscriptions, daily_logs, workout_completions |
-| **MongoDB** | — | 27017 | Document data: community_posts, coach_conversations, analytics_events |
+| **MongoDB** | — | 27017 | Document data: community_posts, analytics_events |
 | **Cloudflare D1** | — | — | Auth tokens, session validation, rate limit counters |
 | **Cloudflare KV** | — | — | Feature flags, cached static data (meal plans, workout templates) |
-| **Supermemory** | — | — | RAG index for AI coach (user context, conversation history) |
+| **CockroachDB vectors** | — | — | Coach memory: messages, facts, summaries (`VECTOR(1024)`) |
 | **Polar.sh** | — | — | Checkout, subscriptions, billing, webhooks |
 
 ---
@@ -234,36 +234,11 @@ db.community_posts.createIndex({ "created_at": -1 })
 db.community_posts.createIndex({ "user_id": 1, "created_at": -1 })
 ```
 
-#### `coach_conversations` collection
+#### Coach conversations
 
-```json
-{
-  "_id": "ObjectId",
-  "id": "uuid-string",
-  "user_id": "uuid-string",
-  "session_id": "uuid-string",
-  "messages": [
-    {
-      "role": "user",
-      "content": "string",
-      "timestamp": "2026-07-20T10:30:00Z"
-    },
-    {
-      "role": "assistant",
-      "content": "string",
-      "timestamp": "2026-07-20T10:30:05Z"
-    }
-  ],
-  "created_at": "2026-07-20T10:30:00Z",
-  "updated_at": "2026-07-20T10:35:00Z"
-}
-```
-
-**Indexes:**
-```javascript
-db.coach_conversations.createIndex({ "user_id": 1, "created_at": -1 })
-db.coach_conversations.createIndex({ "session_id": 1 }, { unique: true })
-```
+Coach conversations are not stored in MongoDB. They live in CockroachDB as
+`chat_sessions` (session metadata plus a JSON mirror) and `chat_messages`
+(one row per message with a `VECTOR(1024)` embedding). See section 9.
 
 #### `analytics_events` collection
 
@@ -737,7 +712,6 @@ Event dispatch:
     3. Create TigerBeetle transfer (PolarSettlement → UserWallet)
     4. Upsert subscription in PostgreSQL
     5. Publish Redis: ws:broadcast:{user_id} → subscription_update
-    6. Ingest to Supermemory: "User subscribed to {tier}"
 
   subscription.active:
     1. Update subscription status → "active"
@@ -783,105 +757,74 @@ webhooks::verify(&raw_body, &headers, &secret)?;
 
 ---
 
-## 9. AI Coach Flow (Supermemory)
+## 9. AI Coach Memory
 
 ### 9.1 Architecture
 
 ```
-User sends message → Rust API → Supermemory (get context) → LLM API → Stream response
-                          ↓                                          ↓
-                    MongoDB (save conversation)              Gleam WS (stream to client)
-                          ↓
-                    Supermemory (ingest new context)
+message → embed (bge-m3, 1024d) → chat_messages.embedding
+              │
+              ├── facts (always injected)
+              ├── session summaries (embedded, cross-session)
+              └── hybrid recall: vector top-k + keyword matches
+                          │
+                          ▼
+              system prompt → Workers AI → reply
 ```
+
+Messages are rows in `chat_messages` with an embedding alongside the text.
+`chat_sessions.messages` remains a JSON mirror for older clients; reads
+prefer the rows and fall back to the blob.
 
 ### 9.2 Request Flow
 
-```
-POST /v1/coach/chat
-Body: {
-  messages: [{ role: "user", content: "How much protein do I need?" }],
-  sessionId: "optional-existing-session"
-}
-```
+`POST /v1/coach/chat` with `{ session_id, message }`:
 
-```
-1. Auth: Validate JWT, get user_id
-2. Rate limit: Check Redis ratelimit:coach:{user_id} < 30/min
-3. Load profile from PostgreSQL (or Redis cache)
-4. Supermemory: GET profile + search
-   client.profile({
-     containerTag: user_id,
-     q: "What should I know about this user for coaching?"
-   })
-   → profile.static (permanent facts)
-   → profile.dynamic (recent activity)
-   → searchResults (relevant memories)
-5. Build system prompt:
-   - FitMentor coach persona
-   - User profile (from PostgreSQL)
-   - Static facts (from Supermemory)
-   - Dynamic facts (from Supermemory)
-   - Relevant memories (from Supermemory search)
-6. Call LLM API with streaming
-7. Stream chunks via Redis PUBLISH → Gleam WS → Client
-8. On completion:
-   a. Save conversation to MongoDB
-   b. Ingest summary to Supermemory
-   c. Log analytics event to MongoDB
-```
+1. Auth via Bearer JWT (`require_user`).
+2. Load the session and its messages (rows first, JSON fallback).
+3. Consume the daily AI quota.
+4. Embed the new message.
+5. Load memory:
+   - all active `coach_facts` for the user,
+   - the current session summary,
+   - the 3 most similar summaries from other sessions,
+   - the 8 nearest messages from other sessions,
+   - keyword matches for up to 6 names/numbers.
+6. Build the prompt: recent turns that fit a **6,000-token budget** (newest
+   first), plus the new message. There is no fixed "last 10" window.
+7. Call Workers AI.
+8. Insert the user message and reply into `chat_messages` with embeddings.
+9. Mirror the turn into `chat_sessions.messages`.
+10. Every 8 messages, run one maintenance call that refreshes the rolling
+    summary and extracts durable facts.
 
-### 9.3 Supermemory Integration
+The web path builds its prompt in the Pages worker, so it fetches the same
+memory block from `POST /v1/coach/context` before calling the model, then
+posts the turn to `/v1/coach/log`.
 
-```rust
-let client = reqwest::Client::new();
+### 9.3 Tables
 
-// Get user profile + relevant memories
-let profile_resp = client.post("https://api.supermemory.ai/v4/profile")
-    .bearer_auth(&supermemory_api_key)
-    .json(&serde_json::json!({
-        "containerTag": user_id,
-        "q": "What should I know about this user for today's coaching session?"
-    }))
-    .send().await?;
-
-// Ingest new conversation context
-client.post("https://api.supermemory.ai/v3/documents")
-    .bearer_auth(&supermemory_api_key)
-    .json(&serde_json::json!({
-        "content": conversation_summary,
-        "containerTag": user_id,
-        "entityContext": "Coaching conversation",
-        "metadata": { "source": "coach_chat", "date": today }
-    }))
-    .send().await?;
+```sql
+chat_messages   (id, session_id, user_id, role, content,
+                 embedding VECTOR(1024), seq, created_at)
+coach_facts     (id, user_id, fact, embedding VECTOR(1024),
+                 source_session, active, created_at, updated_at)
+coach_summaries (session_id, user_id, summary, embedding VECTOR(1024),
+                 covered_until_seq, updated_at)
 ```
 
-### 9.4 Conversation Storage (MongoDB)
+Facts are deduped by embedding similarity and by the model itself. When a
+fact changes (goal, schedule, preference), the model retires the old row and
+adds the corrected one. Facts are injected last and marked authoritative, so
+they win against older summaries and retrieved lines.
 
-```rust
-mongo.collection("coach_conversations").update_one(
-    doc! { "session_id": &session_id },
-    doc! {
-        "$setOnInsert": {
-            "id": Uuid::new_v4().to_string(),
-            "user_id": &user_id,
-            "session_id": &session_id,
-            "created_at": chrono::Utc::now().to_rfc3339(),
-        },
-        "$push": {
-            "messages": {
-                "$each": [
-                    doc! { "role": "user", "content": user_msg, "timestamp": now },
-                    doc! { "role": "assistant", "content": assistant_msg, "timestamp": now },
-                ]
-            }
-        },
-        "$set": { "updated_at": chrono::Utc::now().to_rfc3339() }
-    },
-    UpdateOptions::builder().upsert(true).build(),
-).await?;
-```
+### 9.4 Embeddings
+
+`POST /api/ai/embed` on Cloudflare Pages calls Workers AI
+`@cf/baai/bge-m3` (1,024 dimensions, multilingual). Vectors are
+unit-normalised so Cockroach's L2 vector index ranks like cosine similarity.
+If the embed worker is down, chat still succeeds; the message is stored with
+a `NULL` embedding and is skipped by recall until re-embedded.
 
 ---
 
@@ -1043,8 +986,8 @@ Managed Services
 ├── MongoDB: Atlas (M0 → M10)
 ├── Redis: Upstash (serverless)
 ├── Polar.sh: Payments
-├── Supermemory: RAG
-└── OpenAI/Anthropic: LLM
+├── CockroachDB: relational data + coach memory
+└── Cloudflare Workers AI: LLM + embeddings
 ```
 
 ### 11.2 Docker Compose (Local Development)
@@ -1213,9 +1156,6 @@ POLAR_ACCESS_TOKEN=polar_oat_...
 POLAR_WEBHOOK_SECRET=whsec_...
 POLAR_ENVIRONMENT=sandbox
 
-# Supermemory
-SUPERMEMORY_API_KEY=sm_...
-
 # LLM
 LLM_PROVIDER=openai
 LLM_API_KEY=sk-...
@@ -1340,10 +1280,10 @@ impl IntoResponse for AppError {
 
 ### Phase 5: AI Coach (Weeks 5-6)
 - [ ] Coach chat endpoint (REST)
-- [ ] Supermemory integration
+- [ ] Vector memory (facts, summaries, hybrid recall)
 - [ ] LLM API streaming
 - [ ] WebSocket streaming (Rust → Redis → Gleam → Client)
-- [ ] Conversation storage (MongoDB)
+- [ ] Conversation storage (CockroachDB)
 
 ### Phase 6: Payments (Weeks 6-7)
 - [ ] Polar.sh checkout flow
@@ -1477,8 +1417,8 @@ FitMentor/
 | Edge DB | Cloudflare D1 | — | Auth sessions, rate limit counters |
 | Edge Cache | Cloudflare KV | — | Meal plans, workout templates, feature flags |
 | Payments | Polar.sh | — | Checkout, subscriptions, billing |
-| RAG | Supermemory | — | AI coach context + memory |
-| LLM | OpenAI / Anthropic | — | AI coach responses |
+| Vector memory | CockroachDB `VECTOR` | 26.2 | Coach facts, summaries, message recall |
+| LLM | Cloudflare Workers AI | — | Coach replies + bge-m3 embeddings |
 | Hosting (FE) | Cloudflare Pages | — | Frontend deployment |
 | Hosting (BE) | Fly.io | — | Rust + Gleam deployment |
 | Hosting (DB) | Neon / Supabase | — | Managed PostgreSQL |

@@ -14,4 +14,5 @@ pub mod db;
 pub mod embeddings;
 pub mod error;
 pub mod handlers;
+pub mod memory;
 pub mod models;

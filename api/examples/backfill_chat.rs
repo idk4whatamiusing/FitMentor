@@ -17,7 +17,8 @@ async fn main() -> Result<(), String> {
     }
 
     let sessions = sqlx::query_as::<_, (String, String, String)>(
-        "SELECT id, user_id, messages FROM chat_sessions WHERE messages <> '[]'",
+        "SELECT id, user_id, messages FROM chat_sessions
+         WHERE messages <> '[]' ORDER BY created_at ASC",
     )
     .fetch_all(&state.pool)
     .await
@@ -35,7 +36,8 @@ async fn main() -> Result<(), String> {
                 .await
                 .map_err(|error| error.to_string())?;
         if existing > 0 {
-            println!("skip {session_id}: {existing} rows already");
+            println!("{session_id}: {existing} rows already, refreshing memory");
+            fitmentor_api::memory::maintain(&state, &user_id, &session_id).await;
             continue;
         }
 
@@ -93,6 +95,7 @@ async fn main() -> Result<(), String> {
             "{session_id}: {} messages, {embedded} embedded",
             items.len()
         );
+        fitmentor_api::memory::maintain(&state, &user_id, &session_id).await;
         total_messages += items.len();
         total_embedded += embedded;
     }

@@ -14,8 +14,7 @@ const Input = z.object({
         content: z.string().min(1).max(2000),
       }),
     )
-    .min(1)
-    .max(40),
+    .min(1),
   profile: z
     .object({
       name: z.string().optional(),
@@ -39,6 +38,22 @@ const Input = z.object({
 });
 
 const apiUrl = () => getEnv("API_URL");
+
+// Keep the prompt bounded by size, not by an arbitrary message count.
+const PROMPT_CHAR_BUDGET = 18_000;
+const MESSAGE_CHAR_CAP = 4_000;
+
+function budgetMessages(messages: ChatMessage[]): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  let used = 0;
+  for (const message of [...messages].reverse()) {
+    const length = Math.min(message.content.length, MESSAGE_CHAR_CAP);
+    if (out.length > 0 && used + length > PROMPT_CHAR_BUDGET) break;
+    used += length;
+    out.push(message);
+  }
+  return out.reverse();
+}
 
 export const askCoach = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
@@ -103,12 +118,41 @@ ${profileBlock}`;
       } catch {}
     }
 
-    const messages: ChatMessage[] = [{ role: "system", content: system }, ...data.messages];
+    const lastUserMsg = [...data.messages].reverse().find((m) => m.role === "user");
+
+    // Facts, summaries and hybrid recall live in the API. Fetch them once so
+    // the web prompt matches the native `/v1/coach/chat` path.
+    let memoryBlock = "";
+    if (sub && lastUserMsg) {
+      try {
+        const apiKey = getEnv("API_SHARED_SECRET");
+        const ctxRes = await fetch(`${apiUrl()}/v1/coach/context`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Api-Key": apiKey ?? "",
+            "X-User-Id": sub,
+          },
+          body: JSON.stringify({
+            session_id: data.session_id || "",
+            message: lastUserMsg.content,
+          }),
+        });
+        if (ctxRes.ok) {
+          const ctx = await ctxRes.json();
+          if (typeof ctx?.context === "string") memoryBlock = ctx.context;
+        }
+      } catch {}
+    }
+
+    const messages: ChatMessage[] = [
+      { role: "system", content: system + memoryBlock },
+      ...budgetMessages(data.messages),
+    ];
     const reply = await chatCompletion({ messages, userId: sub ?? undefined, tier });
 
     if (sub) {
       const apiKey = getEnv("API_SHARED_SECRET");
-      const lastUserMsg = [...data.messages].reverse().find((m) => m.role === "user");
       try {
         const res = await fetch(`${apiUrl()}/v1/coach/log`, {
           method: "POST",
