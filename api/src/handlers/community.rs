@@ -6,6 +6,7 @@
 //! dispatched on the operation name, so this module does the same and returns
 //! `{ "data": ... }` / `{ "errors": [...] }`.
 
+use aurora_dsql_sqlx_connector::{retry_on_occ, OCCRetryConfig};
 use axum::body::Bytes;
 use axum::extract::State;
 use axum::http::HeaderMap;
@@ -135,7 +136,7 @@ SELECT p.id, p.user_id, p.body, p.parent_id, p.reshare_id, p.hidden, p.created_a
        (SELECT COUNT(*) FROM community_likes l WHERE l.post_id = p.id AND l.user_id = $1) AS liked_by_me,
        (SELECT COUNT(*) FROM community_posts r WHERE r.parent_id = p.id) AS reply_count,
        (SELECT COUNT(*) FROM community_posts r WHERE r.reshare_id = p.id) AS reshare_count,
-       COALESCE((SELECT u.name FROM users u WHERE u.cf_access_sub = p.user_id), 'User') AS author_name
+       p.author_name
 FROM community_posts p
 ";
 
@@ -157,25 +158,27 @@ pub async fn graphql(State(state): State<AppState>, headers: HeaderMap, body: By
     let operation = operation_name(&request.query);
     let user_id = auth_user.user_id.as_str();
 
+    let community = &state.community_pool;
+    let users = &state.pool;
     let result: Result<Value, String> = match operation.as_str() {
-        "feed" => feed(&state.pool, user_id, &variables).await,
-        "post" => post(&state.pool, user_id, &variables).await,
-        "myPosts" => my_posts(&state.pool, user_id, &variables).await,
-        "search" => search(&state.pool, user_id, &variables).await,
-        "notifications" => notifications(&state.pool, user_id, &variables).await,
-        "unreadNotificationCount" => unread_count(&state.pool, user_id).await,
-        "markNotificationsRead" => mark_read(&state.pool, user_id, "markNotificationsRead").await,
+        "feed" => feed(community, user_id, &variables).await,
+        "post" => post(community, user_id, &variables).await,
+        "myPosts" => my_posts(community, user_id, &variables).await,
+        "search" => search(community, user_id, &variables).await,
+        "notifications" => notifications(community, user_id, &variables).await,
+        "unreadNotificationCount" => unread_count(community, user_id).await,
+        "markNotificationsRead" => mark_read(community, user_id, "markNotificationsRead").await,
         "markAllNotificationsRead" => {
-            mark_read(&state.pool, user_id, "markAllNotificationsRead").await
+            mark_read(community, user_id, "markAllNotificationsRead").await
         }
-        "createPost" => create_post(&state.pool, user_id, &variables).await,
-        "deletePost" => delete_post(&state.pool, user_id, &variables).await,
-        "toggleLike" => toggle_like(&state.pool, user_id, &variables).await,
-        "replyToPost" => reply_to_post(&state.pool, user_id, &variables).await,
-        "resharePost" => reshare_post(&state.pool, user_id, &variables).await,
-        "reportPost" => report_post(&state.pool, user_id, &variables).await,
-        "blockUser" => block_user(&state.pool, user_id, &variables).await,
-        "unblockUser" => unblock_user(&state.pool, user_id, &variables).await,
+        "createPost" => create_post(community, users, user_id, &variables).await,
+        "deletePost" => delete_post(community, user_id, &variables).await,
+        "toggleLike" => toggle_like(community, user_id, &variables).await,
+        "replyToPost" => reply_to_post(community, users, user_id, &variables).await,
+        "resharePost" => reshare_post(community, users, user_id, &variables).await,
+        "reportPost" => report_post(community, user_id, &variables).await,
+        "blockUser" => block_user(community, user_id, &variables).await,
+        "unblockUser" => unblock_user(community, user_id, &variables).await,
         "requestUploadUrl" => Err("media_uploads_not_configured".into()),
         _ => Err(format!("unknown_operation: {operation}")),
     };
@@ -305,10 +308,10 @@ async fn mark_read(pool: &PgPool, user_id: &str, key: &str) -> Result<Value, Str
     Ok(Value::Object(response))
 }
 
-async fn author_name(pool: &PgPool, user_id: &str) -> String {
+async fn author_name(users: &PgPool, user_id: &str) -> String {
     sqlx::query_scalar::<_, String>("SELECT name FROM users WHERE cf_access_sub = $1")
         .bind(user_id)
-        .fetch_optional(pool)
+        .fetch_optional(users)
         .await
         .ok()
         .flatten()
@@ -371,44 +374,48 @@ async fn notify(
     }
     let id = Uuid::new_v4().to_string();
     sqlx::query(
-        "INSERT INTO community_notifications (id, user_id, actor_id, post_id, type)
-         VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO community_notifications (id, user_id, actor_id, post_id, type, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6)",
     )
     .bind(id)
     .bind(user_id)
     .bind(actor_id)
     .bind(post_id)
     .bind(notification_type)
+    .bind(crate::db::now_text())
     .execute(pool)
     .await
     .map_err(|error| format!("query_failed: {error}"))?;
     Ok(())
 }
 
-async fn create_post(pool: &PgPool, user_id: &str, variables: &Value) -> Result<Value, String> {
+async fn create_post(
+    community: &PgPool,
+    users: &PgPool,
+    user_id: &str,
+    variables: &Value,
+) -> Result<Value, String> {
     let body = post_body(variables)?;
+    let author = author_name(users, user_id).await;
     let id = Uuid::new_v4().to_string();
-    let created_at = sqlx::query_scalar::<_, String>(
-        "INSERT INTO community_posts (id, user_id, body) VALUES ($1, $2, $3) RETURNING created_at",
-    )
-    .bind(&id)
-    .bind(user_id)
-    .bind(&body)
-    .fetch_one(pool)
+    let created_at = crate::db::now_text();
+    retry_on_occ(&OCCRetryConfig::default(), || async {
+        sqlx::query(
+            "INSERT INTO community_posts (id, user_id, author_name, body, created_at)
+             VALUES ($1, $2, $3, $4, $5)",
+        )
+        .bind(&id)
+        .bind(user_id)
+        .bind(&author)
+        .bind(&body)
+        .bind(&created_at)
+        .execute(community)
+        .await
+    })
     .await
     .map_err(|error| format!("query_failed: {error}"))?;
 
-    let row = build_row(
-        id,
-        user_id,
-        body,
-        None,
-        None,
-        created_at,
-        author_name(pool, user_id).await,
-        0,
-        0,
-    );
+    let row = build_row(id, user_id, body, None, None, created_at, author, 0, 0);
     Ok(json!({ "createPost": row.to_json() }))
 }
 
@@ -446,12 +453,15 @@ async fn toggle_like(pool: &PgPool, user_id: &str, variables: &Value) -> Result<
             .await
             .map_err(|error| format!("query_failed: {error}"))?;
     } else {
-        sqlx::query("INSERT INTO community_likes (post_id, user_id) VALUES ($1, $2)")
-            .bind(&post_id)
-            .bind(user_id)
-            .execute(pool)
-            .await
-            .map_err(|error| format!("query_failed: {error}"))?;
+        sqlx::query(
+            "INSERT INTO community_likes (post_id, user_id, created_at) VALUES ($1, $2, $3)",
+        )
+        .bind(&post_id)
+        .bind(user_id)
+        .bind(crate::db::now_text())
+        .execute(pool)
+        .await
+        .map_err(|error| format!("query_failed: {error}"))?;
 
         if let Some(author) = sqlx::query_scalar::<_, String>(
             "SELECT user_id FROM community_posts WHERE id = $1 AND hidden = 0",
@@ -475,7 +485,12 @@ async fn toggle_like(pool: &PgPool, user_id: &str, variables: &Value) -> Result<
     Ok(json!({ "toggleLike": { "liked": !liked, "count": count } }))
 }
 
-async fn reply_to_post(pool: &PgPool, user_id: &str, variables: &Value) -> Result<Value, String> {
+async fn reply_to_post(
+    community: &PgPool,
+    users: &PgPool,
+    user_id: &str,
+    variables: &Value,
+) -> Result<Value, String> {
     let parent_id = var_str(variables, "postId");
     if parent_id.is_empty() {
         return Err("post_not_found".into());
@@ -484,7 +499,7 @@ async fn reply_to_post(pool: &PgPool, user_id: &str, variables: &Value) -> Resul
         "SELECT user_id FROM community_posts WHERE id = $1 AND hidden = 0",
     )
     .bind(&parent_id)
-    .fetch_optional(pool)
+    .fetch_optional(community)
     .await
     .map_err(|error| format!("query_failed: {error}"))?;
     let Some(parent_author) = parent_author else {
@@ -492,20 +507,27 @@ async fn reply_to_post(pool: &PgPool, user_id: &str, variables: &Value) -> Resul
     };
 
     let body = post_body(variables)?;
+    let author = author_name(users, user_id).await;
     let id = Uuid::new_v4().to_string();
-    let created_at = sqlx::query_scalar::<_, String>(
-        "INSERT INTO community_posts (id, user_id, body, parent_id)
-         VALUES ($1, $2, $3, $4) RETURNING created_at",
-    )
-    .bind(&id)
-    .bind(user_id)
-    .bind(&body)
-    .bind(&parent_id)
-    .fetch_one(pool)
+    let created_at = crate::db::now_text();
+    retry_on_occ(&OCCRetryConfig::default(), || async {
+        sqlx::query(
+            "INSERT INTO community_posts (id, user_id, author_name, body, parent_id, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6)",
+        )
+        .bind(&id)
+        .bind(user_id)
+        .bind(&author)
+        .bind(&body)
+        .bind(&parent_id)
+        .bind(&created_at)
+        .execute(community)
+        .await
+    })
     .await
     .map_err(|error| format!("query_failed: {error}"))?;
 
-    notify(pool, &parent_author, user_id, &parent_id, "reply").await?;
+    notify(community, &parent_author, user_id, &parent_id, "reply").await?;
 
     let row = build_row(
         id,
@@ -514,7 +536,7 @@ async fn reply_to_post(pool: &PgPool, user_id: &str, variables: &Value) -> Resul
         Some(parent_id),
         None,
         created_at,
-        author_name(pool, user_id).await,
+        author,
         0,
         0,
     );
@@ -527,7 +549,12 @@ struct OriginalPost {
     user_id: String,
 }
 
-async fn reshare_post(pool: &PgPool, user_id: &str, variables: &Value) -> Result<Value, String> {
+async fn reshare_post(
+    community: &PgPool,
+    users: &PgPool,
+    user_id: &str,
+    variables: &Value,
+) -> Result<Value, String> {
     let original_id = var_str(variables, "postId");
     if original_id.is_empty() {
         return Err("post_not_found".into());
@@ -536,27 +563,41 @@ async fn reshare_post(pool: &PgPool, user_id: &str, variables: &Value) -> Result
         "SELECT body, user_id FROM community_posts WHERE id = $1 AND hidden = 0",
     )
     .bind(&original_id)
-    .fetch_optional(pool)
+    .fetch_optional(community)
     .await
     .map_err(|error| format!("query_failed: {error}"))?;
     let Some(original) = original else {
         return Err("post_not_found".into());
     };
 
+    let author = author_name(users, user_id).await;
     let id = Uuid::new_v4().to_string();
-    let created_at = sqlx::query_scalar::<_, String>(
-        "INSERT INTO community_posts (id, user_id, body, reshare_id)
-         VALUES ($1, $2, $3, $4) RETURNING created_at",
-    )
-    .bind(&id)
-    .bind(user_id)
-    .bind(&original.body)
-    .bind(&original_id)
-    .fetch_one(pool)
+    let created_at = crate::db::now_text();
+    retry_on_occ(&OCCRetryConfig::default(), || async {
+        sqlx::query(
+            "INSERT INTO community_posts (id, user_id, author_name, body, reshare_id, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6)",
+        )
+        .bind(&id)
+        .bind(user_id)
+        .bind(&author)
+        .bind(&original.body)
+        .bind(&original_id)
+        .bind(&created_at)
+        .execute(community)
+        .await
+    })
     .await
     .map_err(|error| format!("query_failed: {error}"))?;
 
-    notify(pool, &original.user_id, user_id, &original_id, "reshare").await?;
+    notify(
+        community,
+        &original.user_id,
+        user_id,
+        &original_id,
+        "reshare",
+    )
+    .await?;
 
     let row = build_row(
         id,
@@ -565,7 +606,7 @@ async fn reshare_post(pool: &PgPool, user_id: &str, variables: &Value) -> Result
         None,
         Some(original_id),
         created_at,
-        author_name(pool, user_id).await,
+        author,
         0,
         0,
     );
@@ -580,13 +621,14 @@ async fn report_post(pool: &PgPool, user_id: &str, variables: &Value) -> Result<
     }
     let id = Uuid::new_v4().to_string();
     sqlx::query(
-        "INSERT INTO community_reports (id, reporter_id, post_id, reason)
-         VALUES ($1, $2, $3, $4)",
+        "INSERT INTO community_reports (id, reporter_id, post_id, reason, created_at)
+         VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(id)
     .bind(user_id)
     .bind(post_id)
     .bind(reason)
+    .bind(crate::db::now_text())
     .execute(pool)
     .await
     .map_err(|error| format!("query_failed: {error}"))?;
@@ -599,11 +641,12 @@ async fn block_user(pool: &PgPool, user_id: &str, variables: &Value) -> Result<V
         return Err("invalid_user".into());
     }
     sqlx::query(
-        "INSERT INTO community_blocks (blocker_id, blocked_id) VALUES ($1, $2)
+        "INSERT INTO community_blocks (blocker_id, blocked_id, created_at) VALUES ($1, $2, $3)
          ON CONFLICT (blocker_id, blocked_id) DO NOTHING",
     )
     .bind(user_id)
     .bind(blocked_id)
+    .bind(crate::db::now_text())
     .execute(pool)
     .await
     .map_err(|error| format!("query_failed: {error}"))?;
@@ -619,4 +662,179 @@ async fn unblock_user(pool: &PgPool, user_id: &str, variables: &Value) -> Result
         .await
         .map_err(|error| format!("query_failed: {error}"))?;
     Ok(json!({ "unblockUser": true }))
+}
+
+#[derive(sqlx::FromRow)]
+struct BackfillPost {
+    id: String,
+    user_id: String,
+    author_name: String,
+    body: String,
+    parent_id: Option<String>,
+    reshare_id: Option<String>,
+    hidden: i64,
+    created_at: String,
+}
+
+/// Copy community rows from CockroachDB into DSQL.
+///
+/// Idempotent: existing ids are skipped and self-references are only filled
+/// in when still null, so the endpoint can be run again after a partial copy.
+pub async fn backfill(users: &PgPool, community: &PgPool) -> Result<Value, String> {
+    let posts = sqlx::query_as::<_, BackfillPost>(
+        "SELECT id, user_id, author_name, body, parent_id, reshare_id, hidden, created_at
+         FROM community_posts ORDER BY created_at ASC",
+    )
+    .fetch_all(users)
+    .await
+    .map_err(|error| format!("query_failed: {error}"))?;
+
+    let mut posts_written = 0usize;
+    for post in &posts {
+        let result = sqlx::query(
+            "INSERT INTO community_posts (id, user_id, author_name, body, hidden, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (id) DO NOTHING",
+        )
+        .bind(&post.id)
+        .bind(&post.user_id)
+        .bind(&post.author_name)
+        .bind(&post.body)
+        .bind(post.hidden)
+        .bind(&post.created_at)
+        .execute(community)
+        .await
+        .map_err(|error| format!("query_failed: {error}"))?;
+        posts_written += result.rows_affected() as usize;
+    }
+
+    // Insert every row before linking replies/reshares: the self-referencing
+    // foreign keys then resolve regardless of creation order.
+    for post in &posts {
+        if let Some(parent_id) = &post.parent_id {
+            sqlx::query(
+                "UPDATE community_posts SET parent_id = $1
+                 WHERE id = $2 AND parent_id IS NULL",
+            )
+            .bind(parent_id)
+            .bind(&post.id)
+            .execute(community)
+            .await
+            .map_err(|error| format!("query_failed: {error}"))?;
+        }
+        if let Some(reshare_id) = &post.reshare_id {
+            sqlx::query(
+                "UPDATE community_posts SET reshare_id = $1
+                 WHERE id = $2 AND reshare_id IS NULL",
+            )
+            .bind(reshare_id)
+            .bind(&post.id)
+            .execute(community)
+            .await
+            .map_err(|error| format!("query_failed: {error}"))?;
+        }
+    }
+
+    let likes = sqlx::query_as::<_, (String, String, String)>(
+        "SELECT post_id, user_id, created_at FROM community_likes",
+    )
+    .fetch_all(users)
+    .await
+    .map_err(|error| format!("query_failed: {error}"))?;
+    let mut likes_written = 0usize;
+    for (post_id, user_id, created_at) in &likes {
+        let result = sqlx::query(
+            "INSERT INTO community_likes (post_id, user_id, created_at)
+             VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+        )
+        .bind(post_id)
+        .bind(user_id)
+        .bind(created_at)
+        .execute(community)
+        .await
+        .map_err(|error| format!("query_failed: {error}"))?;
+        likes_written += result.rows_affected() as usize;
+    }
+
+    let notifications =
+        sqlx::query_as::<_, (String, String, String, Option<String>, String, i64, String)>(
+            "SELECT id, user_id, actor_id, post_id, type, read, created_at
+         FROM community_notifications",
+        )
+        .fetch_all(users)
+        .await
+        .map_err(|error| format!("query_failed: {error}"))?;
+    let mut notifications_written = 0usize;
+    for (id, user_id, actor_id, post_id, kind, read, created_at) in &notifications {
+        let result = sqlx::query(
+            "INSERT INTO community_notifications
+                (id, user_id, actor_id, post_id, type, read, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             ON CONFLICT (id) DO NOTHING",
+        )
+        .bind(id)
+        .bind(user_id)
+        .bind(actor_id)
+        .bind(post_id)
+        .bind(kind)
+        .bind(read)
+        .bind(created_at)
+        .execute(community)
+        .await
+        .map_err(|error| format!("query_failed: {error}"))?;
+        notifications_written += result.rows_affected() as usize;
+    }
+
+    let reports = sqlx::query_as::<_, (String, String, String, String, String)>(
+        "SELECT id, reporter_id, post_id, reason, created_at FROM community_reports",
+    )
+    .fetch_all(users)
+    .await
+    .map_err(|error| format!("query_failed: {error}"))?;
+    let mut reports_written = 0usize;
+    for (id, reporter_id, post_id, reason, created_at) in &reports {
+        let result = sqlx::query(
+            "INSERT INTO community_reports (id, reporter_id, post_id, reason, created_at)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (id) DO NOTHING",
+        )
+        .bind(id)
+        .bind(reporter_id)
+        .bind(post_id)
+        .bind(reason)
+        .bind(created_at)
+        .execute(community)
+        .await
+        .map_err(|error| format!("query_failed: {error}"))?;
+        reports_written += result.rows_affected() as usize;
+    }
+
+    let blocks = sqlx::query_as::<_, (String, String, String)>(
+        "SELECT blocker_id, blocked_id, created_at FROM community_blocks",
+    )
+    .fetch_all(users)
+    .await
+    .map_err(|error| format!("query_failed: {error}"))?;
+    let mut blocks_written = 0usize;
+    for (blocker_id, blocked_id, created_at) in &blocks {
+        let result = sqlx::query(
+            "INSERT INTO community_blocks (blocker_id, blocked_id, created_at)
+             VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+        )
+        .bind(blocker_id)
+        .bind(blocked_id)
+        .bind(created_at)
+        .execute(community)
+        .await
+        .map_err(|error| format!("query_failed: {error}"))?;
+        blocks_written += result.rows_affected() as usize;
+    }
+
+    Ok(json!({
+        "posts": posts_written,
+        "likes": likes_written,
+        "notifications": notifications_written,
+        "reports": reports_written,
+        "blocks": blocks_written,
+    }))
 }

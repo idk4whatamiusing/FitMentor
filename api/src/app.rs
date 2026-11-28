@@ -17,7 +17,11 @@ use crate::handlers::{
 
 #[derive(Clone)]
 pub struct AppState {
+    /// CockroachDB: identity, health logs, plans, coach memory.
     pub pool: PgPool,
+    /// Aurora DSQL: community posts and social data. Falls back to `pool`
+    /// when `DSQL_URL` is unset (local development and first deploy).
+    pub community_pool: PgPool,
     pub config: Arc<Config>,
     pub http: reqwest::Client,
 }
@@ -28,12 +32,21 @@ impl AppState {
         let pool = crate::db::connect(&config.database_url)
             .await
             .map_err(|error| format!("database connect failed: {error}"))?;
+        let community_pool = if config.dsql_url.trim().is_empty() {
+            tracing::warn!("DSQL_URL is not set; community data will use CockroachDB");
+            pool.clone()
+        } else {
+            let community = crate::db::connect_dsql(&config.dsql_url).await?;
+            crate::db::migrate_dsql(&community).await?;
+            community
+        };
         let http = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(120))
             .build()
             .map_err(|error| format!("http client failed: {error}"))?;
         Ok(Self {
             pool,
+            community_pool,
             config: Arc::new(config),
             http,
         })
@@ -84,6 +97,7 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/coach/chat", post(coach::chat))
         // community
         .route("/v1/community/graphql", post(community::graphql))
+        .route("/v1/internal/community/backfill", post(community_backfill))
         // plans / advice
         .route("/v1/meal/today", get(meal_get))
         .route("/v1/meal/today", put(meal_upsert))
@@ -128,6 +142,26 @@ async fn generate_plans(
             Ok(Json(json!({ "ok": true, "mode": "batch" })))
         }
     }
+}
+
+/// Idempotent copy of community rows from CockroachDB to DSQL.
+///
+/// Guarded by the shared API key. Refuses to run while DSQL is not
+/// configured, so it can never copy a database onto itself.
+async fn community_backfill(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> crate::error::ApiResult {
+    crate::auth::require_api_key(&headers, &state.config)?;
+    if state.config.dsql_url.trim().is_empty() {
+        return Err(crate::error::ApiError::BadRequest(
+            "dsql_not_configured".to_string(),
+        ));
+    }
+    let result = community::backfill(&state.pool, &state.community_pool)
+        .await
+        .map_err(crate::error::ApiError::Internal)?;
+    Ok(Json(result))
 }
 
 // ---------------------------------------------------------------------------

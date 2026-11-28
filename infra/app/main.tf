@@ -20,6 +20,8 @@ provider "aws" {
   region = var.aws_region
 }
 
+data "aws_caller_identity" "current" {}
+
 variable "aws_region" {
   type    = string
   default = "ap-south-1"
@@ -28,6 +30,13 @@ variable "aws_region" {
 variable "database_url" {
   type      = string
   sensitive = true
+}
+
+variable "dsql_url" {
+  type        = string
+  description = "Aurora DSQL connection string for community data. Empty keeps community in CockroachDB."
+  sensitive   = true
+  default     = ""
 }
 
 variable "api_shared_secret" {
@@ -138,9 +147,19 @@ variable "log_retention_days" {
 }
 
 locals {
+  dsql_enabled = trimspace(var.dsql_url) != ""
+  dsql_cluster_id = local.dsql_enabled ? try(
+    regex("^postgres[^:]*://[^@]+@([^.]+)", var.dsql_url)[0],
+    "",
+  ) : ""
+  dsql_cluster_arn = local.dsql_cluster_id != "" ? (
+    "arn:aws:dsql:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${local.dsql_cluster_id}"
+  ) : ""
+
   environment = {
     RUST_LOG                 = "info"
     DATABASE_URL             = var.database_url
+    DSQL_URL                 = var.dsql_url
     API_SHARED_SECRET        = var.api_shared_secret
     AI_WORKER_URL            = var.ai_worker_url
     POLAR_ACCESS_TOKEN       = var.polar_access_token
@@ -182,6 +201,28 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy" "lambda_dsql" {
+  count = local.dsql_enabled ? 1 : 0
+  name  = "fitmentor-dsql"
+  role  = aws_iam_role.lambda.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["dsql:DbConnectAdmin"]
+      Resource = local.dsql_cluster_arn
+    }]
+  })
+
+  lifecycle {
+    precondition {
+      condition     = local.dsql_cluster_id != ""
+      error_message = "DSQL_URL must look like postgresql://<user>@<cluster-id>... so Terraform can scope the IAM policy."
+    }
+  }
+}
+
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/aws/lambda/fitmentor-api"
   retention_in_days = var.log_retention_days
@@ -207,7 +248,8 @@ resource "aws_lambda_function" "api" {
     variables = local.environment
   }
 
-  depends_on = [aws_cloudwatch_log_group.api]
+  # Attach the DSQL policy before the first cold start that uses it.
+  depends_on = [aws_cloudwatch_log_group.api, aws_iam_role_policy.lambda_dsql]
 }
 
 resource "aws_lambda_function_url" "api" {

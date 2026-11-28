@@ -74,6 +74,28 @@ FitMentor is a fitness app with a Discord-style multi-database architecture. Eac
                      └────────────┘  └────────────┘
 ```
 
+### 2.1 Current storage topology
+
+The shipped backend uses three stores with one writer per fact:
+
+| Store | Owns | Does not hold |
+|-------|------|---------------|
+| **CockroachDB** (`fitmentor`) | identity, profiles, subscriptions, daily logs, workouts, plans, coach sessions/messages, coach facts/summaries (`VECTOR(1024)`) | public posts, media bytes |
+| **Aurora DSQL** (`ap-south-1`) | community posts, replies, reshares, likes, notifications, reports, blocks | health logs, coach content, media bytes |
+| **Cloudflare R2** (private) | image/audio/video objects, addressed by keys | queryable rows |
+
+Rules that keep the split safe:
+
+- `user_id` is opaque across databases; there are no cross-database foreign keys.
+- `author_name` is snapshotted into `community_posts` when a post is written.
+- Shared insight and milestone cards snapshot their values into the post body.
+- An empty `DSQL_URL` keeps community on CockroachDB (local development and
+  first deploy). Setting it moves community to DSQL with no client change.
+- The Lambda applies the DSQL schema at startup
+  (`api/src/db.rs::migrate_dsql`), one DDL statement per transaction.
+- `POST /v1/internal/community/backfill` (shared-key protected) copies existing
+  Cockroach community rows into DSQL and is idempotent.
+
 ### Service Responsibilities
 
 | Service | Language | Port | Role |
@@ -201,38 +223,32 @@ CREATE TABLE workout_completions (
 CREATE INDEX idx_workout_completions_user_date ON workout_completions(user_id, date DESC);
 ```
 
-### 3.2 MongoDB — Document Data
+### 3.2 Aurora DSQL — Community Data
 
-#### `community_posts` collection
+Community data is isolated from identity and health data. The schema is
+applied by the API at startup (`api/src/db.rs::migrate_dsql`) and lives in
+`api/migrations/dsql/0001_community.sql`.
 
-```json
-{
-  "_id": "ObjectId",
-  "id": "uuid-string",
-  "user_id": "uuid-string",
-  "author_name": "string",
-  "text": "string",
-  "likes": 0,
-  "liked_by": ["user_id_1", "user_id_2"],
-  "replies": [
-    {
-      "id": "uuid-string",
-      "user_id": "uuid-string",
-      "author_name": "string",
-      "text": "string",
-      "created_at": "2026-07-20T10:30:00Z"
-    }
-  ],
-  "created_at": "2026-07-20T10:30:00Z",
-  "updated_at": "2026-07-20T10:30:00Z"
-}
+```sql
+CREATE TABLE community_posts (
+    id          TEXT PRIMARY KEY,              -- UUID string
+    user_id     TEXT NOT NULL,                 -- opaque CockroachDB identity
+    author_name TEXT NOT NULL DEFAULT 'User',  -- snapshotted at write time
+    body        TEXT NOT NULL DEFAULT '{}',    -- {"text": "...", "media": [...]}
+    parent_id   TEXT REFERENCES community_posts(id) ON DELETE CASCADE,
+    reshare_id  TEXT REFERENCES community_posts(id) ON DELETE SET NULL,
+    hidden      BIGINT NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL                  -- "YYYY-MM-DD HH:MM:SS.ffffff+00"
+);
+CREATE INDEX ASYNC idx_community_posts_created ON community_posts(created_at);
+CREATE INDEX ASYNC idx_community_posts_user ON community_posts(user_id);
+CREATE INDEX ASYNC idx_community_posts_parent ON community_posts(parent_id);
 ```
 
-**Indexes:**
-```javascript
-db.community_posts.createIndex({ "created_at": -1 })
-db.community_posts.createIndex({ "user_id": 1, "created_at": -1 })
-```
+Likes, notifications, reports, and blocks are separate tables in the same
+database. There are no foreign keys to CockroachDB: `user_id` is opaque,
+`author_name` is denormalised at publish time, and account deletion runs as a
+saga across CockroachDB, DSQL, and R2.
 
 #### Coach conversations
 
@@ -540,21 +556,26 @@ GET /v1/progress/charts
 
 ### 6.8 Community
 
+Community is a single GraphQL endpoint. The server owns author lookup,
+permission checks, and storage routing; the client never chooses a database.
+
 ```
-GET /v1/community/posts?limit=20&cursor=<last_post_id>
-→ 200 { posts: [...], nextCursor: string | null }
+POST /v1/community/graphql
+Body: { operation: string, variables: object }
+→ 200 { data: { ... } } | 400 { error: { code, message } }
 
-POST /v1/community/posts
-Body: { text: string }
-→ 201 { post: { id, authorName, text, likes, replies, createdAt } }
-
-POST /v1/community/posts/:id/like
-→ 200 { likes: number, liked: boolean }
-
-POST /v1/community/posts/:id/reply
-Body: { text: string }
-→ 201 { reply: { id, authorName, text, createdAt } }
+Operations:
+  feed, post, myPosts, search
+  createPost, deletePost, replyToPost, resharePost
+  toggleLike, reportPost, blockUser, unblockUser
+  notifications, unreadNotificationCount,
+  markNotificationsRead, markAllNotificationsRead
+  requestUploadUrl
 ```
+
+Posts are stored in Aurora DSQL. `author_name` is resolved from CockroachDB
+once at publish time. Uploads use presigned R2 PUT URLs; the server stores
+object keys only and returns signed GET URLs with the feed.
 
 ### 6.9 Subscription & Payment
 
@@ -1410,8 +1431,9 @@ FitMentor/
 | Auth | Cloudflare Access | — | Zero Trust authentication |
 | API | Rust + Axum | 0.8.x | REST API server |
 | Realtime | Gleam + Mist | 1.x + 6.x | WebSocket server |
-| Relational DB | PostgreSQL | 16 | Users, profiles, subscriptions, logs |
-| Document DB | MongoDB | 7 | Community, conversations, analytics |
+| Relational DB | CockroachDB | 26.2 | Users, profiles, subscriptions, logs, coach memory |
+| Community DB | Aurora DSQL | — | Posts, likes, replies, notifications, reports, blocks |
+| Object storage | Cloudflare R2 | — | Private media objects (images, audio, video) |
 | Cache | Redis | 7 | Cache, Pub/Sub, sessions, rate limits |
 | Ledger | TigerBeetle | 0.17.x | Payment double-entry accounting |
 | Edge DB | Cloudflare D1 | — | Auth sessions, rate limit counters |
@@ -1420,9 +1442,8 @@ FitMentor/
 | Vector memory | CockroachDB `VECTOR` | 26.2 | Coach facts, summaries, message recall |
 | LLM | Cloudflare Workers AI | — | Coach replies + bge-m3 embeddings |
 | Hosting (FE) | Cloudflare Pages | — | Frontend deployment |
-| Hosting (BE) | Fly.io | — | Rust + Gleam deployment |
-| Hosting (DB) | Neon / Supabase | — | Managed PostgreSQL |
-| Hosting (Mongo) | MongoDB Atlas | — | Managed MongoDB |
+| Hosting (BE) | AWS Lambda | — | Rust API deployment |
+| Hosting (DB) | CockroachDB Cloud + Aurora DSQL | — | Managed databases |
 | Hosting (Redis) | Upstash | — | Serverless Redis |
 | CI/CD | GitHub Actions | — | Automated deployment |
 

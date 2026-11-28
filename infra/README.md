@@ -49,6 +49,33 @@ terraform apply
 On push to `main`, `.github/workflows/deploy-lambda.yml` does both steps via
 GitHub OIDC (no long-lived AWS keys).
 
+## Community database (Aurora DSQL)
+
+Community posts live in Aurora DSQL; identity, logs, and coach memory stay in
+CockroachDB. The Lambda connects with the AWS Labs SQLx connector, so IAM
+tokens refresh automatically.
+
+One-time setup:
+
+1. Create a DSQL cluster in `ap-south-1`.
+2. Add a GitHub Actions secret `DSQL_URL`:
+
+   ```
+   postgresql://admin@<cluster-id>.dsql.ap-south-1.on.aws/postgres?region=ap-south-1
+   ```
+
+3. Re-run **Deploy Lambda** (or push to `main`). Terraform scopes
+   `dsql:DbConnectAdmin` to that cluster and passes `DSQL_URL` to the Lambda.
+4. Copy existing community rows once:
+
+   ```bash
+   curl -X POST "$API_URL/v1/internal/community/backfill" \
+     -H "x-api-key: $API_SHARED_SECRET"
+   ```
+
+The Lambda creates the DSQL schema on cold start. Leave `DSQL_URL` unset to
+keep community on CockroachDB; the API falls back automatically.
+
 ## Cloudflare Pages settings (required for cutover)
 
 Set these in the Pages project (`fitmentor`) and redeploy:

@@ -5,6 +5,7 @@ use std::env;
 #[derive(Clone, Debug)]
 pub struct Config {
     pub database_url: String,
+    pub dsql_url: String,
     pub api_shared_secret: String,
     pub ai_worker_url: String,
     pub ai_embed_url: String,
@@ -58,6 +59,7 @@ impl Config {
 
         Ok(Self {
             database_url,
+            dsql_url: env::var("DSQL_URL").unwrap_or_default().trim().to_string(),
             api_shared_secret: env::var("API_SHARED_SECRET").unwrap_or_default(),
             ai_worker_url,
             ai_embed_url,
