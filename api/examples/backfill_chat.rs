@@ -1,11 +1,12 @@
 //! One-off backfill: copies `chat_sessions.messages` JSON into `chat_messages`
-//! rows and embeds each message.
+//! rows, embeds each message, and refreshes the session summary + facts.
 //!
 //! Usage:
 //!   set -a && . .env && set +a
 //!   cargo run --example backfill_chat
 //!
-//! Safe to re-run: sessions that already have rows are skipped.
+//! Safe to re-run: message rows are skipped when they already exist, and the
+//! memory refresh is idempotent.
 
 use fitmentor_api::{app::AppState, embeddings};
 
