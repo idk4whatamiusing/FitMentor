@@ -1,4 +1,9 @@
-//! Coach sessions + coach log.
+//! Coach sessions, messages, and chat.
+//!
+//! Messages live in `chat_messages` as rows with an embedding, which gives the
+//! coach cross-session recall. `chat_sessions.messages` is still written as a
+//! JSON mirror for older clients; reads prefer the rows and fall back to the
+//! blob for sessions that predate the table.
 
 use axum::body::Bytes;
 use axum::extract::{Path, State};
@@ -9,12 +14,121 @@ use uuid::Uuid;
 
 use crate::app::AppState;
 use crate::auth;
+use crate::embeddings;
 use crate::error::{ApiError, ApiResult};
 use crate::handlers::{planner, quota};
 use crate::models::SessionRow;
 
+const MEMORY_LIMIT: i64 = 6;
+const MEMORY_MAX_CHARS: usize = 300;
+
 fn json_resp(value: Value) -> Json<Value> {
     Json(value)
+}
+
+/// Rows first, JSON blob as a fallback for sessions created before 0005.
+async fn session_messages(state: &AppState, session_id: &str, user_id: &str) -> Vec<Value> {
+    let rows = sqlx::query_as::<_, (String, String)>(
+        "SELECT role, content FROM chat_messages
+         WHERE session_id = $1 AND user_id = $2 ORDER BY seq",
+    )
+    .bind(session_id)
+    .bind(user_id)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+
+    if !rows.is_empty() {
+        return rows
+            .into_iter()
+            .map(|(role, content)| json!({ "role": role, "content": content }))
+            .collect();
+    }
+
+    let legacy: Option<String> =
+        sqlx::query_scalar("SELECT messages FROM chat_sessions WHERE id = $1 AND user_id = $2")
+            .bind(session_id)
+            .bind(user_id)
+            .fetch_optional(&state.pool)
+            .await
+            .ok()
+            .flatten();
+
+    legacy
+        .and_then(|raw| serde_json::from_str::<Vec<Value>>(&raw).ok())
+        .unwrap_or_default()
+}
+
+/// Past messages from other sessions that are closest to the new message.
+async fn memory_context(
+    state: &AppState,
+    user_id: &str,
+    session_id: &str,
+    embedding: &[f32],
+) -> String {
+    let literal = embeddings::vector_literal(embedding);
+    let rows = sqlx::query_as::<_, (String, String)>(
+        "SELECT role, content FROM chat_messages
+         WHERE user_id = $1 AND session_id <> $2 AND embedding IS NOT NULL
+         ORDER BY embedding <-> $3::vector
+         LIMIT $4",
+    )
+    .bind(user_id)
+    .bind(session_id)
+    .bind(&literal)
+    .bind(MEMORY_LIMIT)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+
+    if rows.is_empty() {
+        return String::new();
+    }
+
+    let mut block = String::from(
+        "\nRelevant context from earlier conversations with this user \
+         (most similar first). Use it only if it helps; never say you looked it up:\n",
+    );
+    for (role, content) in rows {
+        let trimmed: String = content.chars().take(MEMORY_MAX_CHARS).collect();
+        block.push_str(&format!("- {role}: {trimmed}\n"));
+    }
+    block
+}
+
+async fn insert_messages(
+    state: &AppState,
+    session_id: &str,
+    user_id: &str,
+    items: &[(String, String)],
+    vectors: &[Option<Vec<f32>>],
+) -> Result<(), sqlx::Error> {
+    if items.is_empty() {
+        return Ok(());
+    }
+
+    let mut tx = state.pool.begin().await?;
+    for (index, (role, content)) in items.iter().enumerate() {
+        let id = Uuid::new_v4().to_string();
+        let literal = vectors
+            .get(index)
+            .and_then(|vector| vector.as_ref())
+            .map(|vector| embeddings::vector_literal(vector));
+
+        sqlx::query(
+            "INSERT INTO chat_messages (id, session_id, user_id, role, content, embedding)
+             VALUES ($1, $2, $3, $4, $5, $6::vector)",
+        )
+        .bind(&id)
+        .bind(session_id)
+        .bind(user_id)
+        .bind(role)
+        .bind(content)
+        .bind(literal)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await
 }
 
 pub async fn list(State(state): State<AppState>, headers: HeaderMap) -> ApiResult {
@@ -27,20 +141,32 @@ pub async fn list(State(state): State<AppState>, headers: HeaderMap) -> ApiResul
     .fetch_all(&state.pool)
     .await?;
 
-    let items: Vec<Value> = rows
-        .iter()
-        .map(|row| {
-            let count = serde_json::from_str::<Vec<Value>>(&row.messages)
+    let mut items = Vec::with_capacity(rows.len());
+    for row in &rows {
+        let stored: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM chat_messages WHERE session_id = $1 AND user_id = $2",
+        )
+        .bind(&row.id)
+        .bind(&row.user_id)
+        .fetch_one(&state.pool)
+        .await
+        .unwrap_or(0);
+
+        let count = if stored > 0 {
+            stored as usize
+        } else {
+            serde_json::from_str::<Vec<Value>>(&row.messages)
                 .map(|messages| messages.len())
-                .unwrap_or(0);
-            json!({
-                "id": row.id,
-                "title": row.title,
-                "message_count": count,
-                "created_at": row.created_at,
-            })
-        })
-        .collect();
+                .unwrap_or(0)
+        };
+
+        items.push(json!({
+            "id": row.id,
+            "title": row.title,
+            "message_count": count,
+            "created_at": row.created_at,
+        }));
+    }
 
     Ok(json_resp(Value::Array(items)))
 }
@@ -81,14 +207,17 @@ pub async fn get(
     .await?;
 
     match row {
-        Some(row) => Ok(json_resp(json!({
-            "id": row.id,
-            "user_id": row.user_id,
-            "title": row.title,
-            "messages": serde_json::from_str::<Value>(&row.messages).unwrap_or(json!([])),
-            "created_at": row.created_at,
-            "updated_at": row.updated_at,
-        }))),
+        Some(row) => {
+            let messages = session_messages(&state, &row.id, &row.user_id).await;
+            Ok(json_resp(json!({
+                "id": row.id,
+                "user_id": row.user_id,
+                "title": row.title,
+                "messages": messages,
+                "created_at": row.created_at,
+                "updated_at": row.updated_at,
+            })))
+        }
         None => Err(ApiError::NotFound),
     }
 }
@@ -99,11 +228,19 @@ pub async fn delete(
     Path(id): Path<String>,
 ) -> ApiResult {
     let auth_user = auth::require_user(&headers, &state.config)?;
+
+    let mut tx = state.pool.begin().await?;
+    sqlx::query("DELETE FROM chat_messages WHERE session_id = $1 AND user_id = $2")
+        .bind(&id)
+        .bind(&auth_user.user_id)
+        .execute(&mut *tx)
+        .await?;
     let result = sqlx::query("DELETE FROM chat_sessions WHERE id = $1 AND user_id = $2")
         .bind(&id)
         .bind(&auth_user.user_id)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await?;
+    tx.commit().await?;
 
     if result.rows_affected() == 0 {
         return Err(ApiError::NotFound);
@@ -153,55 +290,88 @@ pub async fn rename(
     .await?
     .ok_or(ApiError::NotFound)?;
 
+    let messages = session_messages(&state, &row.id, &row.user_id).await;
     Ok(json_resp(json!({
         "id": row.id,
         "user_id": row.user_id,
         "title": row.title,
-        "messages": serde_json::from_str::<Value>(&row.messages).unwrap_or(json!([])),
+        "messages": messages,
     })))
 }
 
-/// POST /v1/coach/log — stores the container tag and appends the assistant reply.
+/// POST /v1/coach/log — web path: the reply was generated by the Pages worker.
 pub async fn log(State(state): State<AppState>, headers: HeaderMap, body: Bytes) -> ApiResult {
     let auth_user = auth::require_user(&headers, &state.config)?;
     let body: Value =
         serde_json::from_slice(&body).map_err(|_| ApiError::BadRequest("invalid json".into()))?;
 
-    let container_tag = body
-        .get("container_tag")
+    let reply = body.get("reply").and_then(Value::as_str).unwrap_or("");
+    let user_message = body
+        .get("user_message")
         .and_then(Value::as_str)
         .unwrap_or("");
-    let reply = body.get("reply").and_then(Value::as_str).unwrap_or("");
     let session_id = body
         .get("session_id")
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_string();
-    if container_tag.is_empty() {
-        return Err(ApiError::BadRequest("missing container_tag".into()));
+
+    if session_id.is_empty() {
+        return Ok(json_resp(json!({ "ok": true })));
     }
 
-    let row_id = Uuid::new_v4().to_string();
-    let _ = sqlx::query(
-        "INSERT INTO coach_logs (id, user_id, container_tag) VALUES ($1, $2, $3)
-         ON CONFLICT (user_id, container_tag) DO NOTHING",
-    )
-    .bind(&row_id)
-    .bind(&auth_user.user_id)
-    .bind(container_tag)
-    .execute(&state.pool)
-    .await;
+    let owned: Option<String> =
+        sqlx::query_scalar("SELECT id FROM chat_sessions WHERE id = $1 AND user_id = $2")
+            .bind(&session_id)
+            .bind(&auth_user.user_id)
+            .fetch_optional(&state.pool)
+            .await?;
+    if owned.is_none() {
+        return Err(ApiError::NotFound);
+    }
 
-    if !session_id.is_empty() {
+    let last = sqlx::query_as::<_, (String, String)>(
+        "SELECT role, content FROM chat_messages
+         WHERE session_id = $1 AND user_id = $2 ORDER BY seq DESC LIMIT 1",
+    )
+    .bind(&session_id)
+    .bind(&auth_user.user_id)
+    .fetch_optional(&state.pool)
+    .await?;
+
+    // Retries resend the same reply; don't duplicate it.
+    let already_stored = last
+        .as_ref()
+        .map(|(role, content)| role == "assistant" && content == reply)
+        .unwrap_or(false);
+
+    if !already_stored {
+        let mut items: Vec<(String, String)> = Vec::new();
+        if !user_message.is_empty() {
+            items.push(("user".to_string(), user_message.to_string()));
+        }
+        if !reply.is_empty() {
+            items.push(("assistant".to_string(), reply.to_string()));
+        }
+
+        if !items.is_empty() {
+            let texts: Vec<String> = items.iter().map(|(_, content)| content.clone()).collect();
+            let vectors = embeddings::embed_texts(&state, &texts).await;
+            insert_messages(&state, &session_id, &auth_user.user_id, &items, &vectors).await?;
+        }
+
         let mut messages: Vec<Value> = body
             .get("messages")
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
-        messages.push(json!({ "role": "assistant", "content": reply }));
+        if !reply.is_empty() {
+            messages.push(json!({ "role": "assistant", "content": reply }));
+        }
         let encoded = serde_json::to_string(&messages).unwrap_or_else(|_| "[]".into());
         let _ = sqlx::query(
-            "UPDATE chat_sessions SET messages = $1, updated_at = now()::text WHERE id = $2 AND user_id = $3",
+            "UPDATE chat_sessions SET messages = $1, updated_at = now()::text
+             WHERE id = $2 AND user_id = $3",
         )
         .bind(&encoded)
         .bind(&session_id)
@@ -272,7 +442,7 @@ fn chat_prompt(messages: &[Value], message: &str) -> String {
     prompt
 }
 
-/// POST /v1/coach/chat — mobile chat turn (quota + Workers AI + session log).
+/// POST /v1/coach/chat — mobile chat turn (quota + Workers AI + vector memory).
 pub async fn chat(State(state): State<AppState>, headers: HeaderMap, body: Bytes) -> ApiResult {
     let auth_user = auth::require_user(&headers, &state.config)?;
     let body: Value =
@@ -300,7 +470,7 @@ pub async fn chat(State(state): State<AppState>, headers: HeaderMap, body: Bytes
     .await?
     .ok_or(ApiError::NotFound)?;
 
-    let mut messages: Vec<Value> = serde_json::from_str(&row.messages).unwrap_or_default();
+    let messages = session_messages(&state, &row.id, &row.user_id).await;
 
     let tier = sqlx::query_scalar::<_, String>(
         "SELECT s.tier FROM subscriptions s
@@ -331,7 +501,14 @@ pub async fn chat(State(state): State<AppState>, headers: HeaderMap, body: Bytes
     .fetch_optional(&state.pool)
     .await?;
 
-    let system = chat_system_prompt(profile.as_ref());
+    // Embedding drives both memory lookup and the stored vector.
+    let user_embedding = embeddings::embed_one(&state, message).await;
+    let memory = match user_embedding.as_ref() {
+        Some(vector) => memory_context(&state, &auth_user.user_id, session_id, vector).await,
+        None => String::new(),
+    };
+
+    let system = format!("{}{}", chat_system_prompt(profile.as_ref()), memory);
     let prompt = chat_prompt(&messages, message);
     let Some(reply) = planner::call_ai(&state, &system, &prompt, 1024).await else {
         return Err(ApiError::Internal(
@@ -339,9 +516,19 @@ pub async fn chat(State(state): State<AppState>, headers: HeaderMap, body: Bytes
         ));
     };
 
-    messages.push(json!({ "role": "user", "content": message }));
-    messages.push(json!({ "role": "assistant", "content": reply }));
-    let encoded = serde_json::to_string(&messages)
+    let reply_embedding = embeddings::embed_one(&state, &reply).await;
+    let items = vec![
+        ("user".to_string(), message.to_string()),
+        ("assistant".to_string(), reply.clone()),
+    ];
+    let vectors = vec![user_embedding, reply_embedding];
+    insert_messages(&state, session_id, &auth_user.user_id, &items, &vectors).await?;
+
+    // JSON mirror for clients that still read chat_sessions.messages.
+    let mut mirrored = messages;
+    mirrored.push(json!({ "role": "user", "content": message }));
+    mirrored.push(json!({ "role": "assistant", "content": reply }));
+    let encoded = serde_json::to_string(&mirrored)
         .map_err(|error| ApiError::Internal(format!("Could not save chat: {error}")))?;
     let title = if row.title == "New Chat" {
         message.chars().take(40).collect::<String>()
@@ -359,17 +546,6 @@ pub async fn chat(State(state): State<AppState>, headers: HeaderMap, body: Bytes
     .bind(&auth_user.user_id)
     .execute(&state.pool)
     .await?;
-
-    let log_id = Uuid::new_v4().to_string();
-    let _ = sqlx::query(
-        "INSERT INTO coach_logs (id, user_id, container_tag) VALUES ($1, $2, $3)
-         ON CONFLICT (user_id, container_tag) DO NOTHING",
-    )
-    .bind(log_id)
-    .bind(&auth_user.user_id)
-    .bind(&auth_user.user_id)
-    .execute(&state.pool)
-    .await;
 
     Ok(Json(json!({
         "reply": reply,

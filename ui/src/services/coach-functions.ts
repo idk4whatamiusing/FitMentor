@@ -122,7 +122,6 @@ ${profileBlock}`;
             messages: data.messages,
             user_message: lastUserMsg?.content ?? "",
             reply,
-            container_tag: sub,
             session_id: data.session_id || null,
           }),
         });

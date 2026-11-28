@@ -7,6 +7,7 @@ pub struct Config {
     pub database_url: String,
     pub api_shared_secret: String,
     pub ai_worker_url: String,
+    pub ai_embed_url: String,
     pub polar_access_token: String,
     pub polar_webhook_secret: String,
     pub polar_premium_product_id: String,
@@ -44,10 +45,22 @@ impl Config {
             google_client_ids.push(web_id.to_string());
         }
 
+        let ai_worker_url = env::var("AI_WORKER_URL").unwrap_or_default();
+        // The worker exposes `/api/ai/complete` and `/api/ai/embed` side by side.
+        // Derive the sibling route so existing deployments need no new variable.
+        let ai_embed_url = env::var("AI_EMBED_URL").unwrap_or_else(|_| {
+            let base = ai_worker_url.trim().trim_end_matches('/');
+            match base.strip_suffix("/complete") {
+                Some(prefix) => format!("{prefix}/embed"),
+                None => String::new(),
+            }
+        });
+
         Ok(Self {
             database_url,
             api_shared_secret: env::var("API_SHARED_SECRET").unwrap_or_default(),
-            ai_worker_url: env::var("AI_WORKER_URL").unwrap_or_default(),
+            ai_worker_url,
+            ai_embed_url,
             polar_access_token: env::var("POLAR_ACCESS_TOKEN").unwrap_or_default(),
             polar_webhook_secret: env::var("POLAR_WEBHOOK_SECRET").unwrap_or_default(),
             polar_premium_product_id: env::var("POLAR_PREMIUM_PRODUCT_ID").unwrap_or_default(),

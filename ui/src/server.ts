@@ -105,6 +105,57 @@ async function handleAiComplete(
   }
 }
 
+async function handleAiEmbed(
+  request: Request,
+  env: unknown,
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response("method not allowed", { status: 405 });
+  }
+  const key = request.headers.get("x-api-key");
+  const cfEnv = getCfEnv(request, env);
+  const shared =
+    (cfEnv.API_SHARED_SECRET as string) ??
+    (process.env.API_SHARED_SECRET as string) ??
+    "";
+  if (!key || key !== shared) {
+    return new Response("unauthorized", { status: 401 });
+  }
+  try {
+    const body = (await request.json()) as {
+      text?: string;
+      texts?: string[];
+    };
+    const texts = Array.isArray(body.texts)
+      ? body.texts
+      : body.text
+        ? [body.text]
+        : [];
+    if (texts.length === 0) {
+      return new Response("missing text", { status: 400 });
+    }
+    if (texts.length > 32) {
+      return new Response("too many texts", { status: 400 });
+    }
+    const ai = cfEnv.AI;
+    if (!ai) {
+      return new Response("ai binding unavailable", { status: 500 });
+    }
+    const raw = await (ai as any).run("@cf/baai/bge-m3", {
+      text: texts,
+    });
+    const embeddings: number[][] = Array.isArray(raw?.data) ? raw.data : [];
+    return new Response(JSON.stringify({ embeddings }), {
+      headers: { "content-type": "application/json" },
+    });
+  } catch (e: any) {
+    return new Response(JSON.stringify({ error: e?.message ?? "unknown" }), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    });
+  }
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
@@ -113,6 +164,9 @@ export default {
       const url = new URL(request.url);
       if (url.pathname === "/api/ai/complete") {
         return handleAiComplete(request, env);
+      }
+      if (url.pathname === "/api/ai/embed") {
+        return handleAiEmbed(request, env);
       }
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

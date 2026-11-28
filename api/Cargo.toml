@@ -23,7 +23,7 @@ path = "src/bin/mint_token.rs"
 axum = "0.8"
 lambda_http = "1.3"
 lambda_runtime = "1.5"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net"] }
 tower-http = { version = "0.7", features = ["trace"] }
 sqlx = { version = "0.9", default-features = false, features = [
     "runtime-tokio",
